@@ -65,7 +65,9 @@ jobs:
           echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
 
       - name: Verify APK integrity
-        run: unzip -t "${{ env.APK_PATH }}" > /dev/null && echo "APK integrity: OK"
+        run: |
+          unzip -t "$APK_PATH" > /dev/null
+          echo "APK integrity: OK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
