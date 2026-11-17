@@ -160,6 +160,7 @@
     <string name="profile_addresses">လိပ်စာစာအုပ်</string>
     <string name="profile_address_default">အဓိက လိပ်စာ</string>
     <string name="profile_address_secondary">အပို လိပ်စာ</string>
+    <string name="profile_address_secondary_detail">နမူနာလိပ်စာ · ချင်းမိုင် 50000</string>
     <string name="profile_orders">ကျွန်ုပ်၏ အမှာစာများ</string>
     <string name="profile_wishlist">နှစ်သက်စာရင်း</string>
     <string name="profile_messages">စာများ</string>

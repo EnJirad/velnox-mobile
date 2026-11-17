@@ -160,6 +160,7 @@
     <string name="profile_addresses">สมุดที่อยู่</string>
     <string name="profile_address_default">ที่อยู่หลัก</string>
     <string name="profile_address_secondary">ที่อยู่รอง</string>
+    <string name="profile_address_secondary_detail">ที่อยู่ตัวอย่าง · เชียงใหม่ 50000</string>
     <string name="profile_orders">คำสั่งซื้อของฉัน</string>
     <string name="profile_wishlist">รายการโปรด</string>
     <string name="profile_messages">ข้อความ</string>

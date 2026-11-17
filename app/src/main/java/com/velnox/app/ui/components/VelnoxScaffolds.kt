@@ -156,7 +156,7 @@ fun IconActionButton(
 ) {
     Box(
         modifier = modifier
-            .size(40.dp)
+            .size(48.dp)
             .clip(Circle)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,

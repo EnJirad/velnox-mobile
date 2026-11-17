@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
@@ -142,19 +144,22 @@ fun ProfileScreen(
                         AddressLine(
                             label = stringResource(R.string.profile_address_default),
                             detail = stringResource(R.string.orders_demo_address),
+                            isDefault = true,
                         )
                         Spacer(Modifier.height(10.dp))
                         AddressLine(
                             label = stringResource(R.string.profile_address_secondary),
-                            detail = stringResource(R.string.settings_address_default),
+                            detail = stringResource(R.string.profile_address_secondary_detail),
+                            isDefault = false,
                         )
                     }
                     CardDivider()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = 48.dp)
                             .clickable(role = Role.Button, onClick = onOpenAddresses)
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
@@ -215,6 +220,8 @@ private fun ProfileHeaderCard(onOpenEditProfile: () -> Unit) {
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     Spacer(Modifier.width(6.dp))
                     BrandBadge(text = stringResource(R.string.profile_demo_badge))
@@ -233,16 +240,17 @@ private fun ProfileHeaderCard(onOpenEditProfile: () -> Unit) {
             }
             Box(
                 modifier = Modifier
+                    .size(44.dp)
                     .clip(SquircleSm)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(role = Role.Button, onClick = onOpenEditProfile)
-                    .padding(8.dp),
+                    .clickable(role = Role.Button, onClick = onOpenEditProfile),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = VelnoxIcons.Pencil,
                     contentDescription = stringResource(R.string.profile_edit),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
@@ -317,7 +325,7 @@ private fun AccountRow(
 }
 
 @Composable
-private fun AddressLine(label: String, detail: String) {
+private fun AddressLine(label: String, detail: String, isDefault: Boolean) {
     Row(verticalAlignment = Alignment.Top) {
         SoftIconTile(icon = VelnoxIcons.MapPin, size = 28)
         Spacer(Modifier.width(10.dp))
@@ -334,17 +342,19 @@ private fun AddressLine(label: String, detail: String) {
             )
         }
         Spacer(Modifier.weight(1f))
-        Box(
-            modifier = Modifier
-                .clip(SquircleSm)
-                .background(VelnoxBrandSoft)
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.settings_address_default),
-                style = Text2xs,
-                color = VelnoxBrandSoftForeground,
-            )
+        if (isDefault) {
+            Box(
+                modifier = Modifier
+                    .clip(SquircleSm)
+                    .background(VelnoxBrandSoft)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_address_default),
+                    style = Text2xs,
+                    color = VelnoxBrandSoftForeground,
+                )
+            }
         }
     }
 }
@@ -353,6 +363,40 @@ private fun AddressLine(label: String, detail: String) {
 @Composable
 private fun ProfilePreview() {
     VelnoxTheme(darkTheme = false) {
+        ProfileScreen(
+            onOpenSettings = {},
+            onOpenEditProfile = {},
+            onOpenPersonalInfo = {},
+            onOpenAddresses = {},
+            onOpenOrders = {},
+            onOpenWishlist = {},
+            onOpenMessages = {},
+            onSignOut = {},
+        )
+    }
+}
+
+@Preview(name = "Profile 320dp", showBackground = true, widthDp = 320, heightDp = 760)
+@Composable
+private fun ProfileCompactPreview() {
+    VelnoxTheme(darkTheme = false) {
+        ProfileScreen(
+            onOpenSettings = {},
+            onOpenEditProfile = {},
+            onOpenPersonalInfo = {},
+            onOpenAddresses = {},
+            onOpenOrders = {},
+            onOpenWishlist = {},
+            onOpenMessages = {},
+            onSignOut = {},
+        )
+    }
+}
+
+@Preview(name = "Profile dark", showBackground = true, widthDp = 390, heightDp = 900)
+@Composable
+private fun ProfileDarkPreview() {
+    VelnoxTheme(darkTheme = true) {
         ProfileScreen(
             onOpenSettings = {},
             onOpenEditProfile = {},

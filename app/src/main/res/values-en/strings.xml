@@ -160,6 +160,7 @@
     <string name="profile_addresses">Address book</string>
     <string name="profile_address_default">Primary address</string>
     <string name="profile_address_secondary">Secondary address</string>
+    <string name="profile_address_secondary_detail">Sample address · Chiang Mai 50000</string>
     <string name="profile_orders">My orders</string>
     <string name="profile_wishlist">Wishlist</string>
     <string name="profile_messages">Messages</string>
