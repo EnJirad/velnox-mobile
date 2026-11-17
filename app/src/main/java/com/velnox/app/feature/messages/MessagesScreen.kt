@@ -207,7 +207,7 @@ fun ConversationScreen(
         ) {
             PreviewNotice(text = stringResource(R.string.messages_demo_notice))
             Bubble(text = stringResource(thread.previewRes), incoming = true)
-            Bubble(text = stringResource(R.string.login_subtitle), incoming = false)
+            Bubble(text = stringResource(R.string.messages_preview_2), incoming = false)
         }
 
         Row(
