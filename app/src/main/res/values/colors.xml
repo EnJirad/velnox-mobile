@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Velnox surface tokens. The Compose theme is the source of truth;
+         these keep the window background matching before the first frame. -->
+    <color name="velnox_background">#f8fafc</color>
+    <color name="velnox_foreground">#0f172a</color>
+    <color name="velnox_brand">#10b981</color>
+</resources>

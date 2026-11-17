@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Velnox</string>
+
+    <string name="login_brand_mark">V</string>
+    <string name="login_brand_badge">VELNOX ID</string>
+
+    <string name="login_title">Welcome back</string>
+    <string name="login_subtitle">Sign in to continue to Velnox</string>
+
+    <string name="login_email_label">Email</string>
+    <string name="login_email_placeholder">you@email.com</string>
+    <string name="login_password_label">Password</string>
+    <string name="login_password_placeholder">At least 6 characters</string>
+    <string name="login_password_show">Show</string>
+    <string name="login_password_hide">Hide</string>
+
+    <string name="login_remember">Remember me</string>
+    <string name="login_forgot">Forgot password?</string>
+
+    <string name="login_submit">Sign in</string>
+    <string name="login_signing_in">Signing in…</string>
+    <string name="login_divider">or</string>
+    <string name="login_continue_google">Google</string>
+    <string name="login_continue_facebook">Facebook</string>
+    <string name="login_coming_soon">This will arrive in a later version</string>
+
+    <string name="login_no_account">No account yet?</string>
+    <string name="login_signup">Create one</string>
+    <string name="login_footer">© 2026 Velnox · Connection encrypted</string>
+
+    <string name="login_error_email_required">Enter your email</string>
+    <string name="login_error_email_invalid">Email format is not valid</string>
+    <string name="login_error_password_required">Enter your password</string>
+    <string name="login_error_password_short">Password must be at least 6 characters</string>
+
+    <string name="login_success_title">You are all set</string>
+    <string name="login_success_body">The login screen works — server authentication comes next.</string>
+</resources>

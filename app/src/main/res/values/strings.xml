@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Velnox</string>
+
+    <!-- Brand header -->
+    <string name="login_brand_mark">V</string>
+    <string name="login_brand_badge">VELNOX ID</string>
+
+    <!-- Headline -->
+    <string name="login_title">ยินดีต้อนรับกลับ</string>
+    <string name="login_subtitle">เข้าสู่ระบบเพื่อดำเนินการต่อกับ Velnox</string>
+
+    <!-- Fields -->
+    <string name="login_email_label">อีเมล</string>
+    <string name="login_email_placeholder">you@email.com</string>
+    <string name="login_password_label">รหัสผ่าน</string>
+    <string name="login_password_placeholder">อย่างน้อย 6 ตัวอักษร</string>
+    <string name="login_password_show">แสดง</string>
+    <string name="login_password_hide">ซ่อน</string>
+
+    <!-- Options -->
+    <string name="login_remember">จดจำฉัน</string>
+    <string name="login_forgot">ลืมรหัสผ่าน?</string>
+
+    <!-- Actions -->
+    <string name="login_submit">เข้าสู่ระบบ</string>
+    <string name="login_signing_in">กำลังเข้าสู่ระบบ…</string>
+    <string name="login_divider">หรือ</string>
+    <string name="login_continue_google">Google</string>
+    <string name="login_continue_facebook">Facebook</string>
+    <string name="login_coming_soon">ฟีเจอร์นี้จะมาในเวอร์ชันถัดไป</string>
+
+    <!-- Footer -->
+    <string name="login_no_account">ยังไม่มีบัญชี?</string>
+    <string name="login_signup">สมัครสมาชิก</string>
+    <string name="login_footer">© 2026 Velnox · การเชื่อมต่อถูกเข้ารหัส</string>
+
+    <!-- Validation -->
+    <string name="login_error_email_required">กรุณากรอกอีเมล</string>
+    <string name="login_error_email_invalid">รูปแบบอีเมลไม่ถูกต้อง</string>
+    <string name="login_error_password_required">กรุณากรอกรหัสผ่าน</string>
+    <string name="login_error_password_short">รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร</string>
+
+    <!-- Demo result -->
+    <string name="login_success_title">พร้อมใช้งานแล้ว</string>
+    <string name="login_success_body">หน้าล็อกอินทำงานถูกต้อง — การเชื่อมต่อเซิร์ฟเวอร์จะเพิ่มในขั้นถัดไป</string>
+</resources>
