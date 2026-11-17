@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -170,12 +171,9 @@ fun OrdersScreen(
 
 @Composable
 private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        text = label,
-        style = Text2xs,
-        color = if (selected) VelnoxPrimaryForeground else MaterialTheme.colorScheme.onSurface,
-        maxLines = 1,
+    Box(
         modifier = Modifier
+            .heightIn(min = 44.dp)
             .clip(Squircle)
             .background(if (selected) VelnoxPrimary else MaterialTheme.colorScheme.surface)
             .border(
@@ -183,9 +181,17 @@ private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
                 color = if (selected) VelnoxPrimary else MaterialTheme.colorScheme.outline,
                 shape = Squircle,
             )
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    )
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = Text2xs,
+            color = if (selected) VelnoxPrimaryForeground else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
 }
 
 @Composable
@@ -230,7 +236,7 @@ private fun OrderCard(order: DemoOrder, onClick: () -> Unit) {
             }
             androidx.compose.material3.Icon(
                 imageVector = VelnoxIcons.ChevronRight,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.orders_detail_open),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp),
             )
@@ -291,11 +297,18 @@ fun OrderDetailScreen(
         Spacer(Modifier.height(12.dp))
         SectionCard(title = stringResource(R.string.orders_detail_summary)) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                DetailLine(stringResource(R.string.cart_subtotal), "—")
+                DetailLine(
+                    stringResource(R.string.cart_subtotal),
+                    stringResource(R.string.common_value_placeholder),
+                )
                 CardDivider()
                 DetailLine(stringResource(R.string.cart_shipping), stringResource(R.string.cart_shipping_free))
                 CardDivider()
-                DetailLine(stringResource(R.string.cart_total), "—", strong = true)
+                DetailLine(
+                    stringResource(R.string.cart_total),
+                    stringResource(R.string.common_value_placeholder),
+                    strong = true,
+                )
             }
         }
 
@@ -364,6 +377,22 @@ private fun OrderTimeline(status: OrderStatus) {
 @Composable
 private fun OrdersPreview() {
     VelnoxTheme(darkTheme = false) {
+        OrdersScreen(onOpenOrder = {}, onBrowseProducts = {})
+    }
+}
+
+@Preview(name = "Orders 320dp", showBackground = true, widthDp = 320, heightDp = 760)
+@Composable
+private fun OrdersCompactPreview() {
+    VelnoxTheme(darkTheme = false) {
+        OrdersScreen(onOpenOrder = {}, onBrowseProducts = {})
+    }
+}
+
+@Preview(name = "Orders dark", showBackground = true, widthDp = 390, heightDp = 900)
+@Composable
+private fun OrdersDarkPreview() {
+    VelnoxTheme(darkTheme = true) {
         OrdersScreen(onOpenOrder = {}, onBrowseProducts = {})
     }
 }

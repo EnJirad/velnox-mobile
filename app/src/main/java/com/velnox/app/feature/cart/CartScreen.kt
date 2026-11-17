@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -52,8 +53,6 @@ import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.SquircleXs
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
-import com.velnox.app.ui.theme.VelnoxBrandSoft
-import com.velnox.app.ui.theme.VelnoxBrandSoftForeground
 import com.velnox.app.ui.theme.VelnoxPrimary
 import com.velnox.app.ui.theme.VelnoxPrimaryForeground
 import com.velnox.app.ui.theme.VelnoxTheme
@@ -141,9 +140,16 @@ fun CartScreen(
                 Spacer(Modifier.height(4.dp))
                 SectionCard(title = stringResource(R.string.orders_detail_summary)) {
                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                        SummaryRow(stringResource(R.string.cart_subtotal), "—")
+                        SummaryRow(
+                            stringResource(R.string.cart_subtotal),
+                            stringResource(R.string.common_value_placeholder),
+                        )
                         SummaryRow(stringResource(R.string.cart_shipping), stringResource(R.string.cart_shipping_free))
-                        SummaryRow(stringResource(R.string.cart_total), "—", strong = true)
+                        SummaryRow(
+                            stringResource(R.string.cart_total),
+                            stringResource(R.string.common_value_placeholder),
+                            strong = true,
+                        )
                         Spacer(Modifier.height(6.dp))
                         Text(
                             text = stringResource(R.string.cart_price_preview),
@@ -201,7 +207,10 @@ private fun CartLine(
                 maxLines = 1,
             )
             Spacer(Modifier.height(8.dp))
-            StatusChip(text = "—", tone = StatusTone.Neutral)
+            StatusChip(
+                text = stringResource(R.string.common_value_placeholder),
+                tone = StatusTone.Neutral,
+            )
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 QuantityStepper(
@@ -212,9 +221,10 @@ private fun CartLine(
                 Spacer(Modifier.weight(1f))
                 Row(
                     modifier = Modifier
+                        .heightIn(min = 44.dp)
                         .clip(SquircleSm)
                         .clickable(role = Role.Button, onClick = onRemove)
-                        .padding(6.dp),
+                        .padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -241,24 +251,30 @@ private fun SelectionBox(checked: Boolean, onClick: () -> Unit) {
     val shape = SquircleXs
     Box(
         modifier = Modifier
-            .size(20.dp)
-            .clip(shape)
-            .background(if (checked) VelnoxPrimary else MaterialTheme.colorScheme.surface)
-            .border(
-                width = 1.dp,
-                color = if (checked) VelnoxPrimary else MaterialTheme.colorScheme.outline,
-                shape = shape,
-            )
+            .size(48.dp)
             .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onClick() }),
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) {
-            Icon(
-                imageVector = VelnoxIcons.Check,
-                contentDescription = null,
-                tint = VelnoxPrimaryForeground,
-                modifier = Modifier.size(12.dp),
-            )
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(shape)
+                .background(if (checked) VelnoxPrimary else MaterialTheme.colorScheme.surface)
+                .border(
+                    width = 1.dp,
+                    color = if (checked) VelnoxPrimary else MaterialTheme.colorScheme.outline,
+                    shape = shape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) {
+                Icon(
+                    imageVector = VelnoxIcons.Check,
+                    contentDescription = null,
+                    tint = VelnoxPrimaryForeground,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
         }
     }
 }
@@ -284,13 +300,20 @@ private fun SummaryRow(label: String, value: String, strong: Boolean = false) {
         Text(
             text = value,
             style = if (strong) MaterialTheme.typography.titleSmall else TextXs,
-            color = if (strong) VelnoxBrandSoftForeground else MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
 
 @Composable
 private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
+    val canCheckout = selectedCount > 0
+    val buttonBackground = if (canCheckout) VelnoxPrimary else MaterialTheme.colorScheme.surfaceVariant
+    val buttonForeground = if (canCheckout) {
+        VelnoxPrimaryForeground
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -306,7 +329,7 @@ private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "—",
+                    text = stringResource(R.string.common_value_placeholder),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -315,21 +338,21 @@ private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
                 modifier = Modifier
                     .height(46.dp)
                     .clip(Squircle)
-                    .background(if (selectedCount > 0) VelnoxPrimary else VelnoxBrandSoft)
-                    .clickable(enabled = selectedCount > 0, role = Role.Button, onClick = onCheckout)
+                    .background(buttonBackground)
+                    .clickable(enabled = canCheckout, role = Role.Button, onClick = onCheckout)
                     .padding(horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = stringResource(R.string.cart_checkout),
                     style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (selectedCount > 0) VelnoxPrimaryForeground else VelnoxBrandSoftForeground,
+                    color = buttonForeground,
                 )
                 Spacer(Modifier.width(6.dp))
                 Icon(
                     imageVector = VelnoxIcons.ArrowRight,
                     contentDescription = null,
-                    tint = if (selectedCount > 0) VelnoxPrimaryForeground else VelnoxBrandSoftForeground,
+                    tint = buttonForeground,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -341,6 +364,22 @@ private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
 @Composable
 private fun CartPreview() {
     VelnoxTheme(darkTheme = false) {
+        CartScreen(state = CartState(), onCheckout = {}, onBrowseProducts = {})
+    }
+}
+
+@Preview(name = "Cart 320dp", showBackground = true, widthDp = 320, heightDp = 720)
+@Composable
+private fun CartCompactPreview() {
+    VelnoxTheme(darkTheme = false) {
+        CartScreen(state = CartState(), onCheckout = {}, onBrowseProducts = {})
+    }
+}
+
+@Preview(name = "Cart dark", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun CartDarkPreview() {
+    VelnoxTheme(darkTheme = true) {
         CartScreen(state = CartState(), onCheckout = {}, onBrowseProducts = {})
     }
 }

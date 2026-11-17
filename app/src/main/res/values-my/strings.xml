@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Velnox</string>
+    <string name="common_value_placeholder">—</string>
     <string name="brand_mark">V</string>
 
     <!-- ═════════════════════════════ common ═════════════════════════════ -->
@@ -114,6 +115,7 @@
     <string name="orders_empty_action">ဈေးဝယ် စတင်ရန်</string>
     <string name="orders_demo_notice">ဒီဇိုင်းပြသရန် နမူနာအမှာစာများ · ငွေပေးချေမှု အစစ် မရှိပါ</string>
     <string name="orders_detail_title">အမှာစာ အသေးစိတ်</string>
+    <string name="orders_detail_open">အမှာစာအသေးစိတ်ကို ဖွင့်ရန်</string>
     <string name="orders_detail_items">ပစ္စည်းများ</string>
     <string name="orders_detail_shipping">ပို့ဆောင်ရန် လိပ်စာ</string>
     <string name="orders_detail_payment">ငွေပေးချေမှု နည်းလမ်း</string>

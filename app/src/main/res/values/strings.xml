@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Velnox</string>
+    <string name="common_value_placeholder">—</string>
     <string name="brand_mark">V</string>
 
     <!-- ═════════════════════════════ common ═════════════════════════════ -->
@@ -114,6 +115,7 @@
     <string name="orders_empty_action">เริ่มช้อปปิ้ง</string>
     <string name="orders_demo_notice">คำสั่งซื้อตัวอย่างสำหรับการออกแบบ ไม่มีการชำระเงินจริง</string>
     <string name="orders_detail_title">รายละเอียดคำสั่งซื้อ</string>
+    <string name="orders_detail_open">เปิดรายละเอียดคำสั่งซื้อ</string>
     <string name="orders_detail_items">รายการสินค้า</string>
     <string name="orders_detail_shipping">ที่อยู่จัดส่ง</string>
     <string name="orders_detail_payment">วิธีการชำระเงิน</string>

@@ -238,13 +238,13 @@ fun ConversationScreen(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(SquircleLg)
-                    .background(VelnoxBrandSoft),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
                 androidx.compose.material3.Icon(
                     imageVector = VelnoxIcons.ArrowRight,
                     contentDescription = stringResource(R.string.messages_input_hint),
-                    tint = VelnoxBrand,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -299,5 +299,21 @@ private fun MessagesPreview() {
 private fun MessagesEmptyPreview() {
     VelnoxTheme(darkTheme = false) {
         MessagesScreen(onOpenThread = {}, onBrowseProducts = {}, threads = emptyList())
+    }
+}
+
+@Preview(name = "Messages 320dp", showBackground = true, widthDp = 320, heightDp = 720)
+@Composable
+private fun MessagesCompactPreview() {
+    VelnoxTheme(darkTheme = false) {
+        MessagesScreen(onOpenThread = {}, onBrowseProducts = {})
+    }
+}
+
+@Preview(name = "Messages dark", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun MessagesDarkPreview() {
+    VelnoxTheme(darkTheme = true) {
+        MessagesScreen(onOpenThread = {}, onBrowseProducts = {})
     }
 }
