@@ -1,13 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Velnox</string>
+    <string name="brand_mark">V</string>
 
-    <string name="login_brand_mark">V</string>
+    <!-- Shared -->
+    <string name="common_coming_soon">This will arrive in a later version</string>
+    <string name="common_close">Close</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_categories">Categories</string>
+    <string name="nav_wishlist">Wishlist</string>
+    <string name="nav_profile">Account</string>
+
+    <!-- Home: header -->
+    <string name="home_greeting_morning">Good morning</string>
+    <string name="home_greeting_afternoon">Good afternoon</string>
+    <string name="home_greeting_evening">Good evening</string>
+    <string name="home_location">Bangkok 10110</string>
+    <string name="home_notifications">Notifications</string>
+
+    <!-- Home: search -->
+    <string name="home_search_placeholder">Search products, brands or categories</string>
+    <string name="home_search_action">Search</string>
+    <string name="home_filter">Filters</string>
+
+    <!-- Home: trust -->
+    <string name="home_trust_delivery">Free delivery over limit</string>
+    <string name="home_trust_secure">Secure payment</string>
+    <string name="home_trust_support">24/7 support</string>
+
+    <!-- Home: categories -->
+    <string name="home_categories_title">Popular categories</string>
+    <string name="home_category_all">All</string>
+    <string name="home_category_fashion">Fashion</string>
+    <string name="home_category_electronics">Electronics</string>
+    <string name="home_category_home">Home living</string>
+    <string name="home_category_beauty">Beauty</string>
+    <string name="home_category_sports">Sports</string>
+    <string name="home_category_food">Food</string>
+
+    <!-- Home: hero -->
+    <string name="home_hero_badge">VELNOX SELECT</string>
+    <string name="home_hero_title">The new season collection</string>
+    <string name="home_hero_body">Quiet design, selected from verified sellers only.</string>
+    <string name="home_hero_cta">Explore the collection</string>
+
+    <!-- Home: shop by category (rail) -->
+    <string name="home_rail_categories_title">Shop by category</string>
+    <string name="home_rail_categories_subtitle">Simple, complete, all in one place</string>
+
+    <!-- Home: products -->
+    <string name="home_products_title">Recommended</string>
+    <string name="home_new_title">New arrivals</string>
+    <string name="home_new_action">See all</string>
+    <string name="product_tag_new">New</string>
+    <string name="product_tag_popular">Popular</string>
+    <string name="product_tag_editor">Curated</string>
+    <string name="home_preview_note">Sample data for design preview only · no store connection yet</string>
+
+    <!-- Home: sample products (UI preview data) -->
+    <string name="product_1_name">Lightweight shell jacket</string>
+    <string name="product_1_store">Atelier Nord</string>
+    <string name="product_2_name">ANC Pro wireless headphones</string>
+    <string name="product_2_store">Aural Labs</string>
+    <string name="product_3_name">Minimal leather tote</string>
+    <string name="product_3_store">Nord Studio</string>
+    <string name="product_4_name">Swiss dial watch</string>
+    <string name="product_4_store">Tide &amp; Co.</string>
+    <string name="product_5_name">Round ceramic mug</string>
+    <string name="product_5_store">Clay Works</string>
+    <string name="product_6_name">LED desk lamp</string>
+    <string name="product_6_store">Lumen House</string>
+    <string name="product_7_name">Lightweight running shoes</string>
+    <string name="product_7_store">Stride</string>
+    <string name="product_8_name">Gentle care serum</string>
+    <string name="product_8_store">Botanica</string>
+
+    <!-- Home: grid header -->
+    <string name="home_grid_eyebrow">CURATED FOR YOU</string>
+    <string name="home_grid_title">Selected products</string>
+    <string name="home_grid_subtitle">Picked from verified stores</string>
+
+    <!-- Login: brand -->
     <string name="login_brand_badge">VELNOX ID</string>
 
-    <string name="login_title">Welcome back</string>
-    <string name="login_subtitle">Sign in to continue to Velnox</string>
+    <!-- Login: headline -->
+    <string name="login_eyebrow">Welcome to Velnox</string>
+    <string name="login_title">Sign in to your account</string>
+    <string name="login_subtitle">Orders, favourites and delivery addresses, all in one place.</string>
 
+    <!-- Login: fields -->
     <string name="login_email_label">Email</string>
     <string name="login_email_placeholder">you@email.com</string>
     <string name="login_password_label">Password</string>
@@ -15,25 +98,27 @@
     <string name="login_password_show">Show</string>
     <string name="login_password_hide">Hide</string>
 
+    <!-- Login: options -->
     <string name="login_remember">Remember me</string>
     <string name="login_forgot">Forgot password?</string>
 
+    <!-- Login: actions -->
     <string name="login_submit">Sign in</string>
     <string name="login_signing_in">Signing in…</string>
-    <string name="login_divider">or</string>
+    <string name="login_success_title">Signed in. Taking you home…</string>
+    <string name="login_demo_hint">Demo mode: enter an email and password to reach Home.</string>
+    <string name="login_divider">or continue with</string>
     <string name="login_continue_google">Google</string>
     <string name="login_continue_facebook">Facebook</string>
-    <string name="login_coming_soon">This will arrive in a later version</string>
 
+    <!-- Login: footer -->
     <string name="login_no_account">No account yet?</string>
     <string name="login_signup">Create one</string>
     <string name="login_footer">© 2026 Velnox · Connection encrypted</string>
 
+    <!-- Login: validation -->
     <string name="login_error_email_required">Enter your email</string>
     <string name="login_error_email_invalid">Email format is not valid</string>
     <string name="login_error_password_required">Enter your password</string>
     <string name="login_error_password_short">Password must be at least 6 characters</string>
-
-    <string name="login_success_title">You are all set</string>
-    <string name="login_success_body">The login screen works — server authentication comes next.</string>
 </resources>

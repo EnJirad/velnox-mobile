@@ -16,9 +16,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicTextField
@@ -36,6 +39,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,14 +68,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
+import com.velnox.app.ui.components.BrandBadge
+import com.velnox.app.ui.components.BrandMark
+import com.velnox.app.ui.components.PageGutter
+import com.velnox.app.ui.icons.VelnoxIcons
+import com.velnox.app.ui.theme.Circle
 import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.SquircleLg
-import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.SquircleXs
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxBrandForeground
 import com.velnox.app.ui.theme.VelnoxBrandSoft
 import com.velnox.app.ui.theme.VelnoxBrandSoftForeground
 import com.velnox.app.ui.theme.VelnoxDestructive
@@ -82,17 +89,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Velnox login — first screen of the mobile app.
+ * Velnox Login.
  *
- * Built strictly on the design system in .ai/VELNOX_DESIGN_THEME.md:
- * white card on a slate page, dark primary action, emerald brand accent,
- * squircle radii (7 / 10 / 14 / 18 dp) and the 11-30sp type scale.
- *
- * No backend yet: submit runs a short simulated request and then confirms
- * locally, so the whole flow is testable on device.
+ * Same visual language as Home: white surfaces on the slate page, dark primary
+ * action, emerald accents, squircle controls and the shared type scale. The
+ * screen keeps its original behaviour — inline validation, show/hide password,
+ * remember-me — and now calls [onSignedIn] so navigation owns the transition to
+ * Home. Authentication itself arrives in Phase 2.
  */
 @Composable
-fun LoginScreen() {
+fun LoginScreen(onSignedIn: () -> Unit) {
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
 
@@ -121,237 +127,251 @@ fun LoginScreen() {
         focusManager.clearFocus()
         isSubmitting = true
         notice = null
+        // Phase 2 replaces this with the real sign-in call. Until then the
+        // screen waits a moment, then hands control to navigation.
         scope.launch {
-            delay(900L)
+            delay(700L)
             isSubmitting = false
             notice = LoginNotice.Success
+            delay(450L)
+            onSignedIn()
         }
     }
 
-    Column(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .systemBarsPadding()
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        Spacer(Modifier.height(8.dp))
-        BrandHeader()
+        val horizontal = when {
+            maxWidth < 360.dp -> 16.dp
+            maxWidth > 520.dp -> 32.dp
+            else -> PageGutter
+        }
 
-        Spacer(Modifier.height(24.dp))
-        Text(
-            text = stringResource(R.string.login_title),
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = stringResource(R.string.login_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(Modifier.height(20.dp))
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(SquircleLg)
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .align(Alignment.TopCenter)
+                .fillMaxHeight()
+                .widthIn(max = 480.dp)
+                .systemBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = horizontal)
+                .padding(top = 12.dp, bottom = 24.dp),
         ) {
-            FieldGroup(
-                label = stringResource(R.string.login_email_label),
-                error = if (emailTouched) emailError?.let { stringResource(it) } else null,
-            ) {
-                VelnoxTextField(
-                    value = email,
-                    onValueChange = {
-                        email = it.trim()
-                        emailTouched = true
-                        notice = null
-                    },
-                    placeholder = stringResource(R.string.login_email_placeholder),
-                    isError = emailTouched && emailError != null,
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next,
-                    onImeAction = { focusManager.moveFocus(FocusDirection.Down) },
-                    enabled = !isSubmitting,
-                )
-            }
-
-            FieldGroup(
-                label = stringResource(R.string.login_password_label),
-                error = if (passwordTouched) passwordError?.let { stringResource(it) } else null,
-            ) {
-                VelnoxTextField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        passwordTouched = true
-                        notice = null
-                    },
-                    placeholder = stringResource(R.string.login_password_placeholder),
-                    isError = passwordTouched && passwordError != null,
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                    onImeAction = { submit() },
-                    enabled = !isSubmitting,
-                    masked = !passwordVisible,
-                    trailing = {
-                        Text(
-                            text = stringResource(
-                                if (passwordVisible) R.string.login_password_hide
-                                else R.string.login_password_show
-                            ),
-                            style = TextXs.copy(fontWeight = FontWeight.Medium),
-                            color = if (passwordVisible) {
-                                VelnoxBrandSoftForeground
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier
-                                .clip(SquircleXs)
-                                .clickable(
-                                    enabled = !isSubmitting,
-                                    role = Role.Button,
-                                    onClick = { passwordVisible = !passwordVisible },
-                                )
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                        )
-                    },
-                )
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RememberToggle(
-                    checked = rememberMe,
-                    onCheckedChange = { rememberMe = it },
-                    enabled = !isSubmitting,
-                )
-                Spacer(Modifier.width(8.dp))
+                BrandMark(size = 36)
+                Spacer(Modifier.width(10.dp))
                 Text(
-                    text = stringResource(R.string.login_remember),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .clip(SquircleXs)
-                        .clickable(enabled = !isSubmitting) { rememberMe = !rememberMe }
-                        .padding(vertical = 8.dp),
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.weight(1f))
+                BrandBadge(text = stringResource(R.string.login_brand_badge))
+            }
+
+            Spacer(Modifier.height(28.dp))
+            Text(
+                text = stringResource(R.string.login_eyebrow),
+                style = TextXs.copy(fontWeight = FontWeight.Medium),
+                color = VelnoxBrand,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.login_title),
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.login_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
+
+            Spacer(Modifier.height(22.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(SquircleLg)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                FieldGroup(
+                    label = stringResource(R.string.login_email_label),
+                    error = if (emailTouched) emailError?.let { stringResource(it) } else null,
+                ) {
+                    VelnoxTextField(
+                        value = email,
+                        onValueChange = {
+                            email = it.trim()
+                            emailTouched = true
+                            notice = null
+                        },
+                        placeholder = stringResource(R.string.login_email_placeholder),
+                        isError = emailTouched && emailError != null,
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next,
+                        onImeAction = { focusManager.moveFocus(FocusDirection.Down) },
+                        enabled = !isSubmitting,
+                    )
+                }
+
+                FieldGroup(
+                    label = stringResource(R.string.login_password_label),
+                    error = if (passwordTouched) passwordError?.let { stringResource(it) } else null,
+                ) {
+                    VelnoxTextField(
+                        value = password,
+                        onValueChange = {
+                            password = it
+                            passwordTouched = true
+                            notice = null
+                        },
+                        placeholder = stringResource(R.string.login_password_placeholder),
+                        isError = passwordTouched && passwordError != null,
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                        onImeAction = { submit() },
+                        enabled = !isSubmitting,
+                        masked = !passwordVisible,
+                        trailing = {
+                            Text(
+                                text = stringResource(
+                                    if (passwordVisible) R.string.login_password_hide
+                                    else R.string.login_password_show
+                                ),
+                                style = TextXs.copy(fontWeight = FontWeight.Medium),
+                                color = if (passwordVisible) {
+                                    VelnoxBrandSoftForeground
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier
+                                    .clip(SquircleXs)
+                                    .clickable(
+                                        enabled = !isSubmitting,
+                                        role = Role.Button,
+                                        onClick = { passwordVisible = !passwordVisible },
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                            )
+                        },
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RememberToggle(
+                        checked = rememberMe,
+                        onCheckedChange = { rememberMe = it },
+                        enabled = !isSubmitting,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.login_remember),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .clip(SquircleXs)
+                            .clickable(enabled = !isSubmitting) { rememberMe = !rememberMe }
+                            .padding(vertical = 8.dp),
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = stringResource(R.string.login_forgot),
+                        style = TextXs.copy(fontWeight = FontWeight.Medium),
+                        color = VelnoxBrand,
+                        modifier = Modifier
+                            .clip(SquircleXs)
+                            .clickable(enabled = !isSubmitting) {
+                                notice = LoginNotice.ComingSoon
+                            }
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                    )
+                }
+
+                PrimaryButton(
+                    label = stringResource(
+                        if (isSubmitting) R.string.login_signing_in else R.string.login_submit
+                    ),
+                    loading = isSubmitting,
+                    onClick = { submit() },
+                )
+
                 Text(
-                    text = stringResource(R.string.login_forgot),
-                    style = TextXs.copy(fontWeight = FontWeight.Medium),
-                    color = VelnoxBrandSoftForeground,
-                    modifier = Modifier
-                        .clip(SquircleXs)
-                        .clickable(enabled = !isSubmitting) {
-                            notice = LoginNotice.ComingSoon
-                        }
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                    text = stringResource(R.string.login_demo_hint),
+                    style = Text2xs,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            PrimaryButton(
-                label = stringResource(
-                    if (isSubmitting) R.string.login_signing_in else R.string.login_submit
-                ),
-                loading = isSubmitting,
-                onClick = { submit() },
-            )
-        }
+            AnimatedVisibility(
+                visible = notice != null,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 3 }),
+                exit = fadeOut(),
+            ) {
+                Column {
+                    Spacer(Modifier.height(12.dp))
+                    NoticeBanner(notice)
+                }
+            }
 
-        if (notice != null) {
+            Spacer(Modifier.height(20.dp))
+            OrDivider()
             Spacer(Modifier.height(16.dp))
-            NoticeBanner(notice)
-        }
 
-        Spacer(Modifier.height(20.dp))
-        OrDivider()
-        Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SocialButton(
+                    label = stringResource(R.string.login_continue_google),
+                    glyph = "G",
+                    enabled = !isSubmitting,
+                    modifier = Modifier.weight(1f),
+                    onClick = { notice = LoginNotice.ComingSoon },
+                )
+                SocialButton(
+                    label = stringResource(R.string.login_continue_facebook),
+                    glyph = "f",
+                    enabled = !isSubmitting,
+                    modifier = Modifier.weight(1f),
+                    onClick = { notice = LoginNotice.ComingSoon },
+                )
+            }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            SocialButton(
-                label = stringResource(R.string.login_continue_google),
-                glyph = "G",
+            Spacer(Modifier.height(24.dp))
+            SignUpRow(
                 enabled = !isSubmitting,
-                modifier = Modifier.weight(1f),
                 onClick = { notice = LoginNotice.ComingSoon },
             )
-            SocialButton(
-                label = stringResource(R.string.login_continue_facebook),
-                glyph = "f",
-                enabled = !isSubmitting,
-                modifier = Modifier.weight(1f),
-                onClick = { notice = LoginNotice.ComingSoon },
-            )
-        }
-
-        Spacer(Modifier.height(28.dp))
-        SignUpRow(
-            enabled = !isSubmitting,
-            onClick = { notice = LoginNotice.ComingSoon },
-        )
-        Spacer(Modifier.height(20.dp))
-        Text(
-            text = stringResource(R.string.login_footer),
-            style = Text2xs,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(12.dp))
-    }
-}
-
-// ---------------------------------------------------------------- brand header
-
-@Composable
-private fun BrandHeader() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(SquircleSm)
-                .background(VelnoxPrimary),
-            contentAlignment = Alignment.Center,
-        ) {
+            Spacer(Modifier.height(20.dp))
             Text(
-                text = stringResource(R.string.login_brand_mark),
-                style = MaterialTheme.typography.titleMedium,
-                color = VelnoxBrand,
+                text = stringResource(R.string.login_footer),
+                style = Text2xs,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Spacer(Modifier.weight(1f))
-        Text(
-            text = stringResource(R.string.login_brand_badge),
-            style = Text2xs,
-            color = VelnoxBrandSoftForeground,
-            modifier = Modifier
-                .clip(SquircleXs)
-                .background(VelnoxBrandSoft)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        )
     }
 }
 
-// ------------------------------------------------------------------ primitives
+// ---------------------------------------------------------------- primitives
 
 @Composable
 private fun FieldGroup(
@@ -488,15 +508,11 @@ private fun RememberToggle(
         contentAlignment = Alignment.Center,
     ) {
         if (checked) {
-            // Check mark built from two thin rounded strokes: no icon font needed.
-            Box(
-                modifier = Modifier
-                    .size(width = 9.dp, height = 5.dp)
-                    .graphicsLayer {
-                        rotationZ = -45f
-                        translationY = (-1).dp.toPx()
-                    }
-                    .border(BorderStroke(1.5.dp, VelnoxPrimaryForeground), SquircleXs),
+            Icon(
+                imageVector = VelnoxIcons.ShieldCheck,
+                contentDescription = null,
+                tint = VelnoxPrimaryForeground,
+                modifier = Modifier.size(11.dp),
             )
         }
     }
@@ -512,7 +528,7 @@ private fun PrimaryButton(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
+            .height(50.dp)
             .clip(shape)
             .background(VelnoxPrimary)
             .clickable(enabled = !loading, role = Role.Button, onClick = onClick),
@@ -611,7 +627,7 @@ private fun SignUpRow(enabled: Boolean, onClick: () -> Unit) {
             text = stringResource(R.string.login_signup),
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
-            color = VelnoxBrandSoftForeground,
+            color = VelnoxBrand,
             modifier = Modifier
                 .graphicsLayer { alpha = if (enabled) 1f else 0.6f }
                 .clip(SquircleXs)
@@ -639,54 +655,38 @@ private fun NoticeBanner(notice: LoginNotice?) {
     }
     val title = when (notice) {
         LoginNotice.Success -> stringResource(R.string.login_success_title)
-        LoginNotice.ComingSoon -> stringResource(R.string.login_coming_soon)
+        LoginNotice.ComingSoon -> stringResource(R.string.common_coming_soon)
         null -> ""
     }
-    val body = if (isSuccess) stringResource(R.string.login_success_body) else null
 
-    AnimatedVisibility(
-        visible = notice != null,
-        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 3 }),
-        exit = fadeOut(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(Squircle)
-                .background(background)
-                .border(
-                    BorderStroke(
-                        1.dp,
-                        if (isSuccess) VelnoxBrand else MaterialTheme.colorScheme.outline,
-                    ),
-                    Squircle,
-                )
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 7.dp)
-                    .size(6.dp)
-                    .background(if (isSuccess) VelnoxBrand else VelnoxPrimary, SquircleXs),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(Squircle)
+            .background(background)
+            .border(
+                BorderStroke(
+                    1.dp,
+                    if (isSuccess) VelnoxBrand else MaterialTheme.colorScheme.outline,
+                ),
+                Squircle,
             )
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = foreground,
-                )
-                if (body != null) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = body,
-                        style = TextXs,
-                        color = foreground,
-                    )
-                }
-            }
-        }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(Circle)
+                .background(if (isSuccess) VelnoxBrand else VelnoxPrimary),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = foreground,
+        )
     }
 }
 
@@ -708,18 +708,18 @@ private val EMAIL_PATTERN = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$")
 
 // --------------------------------------------------------------------- previews
 
-@Preview(name = "Login light", showBackground = true, widthDp = 390, heightDp = 844)
+@Preview(name = "Login", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun LoginScreenPreview() {
     VelnoxTheme(darkTheme = false) {
-        LoginScreen()
+        LoginScreen(onSignedIn = {})
     }
 }
 
-@Preview(name = "Login dark", showBackground = true, widthDp = 390, heightDp = 844)
+@Preview(name = "Login small", showBackground = true, widthDp = 320, heightDp = 760)
 @Composable
-private fun LoginScreenDarkPreview() {
-    VelnoxTheme(darkTheme = true) {
-        LoginScreen()
+private fun LoginScreenSmallPreview() {
+    VelnoxTheme(darkTheme = false) {
+        LoginScreen(onSignedIn = {})
     }
 }

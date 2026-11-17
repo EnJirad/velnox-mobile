@@ -1,0 +1,31 @@
+feat: add Velnox Home screen and align Login with it
+
+Build the first production-grade UI slice for velnox-mobile, frontend only.
+
+Home (feature/home):
+- Header with brand mark, location and notifications
+- Search field plus filter affordance, trust badges
+- Category chips, dark emerald-accented hero, shop-by-category rail
+- Responsive product grid (2/3/4 columns by width) and a new-arrivals rail
+- Bottom navigation for Home / Categories / Wishlist / Account
+- Feed capped at 560dp and centred so tablets keep a readable line length
+
+Login:
+- Same visual language as Home: eyebrow, headline, card, label groups
+- Kept validation, show/hide password, remember-me and loading state
+- Submits to onSignedIn so navigation owns the transition
+
+Shared UI:
+- VelnoxIcons: Lucide-derived ImageVectors (no icon font, no emoji)
+- VelnoxComponents: brand mark, section header, badge, trust row, spacing
+- VelnoxInfoDialog for destinations scheduled for a later phase
+
+Navigation:
+- Typed AppDestination (Login, Home) saved through a stable string key
+- Cold start lands on Login; the demo flow leads to Home
+- Back from Home returns to Login
+- AppRouting and SignedInStateHolder are the Phase 2 auth seam
+
+Data:
+- HomeCatalog holds UI preview labels only: no prices, stock, orders or
+  payments, and no backend or auth calls anywhere in the app

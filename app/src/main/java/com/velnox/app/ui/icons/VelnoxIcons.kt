@@ -1,0 +1,278 @@
+package com.velnox.app.ui.icons
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.unit.dp
+
+/**
+ * Velnox icon set.
+ *
+ * Stroke geometry is taken from Lucide (ISC License, https://lucide.dev),
+ * each glyph re-authored with the 24dp viewport, 2dp stroke, round caps and
+ * round joins that make Lucide recognisable. Rendering them as ImageVector
+ * keeps the app free of an icon-font dependency and keeps every glyph tintable
+ * from the design tokens.
+ *
+ * Rule from the design system: never use emoji for iconography.
+ */
+object VelnoxIcons {
+
+    // ---------------------------------------------------------------- helpers
+
+    private fun stroke(
+        name: String,
+        pathData: List<String>,
+        strokeWidth: Float = 2f,
+        fill: Boolean = false,
+    ): ImageVector = ImageVector.Builder(
+        name = name,
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        pathData.forEach { data ->
+            addPath(
+                pathData = addPathNodes(data),
+                fill = if (fill) SolidColor(Color.Black) else null,
+                stroke = if (fill) null else SolidColor(Color.Black),
+                strokeLineWidth = strokeWidth,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+            )
+        }
+    }.build()
+
+    private fun filled(name: String, pathData: List<String>): ImageVector =
+        stroke(name = name, pathData = pathData, fill = true)
+
+    // ------------------------------------------------------------ navigation
+
+    val Search: ImageVector by lazy {
+        stroke(
+            "lucide-search",
+            listOf(
+                "M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0",
+                "m21 21l-4.3-4.3",
+            ),
+        )
+    }
+
+    val Home: ImageVector by lazy {
+        stroke(
+            "lucide-house",
+            listOf(
+                "M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8",
+                "M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
+            ),
+        )
+    }
+
+    val ShoppingBag: ImageVector by lazy {
+        stroke(
+            "lucide-shopping-bag",
+            listOf(
+                "M6 6h15l-1.967 12.047A2 2 0 0 1 17.055 20H8.945a2 2 0 0 1-1.978-1.953L5 3H2",
+            ),
+        )
+    }
+
+    val Heart: ImageVector by lazy {
+        stroke(
+            "lucide-heart",
+            listOf(
+                "M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5",
+            ),
+        )
+    }
+
+    val User: ImageVector by lazy {
+        stroke(
+            "lucide-user",
+            listOf(
+                "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",
+                "M8 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0",
+            ),
+        )
+    }
+
+    val Grid: ImageVector by lazy {
+        stroke(
+            "lucide-layout-grid",
+            listOf(
+                "M3 3h7v7h-7z",
+                "M14 3h7v7h-7z",
+                "M14 14h7v7h-7z",
+                "M3 14h7v7h-7z",
+            ),
+        )
+    }
+
+    val ShoppingCart: ImageVector by lazy {
+        stroke(
+            "lucide-shopping-cart",
+            listOf(
+                "M6 6h15l-1.967 12.047A2 2 0 0 1 17.055 20H8.945a2 2 0 0 1-1.978-1.953L5 3H2",
+                "M9 9h.01",
+                "M18 9h.01",
+            ),
+        )
+    }
+
+    // ------------------------------------------------------------ home pieces
+
+    val Bell: ImageVector by lazy {
+        stroke(
+            "lucide-bell",
+            listOf(
+                "M10.268 21a2 2 0 0 0 3.464 0",
+                "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326",
+            ),
+        )
+    }
+
+    val Sliders: ImageVector by lazy {
+        stroke(
+            "lucide-sliders-horizontal",
+            listOf(
+                "M10 5H3",
+                "M12 19H3",
+                "M14 3v4",
+                "M16 17v4",
+                "M21 12h-9",
+                "M21 19h-5",
+                "M21 5h-7",
+                "M8 10v4",
+                "M8 12H3",
+            ),
+        )
+    }
+
+    val ChevronRight: ImageVector by lazy {
+        stroke("lucide-chevron-right", listOf("m9 18l6-6l-6-6"))
+    }
+
+    val ChevronLeft: ImageVector by lazy {
+        stroke("lucide-chevron-left", listOf("m15 18l-6-6l6-6"))
+    }
+
+    val ArrowRight: ImageVector by lazy {
+        stroke(
+            "lucide-arrow-right",
+            listOf("M5 12h14", "m12 5l7 7l-7 7"),
+        )
+    }
+
+    val Star: ImageVector by lazy {
+        filled(
+            "lucide-star",
+            listOf(
+                "M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z",
+            ),
+        )
+    }
+
+    val Truck: ImageVector by lazy {
+        stroke(
+            "lucide-truck",
+            listOf(
+                "M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2",
+                "M15 18H9",
+                "M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14",
+                "M17 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
+                "M7 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
+            ),
+        )
+    }
+
+    val ShieldCheck: ImageVector by lazy {
+        stroke(
+            "lucide-shield-check",
+            listOf(
+                "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+                "m9 12l2 2l4-4",
+            ),
+        )
+    }
+
+    val Wallet: ImageVector by lazy {
+        stroke(
+            "lucide-wallet",
+            listOf(
+                "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1",
+                "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4",
+            ),
+        )
+    }
+
+    val Sparkles: ImageVector by lazy {
+        stroke(
+            "lucide-sparkles",
+            listOf(
+                "M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z",
+                "M20 3v4",
+                "M22 5h-4",
+                "M4 17v2",
+                "M5 18H3",
+            ),
+        )
+    }
+
+    val Tag: ImageVector by lazy {
+        stroke(
+            "lucide-tag",
+            listOf(
+                "M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z",
+                "M7.5 7.5h.01",
+            ),
+        )
+    }
+
+    val Headphones: ImageVector by lazy {
+        stroke(
+            "lucide-headphones",
+            listOf(
+                "M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3",
+            ),
+        )
+    }
+
+    val Shirt: ImageVector by lazy {
+        stroke(
+            "lucide-shirt",
+            listOf(
+                "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0",
+                "M9 3h6l-1 4h-4z",
+            ),
+        )
+    }
+
+    val Laptop: ImageVector by lazy {
+        stroke(
+            "lucide-monitor-smartphone",
+            listOf(
+                "M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8",
+                "M10 19v-3.96 3.15",
+                "M7 19h5",
+                "M16 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2",
+            ),
+        )
+    }
+
+    val Coffee: ImageVector by lazy {
+        stroke(
+            "lucide-coffee",
+            listOf(
+                "M10 2v2",
+                "M14 2v2",
+                "M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1",
+                "M6 2v2",
+            ),
+        )
+    }
+
+}
