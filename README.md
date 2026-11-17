@@ -1,7 +1,8 @@
 # Velnox — Mobile (Android)
 
-Android app for **Velnox**. First slice: the login screen, built strictly on
-the Velnox Design System v2.2 (`.ai/VELNOX_DESIGN_THEME.md`).
+Android app for **Velnox**. Phase 1 ships the Home and Login UI on top of the
+Velnox Design System v2.2 (`.ai/VELNOX_DESIGN_THEME.md`). Frontend only: no
+backend, no authentication, no database.
 
 ## Stack (pinned)
 
@@ -19,47 +20,64 @@ Application id `com.velnox.app`.
 
 ## Build the APK (GitHub Actions only)
 
-The APK is built on `ubuntu-latest` by `.github/workflows/gradle-build.yml`.
-Push to `main` (or run the workflow manually) and download the artifact
-**`velnox-debug-apk`** from the run page.
+Push to `main` (or run the workflow manually). The workflow builds
+`app-debug.apk` and uploads the artifact **`velnox-debug-apk`**.
 
-Do not build locally on aarch64: the Kotlin/AGP toolchain needs a desktop JDK
-and the wrapper jar approach fails there. CI is the build environment.
+Do not build locally on aarch64; CI is the build environment.
+
+## Screens
+
+| Route | Screen |
+|-------|--------|
+| `login` | Login — validation, show/hide password, remember me, demo submit |
+| `home` | Home — header, search, categories, hero, product grid, bottom nav |
+
+Cold start lands on Login. Completing the demo flow opens Home; Back returns to
+Login. Placeholder destinations open a styled dialog.
 
 ## Layout
 
 ```
 app/src/main/java/com/velnox/app/
-├── MainActivity.kt                 # edge-to-edge, VelnoxTheme { LoginScreen() }
-├── feature/auth/LoginScreen.kt     # the only screen in this slice
-└── ui/theme/                       # Color.kt, Shape.kt, Type.kt, Theme.kt
+├── MainActivity.kt                 # edge-to-edge, VelnoxApp()
+├── navigation/
+│   ├── VelnoxApp.kt                # typed destinations, demo auth gate
+│   └── VelnoxInfoDialog.kt         # placeholder destination dialog
+├── feature/auth/LoginScreen.kt
+├── feature/home/
+│   ├── HomeScreen.kt               # feed, responsive grid, bottom nav
+│   └── HomeCatalog.kt              # UI preview data only
+└── ui/
+    ├── components/VelnoxComponents.kt
+    ├── icons/VelnoxIcons.kt        # Lucide-derived ImageVectors
+    └── theme/                      # Color, Shape, Type, Theme
 app/src/main/res/
 ├── values/strings.xml              # Thai (default)
-├── values-en/strings.xml           # English
-└── mipmap-anydpi-v26/              # launcher icon
+└── values-en/strings.xml           # English
 ```
 
-## Design tokens used by the login screen
+## Design rules applied
 
-- Background `#f8fafc`, card `#ffffff`, text `#0f172a` (§2.1)
-- Primary action dark `#0f172a`, brand emerald `#10b981` (§2.2, §2.3)
-- Borders `#e2e8f0` (slate-200), error `#dc2626` (§2.4)
-- Squircle radii 7 / 10 / 14 / 18 dp (§7.1)
-- Type scale 11–30sp, 14sp body default (§8)
+- Surfaces `#f8fafc` / `#ffffff`, text `#0f172a`, brand emerald `#10b981`, borders slate-200
+- Dark primary action, emerald accent and success, red destructive, amber warning
+- Squircle radii 7 / 10 / 14 / 18 dp; circles only for dots, spinners, avatars
+- Type scale 11–30 sp, 14 sp body default
+- Icons are Lucide vector geometry — never emoji, never an icon font
 
-## State handled by the screen
+## Responsive behaviour
 
-- Empty / malformed email and short password show inline errors under the field
-- Show/hide password toggle
-- Remember-me toggle
-- Submit runs a short simulated request (900 ms) then shows a success notice
-- Social buttons, forgot password and sign-up report "coming in a later version"
+- Feed width capped at 560 dp and centred; bottom bar spans the window
+- Product grid: `<400dp` → 2 columns, `<600dp` → 3, otherwise 4
+- Login caps its form at 480 dp and tightens gutters below 360 dp
 
-All user-facing text lives in string resources (Thai + English), with no
-hardcoded copy in composables.
+## Preview data
 
-## Next
+`HomeCatalog` exists only to give the layout realistic proportions: product
+names, store names and qualitative tags such as "New". There are no prices,
+stock levels, orders or payment values anywhere in the app.
 
-- Real authentication API
-- Registration and password reset screens
-- Navigation host for the signed-in area
+## Next (Phase 2)
+
+- Real authentication API and persisted session
+- Resolve `AppRouting` from auth state instead of the fixed start destination
+- Search and category screens, product detail

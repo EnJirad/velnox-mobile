@@ -5,12 +5,32 @@
 
 ---
 
-## Task: Create the Velnox Android app and ship the login APK
+## Task: Phase 1 — Home + Login UI (frontend only)
 
 **Date:** 2026-11-17
-**Commit:** `45e60bd` (app) + workflow fix
-**GitHub Actions Run:** 44098361945
+**Commit:** `72feb92` (feature) + `f31a1d3` (build fix)
+**GitHub Actions Run:** 44110918805
 **Status:** **VERIFIED — BUILD SUCCESSFUL**
+
+---
+
+## Reference research (honest record)
+
+| Source | Result |
+|--------|--------|
+| Mobbin MCP (`search_screens`, `search_flows`, `list_collections`) | **BLOCKED** — every call returned `Mobbin MCP requires a paid plan`. No Mobbin data was used. |
+| Web (Baymard search-bar UI, Rigby marketplace UX, Eleken search examples, LOW/CODE marketplace guide) | **USED** — see the principles applied below |
+
+Principles taken from the web references:
+
+1. Search must be prominent with an obvious action, and scoped filters belong next to it.
+2. Repeated UI patterns across listing/checkout reduce cognitive load → shared components.
+3. Content priority on a marketplace home: location/identity → search → categories → promotion → curated rails.
+4. Quick, touch-friendly tiles; trust signals near the top; consistent naming.
+
+Velnox-specific decisions (not copied from any reference): squircle geometry
+throughout, dark primary + emerald accent, vector-only product art, 2/3/4-column
+responsive grid, and a 560dp content cap for tablets.
 
 ---
 
@@ -18,17 +38,19 @@
 
 | Area | Files | Description |
 |------|-------|-------------|
-| Gradle project | `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties` | AGP 8.7.2, Kotlin 2.0.21, Compose compiler plugin, `rootProject.name = "Velnox"` |
-| App module | `app/build.gradle.kts`, `app/proguard-rules.pro` | namespace / applicationId `com.velnox.app`, compileSdk 35, minSdk 26, targetSdk 35, Compose enabled, BOM 2024.10.01 |
-| Manifest | `app/src/main/AndroidManifest.xml` | Single exported `MainActivity`, `Theme.Velnox`, packaging-style icon references, no permissions |
-| Entry point | `app/src/main/java/com/velnox/app/MainActivity.kt` | `enableEdgeToEdge()`, `VelnoxTheme { LoginScreen() }` |
-| Theme | `ui/theme/Color.kt`, `Shape.kt`, `Type.kt`, `Theme.kt` | Design-system tokens: §2 colours, §7.1 squircle radii 7/10/14/18, §8 type scale 11-30sp, light + dark schemes |
-| Login screen | `feature/auth/LoginScreen.kt` | Email + password with inline validation, show/hide password, remember-me, dark primary submit with loading state, social row, sign-up row, notice banner, previews |
-| Resources | `res/values/strings.xml` (Thai), `res/values-en/strings.xml`, `values/colors.xml`, `values/themes.xml`, `values-night/themes.xml` | All user-facing copy in string resources; no hardcoded text in composables |
-| Icon | `res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml`, `mipmap-anydpi-v26/*` | Adaptive launcher icon: dark tile, emerald V |
-| CI | `.github/workflows/gradle-build.yml` | JDK 17, SDK 35 + build-tools 35.0.0/34.0.0, Gradle 8.11.1 installed directly, `./gradlew :app:assembleDebug`, APK verification + artifact upload |
-| Docs | `README.md`, `.gitignore` | Stack, build route, layout, tokens, screen behaviour |
-| Wrapper | `gradlew`, `gradlew.bat` | Delegating wrapper scripts; no `gradle-wrapper.jar` committed |
+| Icons | `ui/icons/VelnoxIcons.kt` | 22 Lucide-derived `ImageVector` glyphs (24dp viewport, 2dp stroke). No icon font, no emoji |
+| Components | `ui/components/VelnoxComponents.kt` | `BrandMark`, `SectionHeader`, `BrandBadge`, `TrustRow`, `PageColumn`, spacing scale |
+| Home | `feature/home/HomeScreen.kt`, `HomeCatalog.kt` | Header, search + filter, trust row, category chips, hero, category rail, responsive grid, new-arrivals rail, bottom nav |
+| Login | `feature/auth/LoginScreen.kt` | Restyled to match Home; validation, show/hide, remember-me kept; now calls `onSignedIn` |
+| Navigation | `navigation/VelnoxApp.kt`, `VelnoxInfoDialog.kt` | Typed `AppDestination` (Login/Home), Crossfade transition, Back from Home → Login, styled placeholder dialog |
+| Entry | `MainActivity.kt` | Renders `VelnoxApp()` |
+| Strings | `res/values/strings.xml`, `res/values-en/strings.xml` | 85 strings each, Thai and English in sync |
+| Docs | `README.md` (unchanged stack), this report, `AI_HANDOFF.md` | — |
+
+### Stack
+
+Not changed: AGP 8.7.2, Kotlin 2.0.21, Compose BOM 2024.10.01, Gradle 8.11.1,
+compileSdk/targetSdk 35, minSdk 26. No new Gradle dependencies were added.
 
 ---
 
@@ -36,37 +58,35 @@
 
 | Check | Result |
 |-------|--------|
-| Workflow parses | **VERIFIED** — first run failed on a YAML plain-scalar colon; converted to block scalar |
-| `assembleDebug` on CI | **VERIFIED** — `BUILD SUCCESSFUL in 2m 30s` |
-| APK produced | **VERIFIED** — `app-debug.apk`, 9,527,422 bytes |
-| APK integrity | **VERIFIED** — `unzip -t` OK |
-| Artifact uploaded | **VERIFIED** — `velnox-debug-apk`, 9,097,188 bytes, not expired |
-| Package identity | **VERIFIED** — `aapt2 dump badging`: `com.velnox.app`, versionCode 1, versionName 1.0.0 |
-| SDK levels | **VERIFIED** — minSdk 26, targetSdk 35, compileSdk 35 |
-| App label | **VERIFIED** — `Velnox` |
-| Launcher activity | **VERIFIED** — `com.velnox.app.MainActivity` |
-| Thai strings packaged | **VERIFIED** — `aapt2 dump strings` returns `ยินดีต้อนรับกลับ`, `เข้าสู่ระบบ` |
-| On-device render | **NOT TESTED** — no privileged install shell available in this session |
+| Workflow unchanged | **VERIFIED** — `gradle-build.yml` untouched this phase |
+| CI build | **VERIFIED** — run 44110918805, `BUILD SUCCESSFUL in 2m 29s` |
+| APK produced | **VERIFIED** — 9,669,400 bytes |
+| APK integrity | **VERIFIED** — `unzip -t` passed |
+| Artifact uploaded | **VERIFIED** — `velnox-debug-apk`, 9,224,459 bytes |
+| Package identity | **VERIFIED** — `com.velnox.app`, `Velnox`, launcher `MainActivity`, minSdk 26 / target 35 |
+| Thai + English packaged | **VERIFIED** — `aapt2 dump strings` returns Home and Login copy in both locales |
+| First build attempt | **FAILED** — scripted edit left a duplicated `HomeScreen` body (`Syntax error: Expecting a top level declaration`). Fixed in the next commit; second run green |
+| Local compile | **BLOCKED** — the packaged Gradle 9.9.1 launcher jar is missing on this device |
+| On-device render | **NOT TESTED** — no Shizuku / root install route in this session |
 
 ---
 
 ## Notes for Next Agent
 
-- **Do not** commit `gradle-wrapper.jar`. `gradlew` delegates to `GRADLE_HOME` (CI installs 8.11.1).
-- **Do not** build locally on aarch64 with the packaged Gradle; CI is the build environment.
-- **Do not** add `continue-on-error` to any step.
-- Keep `build-tools;34.0.0` + `35.0.0` (AGP 8.7.2 requirement), and accept licences twice.
-- Keep `@file:OptIn(ExperimentalMaterial3Api::class)` off unless a screen actually uses experimental M3 APIs.
-- Keep the squircle tokens (`SquircleXs/Sm/Squircle/SquircleLg`); `rounded-full` only for real circles.
-- Keep copy in `values/strings.xml` (Thai) + `values-en/strings.xml` (English).
-- YAML pitfall found this session: a `run:` step written as a plain scalar that contains `word: word` inside quotes breaks parsing. Use `run: |`.
+- **Mobbin MCP is paywalled** for this account; do not claim Mobbin research. Report the block,
+  then either ask the user or use web references.
+- Home content width: the feed is capped at `ContentMaxWidth` (560dp) and centred; the bottom bar spans the window.
+- Column counts come from `BoxWithConstraints`: `<400dp` → 2, `<600dp` → 3, else 4.
+- Any screen-level `stringResource` / `MaterialTheme` call must be inside `@Composable`.
+- Add new icons to `VelnoxIcons` as Lucide strokes; never emoji, never an icon font.
+- Product data is UI preview only: names, stores and qualitative tags. **No prices, stock, orders or money.**
+- Phase 2 seam: `AppRouting` (start destination) + `SignedInStateHolder` + `LoginScreen(onSignedIn)`.
 
 ---
 
 ## Next
 
-1. Real authentication API + token storage
-2. Registration and password-reset screens
-3. Navigation host for the signed-in area
-4. UI tests for validation states
-5. Dark-theme pass over the login screen (palette exists, screen not audited)
+1. Real auth: replace the 700 ms demo delay with the API call and resolve `AppRouting` from stored state
+2. Search screen and category listing backed by the same catalog
+3. Product detail from the grid tap
+4. UI tests for validation, navigation and the 320dp layout
