@@ -275,4 +275,175 @@ object VelnoxIcons {
         )
     }
 
+    // ------------------------------------------------------ phase 2 additions
+
+    val MessageCircle: ImageVector by lazy {
+        stroke(
+            "lucide-message-circle",
+            listOf("M7.9 20A9 9 0 1 0 4 16.1L2 22z"),
+        )
+    }
+
+    val Package: ImageVector by lazy {
+        stroke(
+            "lucide-package",
+            listOf(
+                "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z",
+                "M3.3 7 12 12l8.7-5",
+                "M12 22V12",
+            ),
+        )
+    }
+
+    val Cog: ImageVector by lazy {
+        stroke(
+            "lucide-settings",
+            listOf(
+                "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+                "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+            ),
+        )
+    }
+
+    val MapPin: ImageVector by lazy {
+        stroke(
+            "lucide-map-pin",
+            listOf(
+                "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0",
+                "M9 10a3 3 0 1 0 6 0a3 3 0 1 0 -6 0",
+            ),
+        )
+    }
+
+    val Globe: ImageVector by lazy {
+        stroke(
+            "lucide-globe",
+            listOf(
+                "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0",
+                "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
+                "M2 12h20",
+            ),
+        )
+    }
+
+    val Moon: ImageVector by lazy {
+        stroke("lucide-moon", listOf("M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"))
+    }
+
+    val Lock: ImageVector by lazy {
+        stroke(
+            "lucide-lock",
+            listOf(
+                "M5 11h14v10H5z",
+                "M8 11V7a4 4 0 0 1 8 0v4",
+            ),
+        )
+    }
+
+    val HelpCircle: ImageVector by lazy {
+        stroke(
+            "lucide-circle-help",
+            listOf(
+                "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
+                "M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3",
+                "M12 17h.01",
+            ),
+        )
+    }
+
+    val FileText: ImageVector by lazy {
+        stroke(
+            "lucide-file-text",
+            listOf(
+                "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z",
+                "M14 2v4a2 2 0 0 0 2 2h4",
+                "M16 13H8",
+                "M16 17H8",
+            ),
+        )
+    }
+
+    val Info: ImageVector by lazy {
+        stroke(
+            "lucide-info",
+            listOf(
+                "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
+                "M12 16v-4",
+                "M12 8h.01",
+            ),
+        )
+    }
+
+    val LogOut: ImageVector by lazy {
+        stroke(
+            "lucide-log-out",
+            listOf(
+                "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4",
+                "M16 17l5-5l-5-5",
+                "M21 12H9",
+            ),
+        )
+    }
+
+    val Plus: ImageVector by lazy {
+        stroke("lucide-plus", listOf("M12 5v14", "M5 12h14"))
+    }
+
+    val Minus: ImageVector by lazy {
+        stroke("lucide-minus", listOf("M5 12h14"))
+    }
+
+    val Check: ImageVector by lazy {
+        stroke("lucide-check", listOf("m20 6L9 17l-5-5"))
+    }
+
+    val Pencil: ImageVector by lazy {
+        stroke(
+            "lucide-pencil",
+            listOf("M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"),
+        )
+    }
+
+    val CreditCard: ImageVector by lazy {
+        stroke(
+            "lucide-credit-card",
+            listOf(
+                "M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z",
+                "M2 10h20",
+            ),
+        )
+    }
+
+    val ChevronDown: ImageVector by lazy {
+        stroke("lucide-chevron-down", listOf("m6 9l6 6l6-6"))
+    }
+
+    val Close: ImageVector by lazy {
+        stroke("lucide-x", listOf("M18 6L6 18", "M6 6l12 12"))
+    }
+
+    val Calendar: ImageVector by lazy {
+        stroke(
+            "lucide-calendar",
+            listOf(
+                "M8 2v4",
+                "M16 2v4",
+                "M3 6h18v15H3z",
+                "M3 11h18",
+            ),
+        )
+    }
+
+    val Trash: ImageVector by lazy {
+        stroke(
+            "lucide-trash-2",
+            listOf(
+                "M3 6h18",
+                "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6",
+                "M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2",
+                "M10 11v6",
+                "M14 11v6",
+            ),
+        )
+    }
 }

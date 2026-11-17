@@ -2,7 +2,6 @@
 
 package com.velnox.app.feature.home
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -29,7 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,7 +41,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -93,30 +89,23 @@ fun HomeScreen(
     onOpenProduct: (String) -> Unit,
     onOpenTab: (String) -> Unit,
 ) {
-    Column(
+    // The feed is capped and centred so tablets keep a readable line length.
+    // The bottom bar is owned by the nav shell, not by this screen.
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        // Feed is capped and centred so tablets keep a readable line length,
-        // while the bottom bar always spans the window.
-        Box(
+        HomeFeed(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            HomeFeed(
-                modifier = Modifier
-                    .widthIn(max = ContentMaxWidth)
-                    .fillMaxHeight(),
-                onOpenNotifications = onOpenNotifications,
-                onOpenFilter = onOpenFilter,
-                onOpenCategory = onOpenCategory,
-                onOpenProduct = onOpenProduct,
-            )
-        }
-        HomeBottomBar(onSelect = onOpenTab)
+                .widthIn(max = ContentMaxWidth)
+                .fillMaxHeight(),
+            onOpenNotifications = onOpenNotifications,
+            onOpenFilter = onOpenFilter,
+            onOpenCategory = onOpenCategory,
+            onOpenProduct = onOpenProduct,
+        )
     }
 }
 
@@ -190,8 +179,8 @@ private fun HomeFeed(
             Spacer(Modifier.height(32.dp))
             GridSection(
                 eyebrow = stringResource(R.string.home_grid_eyebrow),
-                title = stringResource(R.string.home_grid_title),
-                subtitle = stringResource(R.string.home_grid_subtitle),
+                title = stringResource(R.string.home_featured_title),
+                subtitle = stringResource(R.string.home_featured_subtitle),
                 products = HomeCatalog.recommended,
                 onOpenProduct = onOpenProduct,
             )
@@ -199,23 +188,33 @@ private fun HomeFeed(
 
         item {
             Spacer(Modifier.height(32.dp))
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = PageGutter),
+            HomeBand(
+                title = stringResource(R.string.home_popular_title),
+                subtitle = stringResource(R.string.home_popular_subtitle),
+                action = stringResource(R.string.home_see_all),
+                onAction = { onOpenCategory("popular") },
             ) {
-                SectionHeader(
-                    title = stringResource(R.string.home_new_title),
-                    action = stringResource(R.string.home_new_action),
-                    onAction = { onOpenCategory("new") },
+                ProductRail(
+                    products = HomeCatalog.popular,
+                    onOpenProduct = onOpenProduct,
+                    cardWidth = 156,
                 )
             }
-            Spacer(Modifier.height(12.dp))
-            ProductRail(
-                products = HomeCatalog.newArrivals,
-                onOpenProduct = onOpenProduct,
-                cardWidth = 156,
-            )
+        }
+
+        item {
+            Spacer(Modifier.height(32.dp))
+            HomeBand(
+                title = stringResource(R.string.home_new_title),
+                action = stringResource(R.string.home_see_all),
+                onAction = { onOpenCategory("new") },
+            ) {
+                ProductRail(
+                    products = HomeCatalog.newArrivals,
+                    onOpenProduct = onOpenProduct,
+                    cardWidth = 156,
+                )
+            }
         }
 
         item {
@@ -388,11 +387,13 @@ private fun SearchBar(onOpenFilter: () -> Unit) {
 private fun HomeBand(
     title: String,
     subtitle: String? = null,
+    action: String? = null,
+    onAction: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(horizontal = PageGutter)) {
-            SectionHeader(title = title)
+            SectionHeader(title = title, action = action, onAction = onAction)
             if (subtitle != null) {
                 Text(
                     text = subtitle,
@@ -919,63 +920,6 @@ private fun ProductGlyph(
                     style = androidx.compose.ui.graphics.drawscope.Stroke(stroke),
                 )
                 drawLine(color, p(12f, 14f), p(12f, 17f), strokeWidth = stroke, cap = StrokeCap.Round)
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------- bottom nav
-
-private data class HomeTab(
-    val id: String,
-    @StringRes val label: Int,
-    val icon: ImageVector,
-)
-
-private val homeTabs = listOf(
-    HomeTab("home", R.string.nav_home, VelnoxIcons.Home),
-    HomeTab("categories", R.string.nav_categories, VelnoxIcons.Grid),
-    HomeTab("wishlist", R.string.nav_wishlist, VelnoxIcons.Heart),
-    HomeTab("profile", R.string.nav_profile, VelnoxIcons.User),
-)
-
-@Composable
-private fun HomeBottomBar(onSelect: (String) -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface),
-    ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        ) {
-            homeTabs.forEach { tab ->
-                val active = tab.id == "home"
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(SquircleSm)
-                        .clickable(enabled = !active, role = Role.Button) { onSelect(tab.id) }
-                        .padding(vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = null,
-                        tint = if (active) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(tab.label),
-                        style = Text2xs,
-                        color = if (active) VelnoxForeground else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
     }

@@ -51,6 +51,15 @@ object HomeCatalog {
         ProductPreview("p6", R.string.product_6_name, R.string.product_6_store, R.string.product_tag_new, ProductArt.Lamp),
     )
 
+    /** A different slice of the same preview catalogue, ordered by "popularity". */
+    val popular: List<ProductPreview> = listOf(
+        ProductPreview("p2", R.string.product_2_name, R.string.product_2_store, R.string.product_tag_popular, ProductArt.Headphones),
+        ProductPreview("p7", R.string.product_7_name, R.string.product_7_store, R.string.product_tag_popular, ProductArt.Sneaker),
+        ProductPreview("p5", R.string.product_5_name, R.string.product_5_store, R.string.product_tag_popular, ProductArt.Mug),
+        ProductPreview("p8", R.string.product_8_name, R.string.product_8_store, R.string.product_tag_popular, ProductArt.Serum),
+        ProductPreview("p4", R.string.product_4_name, R.string.product_4_store, R.string.product_tag_popular, ProductArt.Watch),
+    )
+
     val newArrivals: List<ProductPreview> = listOf(
         ProductPreview("p7", R.string.product_7_name, R.string.product_7_store, R.string.product_tag_new, ProductArt.Sneaker),
         ProductPreview("p8", R.string.product_8_name, R.string.product_8_store, R.string.product_tag_editor, ProductArt.Serum),

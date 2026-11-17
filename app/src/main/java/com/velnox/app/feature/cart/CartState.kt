@@ -1,0 +1,58 @@
+package com.velnox.app.feature.cart
+
+import androidx.annotation.StringRes
+import androidx.compose.runtime.mutableStateListOf
+import com.velnox.app.R
+import com.velnox.app.feature.home.ProductArt
+
+/**
+ * One line in the demo cart.
+ *
+ * Deliberately carries no price field: Phase 2 is a UI preview and the brief
+ * forbids fabricated financial values. The summary renders placeholder amounts
+ * until a real commerce backend supplies them.
+ */
+data class CartItem(
+    val productId: String,
+    @StringRes val nameRes: Int,
+    @StringRes val storeRes: Int,
+    val art: ProductArt,
+    val quantity: Int,
+    val selected: Boolean,
+)
+
+/**
+ * Cart UI state, hoisted above the tab host so quantities and selections
+ * survive tab switches without a ViewModel or a persistence layer.
+ */
+class CartState {
+
+    val items = mutableStateListOf(
+        CartItem("p2", R.string.product_2_name, R.string.product_2_store, ProductArt.Headphones, 1, true),
+        CartItem("p3", R.string.product_3_name, R.string.product_3_store, ProductArt.Tote, 2, true),
+        CartItem("p6", R.string.product_6_name, R.string.product_6_store, ProductArt.Lamp, 1, false),
+    )
+
+    val selectedCount: Int get() = items.count { it.selected }
+    val allSelected: Boolean get() = items.isNotEmpty() && items.all { it.selected }
+
+    private fun update(id: String, transform: (CartItem) -> CartItem) {
+        val index = items.indexOfFirst { it.productId == id }
+        if (index >= 0) items[index] = transform(items[index])
+    }
+
+    fun increase(id: String) = update(id) { it.copy(quantity = (it.quantity + 1).coerceAtMost(99)) }
+
+    fun decrease(id: String) = update(id) { it.copy(quantity = (it.quantity - 1).coerceAtLeast(1)) }
+
+    fun toggleSelection(id: String) = update(id) { it.copy(selected = !it.selected) }
+
+    fun remove(id: String) {
+        items.removeAll { it.productId == id }
+    }
+
+    fun toggleAll() {
+        val target = !allSelected
+        items.replaceAll { it.copy(selected = target) }
+    }
+}

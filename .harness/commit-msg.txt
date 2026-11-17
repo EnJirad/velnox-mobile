@@ -1,31 +1,32 @@
-feat: add Velnox Home screen and align Login with it
+feat: phase 2 core screens, tab navigation and settings
 
-Build the first production-grade UI slice for velnox-mobile, frontend only.
+Expand the app into five working destinations with a settings system,
+keeping the phase-2 boundary: UI and local preferences only.
 
-Home (feature/home):
-- Header with brand mark, location and notifications
-- Search field plus filter affordance, trust badges
-- Category chips, dark emerald-accented hero, shop-by-category rail
-- Responsive product grid (2/3/4 columns by width) and a new-arrivals rail
-- Bottom navigation for Home / Categories / Wishlist / Account
-- Feed capped at 560dp and centred so tablets keep a readable line length
+Navigation
+- Five-tab shell (Home, Messages, Orders, Cart, Profile) with a shared,
+  Velnox-styled bottom bar that is hidden on Login and standalone screens
+- Per-tab state preservation through SaveableStateHolder
+- Back: settings child -> settings -> tab root -> Home -> system exit
+- Settings, order detail and conversation open over the tabs
 
-Login:
-- Same visual language as Home: eyebrow, headline, card, label groups
-- Kept validation, show/hide password, remember-me and loading state
-- Submits to onSignedIn so navigation owns the transition
+Screens
+- Home: featured grid plus popular and new-arrivals rails
+- Profile: identity header, stats, account shortcuts, addresses, settings icon
+- Settings hub with account, preferences, security, support, legal, about and
+  sign out, each opening a real child screen
+- Messages: conversation list, empty state, conversation detail
+- Orders: six filters, status chips, order detail with timeline
+- Cart: selection, quantity steppers, removal, summary placeholders
 
-Shared UI:
-- VelnoxIcons: Lucide-derived ImageVectors (no icon font, no emoji)
-- VelnoxComponents: brand mark, section header, badge, trust row, spacing
-- VelnoxInfoDialog for destinations scheduled for a later phase
+Localisation and theme
+- Thai, English and Burmese resources (277 keys each, in sync)
+- DataStore-backed language and appearance preferences
+- Live locale switch through a localized context, no activity recreation
+- Light, dark and system appearance with complete colour schemes
+- Notification toggles also stored locally
 
-Navigation:
-- Typed AppDestination (Login, Home) saved through a stable string key
-- Cold start lands on Login; the demo flow leads to Home
-- Back from Home returns to Login
-- AppRouting and SignedInStateHolder are the Phase 2 auth seam
-
-Data:
-- HomeCatalog holds UI preview labels only: no prices, stock, orders or
-  payments, and no backend or auth calls anywhere in the app
+Data
+- Preview content only: no prices, totals, payments or real accounts
+- Every demo block carries a preview notice, so nothing reads as real business
+- Ready for phase 3: signedIn is the single auth seam, no mock auth

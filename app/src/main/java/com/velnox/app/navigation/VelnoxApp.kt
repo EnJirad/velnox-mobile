@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -12,140 +13,204 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import com.velnox.app.R
+import com.velnox.app.core.i18n.VelnoxLocaleProvider
+import com.velnox.app.core.preferences.LocalPreferences
+import com.velnox.app.core.preferences.ThemeMode
+import com.velnox.app.core.preferences.VelnoxPreferencesProvider
 import com.velnox.app.feature.auth.LoginScreen
+import com.velnox.app.feature.cart.CartScreen
+import com.velnox.app.feature.cart.CartState
 import com.velnox.app.feature.home.HomeScreen
+import com.velnox.app.feature.messages.ConversationScreen
+import com.velnox.app.feature.messages.MessagesScreen
+import com.velnox.app.feature.orders.OrderDetailScreen
+import com.velnox.app.feature.orders.OrdersScreen
+import com.velnox.app.feature.profile.ProfileScreen
+import com.velnox.app.feature.settings.SettingsDetailScreen
+import com.velnox.app.feature.settings.SettingsPage
+import com.velnox.app.feature.settings.SettingsScreen
 import com.velnox.app.ui.theme.VelnoxTheme
 
 /**
- * Application destinations.
+ * Application root.
  *
- * A typed, closed set rather than a string route table: Phase 1 only has Login
- * and Home, and this is exactly what the Phase 2 auth gate will observe. Each
- * destination carries a stable [key] so it can be persisted with rememberSaveable
- * without a custom Saver.
+ * Preference → locale → theme is a strict chain: a language change recomposes
+ * the tree with a localized context, and an appearance change swaps the colour
+ * scheme. Neither recreates the activity.
  */
-sealed interface AppDestination {
-    val key: String
+@Composable
+fun VelnoxApp() {
+    VelnoxPreferencesProvider {
+        val preferences = LocalPreferences.current.current
 
-    data object Login : AppDestination {
-        override val key: String = "login"
-    }
-
-    data object Home : AppDestination {
-        override val key: String = "home"
-    }
-
-    companion object {
-        fun fromKey(key: String?): AppDestination = when (key) {
-            Home.key -> Home
-            else -> Login
+        VelnoxLocaleProvider(language = preferences.language) {
+            val darkTheme = when (preferences.themeMode) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+            VelnoxTheme(darkTheme = darkTheme) {
+                VelnoxNavHost()
+            }
         }
     }
 }
 
 /**
- * Phase 2 seam.
+ * Session and navigation state.
  *
- * Today a cold start always lands on Login. Phase 2 replaces this value with the
- * resolved auth state (unknown / signed in / signed out) from the auth
- * repository, and no screen has to change.
+ * Phase 2 has no authentication: `signedIn` is a demo gate that starts false and
+ * is never persisted, so a cold start always lands on Login. Phase 3 replaces
+ * this flag with resolved auth state; the destinations and Back handling below
+ * do not change.
  */
-val AppRouting: AppDestination = AppDestination.Login
-
 @Composable
-fun VelnoxApp() {
-    VelnoxTheme {
-        // A String keeps rememberSaveable honest: an arbitrary sealed object
-        // cannot be written to the saved-state Bundle.
-        var routeKey by rememberSaveable { mutableStateOf(AppRouting.key) }
-        var signedIn by rememberSaveable { mutableStateOf(false) }
-        var dialog by remember { mutableStateOf<AppDialog?>(null) }
+private fun VelnoxNavHost() {
+    var signedIn by rememberSaveable { mutableStateOf(false) }
+    var tabKey by rememberSaveable { mutableStateOf(AppTab.Home.key) }
+    var overlayKey by rememberSaveable { mutableStateOf<String?>(null) }
 
-        val destination = AppDestination.fromKey(routeKey)
+    val tab = AppTab.fromKey(tabKey)
+    val cart = remember { CartState() }
+    val tabStateHolder = rememberSaveableStateHolder()
 
-        fun show(dialogValue: AppDialog) {
-            dialog = dialogValue
+    fun openTab(next: AppTab) {
+        tabKey = next.key
+        overlayKey = null
+    }
+
+    fun closeOverlay() {
+        overlayKey = null
+    }
+
+    // Child page → Settings hub → tabs → Home tab. On Home, the system exits.
+    BackHandler(enabled = signedIn && (overlayKey != null || tab != AppTab.Home)) {
+        val current = overlayKey
+        when {
+            current != null && current.startsWith("settings/") -> overlayKey = "settings"
+            current != null -> closeOverlay()
+            tab != AppTab.Home -> openTab(AppTab.Home)
         }
+    }
 
-        // Home is only reachable once the demo flow has been completed.
-        BackHandler(enabled = destination == AppDestination.Home) {
-            routeKey = AppDestination.Login.key
-            signedIn = false
-            SignedInStateHolder.value = false
-        }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        Crossfade(
+            targetState = signedIn,
+            animationSpec = tween(durationMillis = 260),
+            label = "sessionTransition",
+        ) { isSignedIn ->
+            if (!isSignedIn) {
+                LoginScreen(
+                    onSignedIn = {
+                        signedIn = true
+                        tabKey = AppTab.Home.key
+                        overlayKey = null
+                    },
+                )
+            } else {
+                when (val overlay = overlayKey) {
+                    null -> TabScaffold(selected = tab, onSelectTab = ::openTab) {
+                        tabStateHolder.SaveableStateProvider(tab.key) {
+                            TabContent(
+                                tab = tab,
+                                cart = cart,
+                                onOpenOverlay = { overlayKey = it },
+                                onOpenTab = ::openTab,
+                                onSignOut = {
+                                    signedIn = false
+                                    tabKey = AppTab.Home.key
+                                    overlayKey = null
+                                },
+                            )
+                        }
+                    }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-        ) {
-            Crossfade(
-                targetState = destination,
-                animationSpec = tween(durationMillis = 260),
-                label = "appTransition",
-            ) { target ->
-                when (target) {
-                    AppDestination.Login -> LoginScreen(
-                        onSignedIn = {
-                            // Demo gate only: no credentials are stored or sent.
-                            signedIn = true
-                            SignedInStateHolder.value = true
-                            routeKey = AppDestination.Home.key
+                    "settings" -> SettingsScreen(
+                        onBack = ::closeOverlay,
+                        onOpen = { page -> overlayKey = page.key },
+                        onSignOut = {
+                            overlayKey = null
+                            tabKey = AppTab.Home.key
+                            signedIn = false
                         },
                     )
 
-                    AppDestination.Home -> HomeScreen(
-                        onOpenNotifications = { show(AppDialog.Notifications) },
-                        onOpenFilter = { show(AppDialog.Search) },
-                        onOpenCategory = { id -> show(AppDialog.Category(id)) },
-                        onOpenProduct = { id -> show(AppDialog.Product(id)) },
-                        onOpenTab = { id -> show(AppDialog.Tab(id)) },
-                    )
+                    else -> {
+                        val page = SettingsPage.fromKey(overlay)
+                        if (page != null) {
+                            SettingsDetailScreen(page = page, onBack = ::closeOverlay)
+                        } else if (overlay.startsWith("order:")) {
+                            OrderDetailScreen(
+                                orderId = overlay.removePrefix("order:"),
+                                onBack = ::closeOverlay,
+                            )
+                        } else if (overlay.startsWith("thread:")) {
+                            ConversationScreen(
+                                threadId = overlay.removePrefix("thread:"),
+                                onBack = ::closeOverlay,
+                            )
+                        } else {
+                            PlaceholderDestination(
+                                overlayKey = overlay,
+                                onBack = ::closeOverlay,
+                            )
+                        }
+                    }
                 }
             }
-        }
-
-        dialog?.let { current ->
-            VelnoxInfoDialog(
-                title = current.title(),
-                onDismiss = { dialog = null },
-            )
-        }
-
-        // Keeps the compiler honest about the flag that Phase 2 will read.
-        if (signedIn) {
-            SignedInStateHolder.value = true
         }
     }
 }
 
-/** Minimal holder so later phases can read the demo auth flag without prop drilling. */
-object SignedInStateHolder {
-    var value: Boolean = false
-}
-
-private sealed interface AppDialog {
-    data object Search : AppDialog
-    data object Notifications : AppDialog
-    data class Category(val id: String) : AppDialog
-    data class Product(val id: String) : AppDialog
-    data class Tab(val id: String) : AppDialog
-}
-
 @Composable
-private fun AppDialog.title(): String = when (this) {
-    AppDialog.Search -> stringResource(R.string.home_search_action)
-    AppDialog.Notifications -> stringResource(R.string.home_notifications)
-    is AppDialog.Category -> stringResource(R.string.nav_categories)
-    is AppDialog.Product -> stringResource(R.string.home_products_title)
-    is AppDialog.Tab -> when (id) {
-        "categories" -> stringResource(R.string.nav_categories)
-        "wishlist" -> stringResource(R.string.nav_wishlist)
-        "profile" -> stringResource(R.string.nav_profile)
-        else -> stringResource(R.string.nav_home)
+private fun TabContent(
+    tab: AppTab,
+    cart: CartState,
+    onOpenOverlay: (String) -> Unit,
+    onOpenTab: (AppTab) -> Unit,
+    onSignOut: () -> Unit,
+) {
+    when (tab) {
+        AppTab.Home -> HomeScreen(
+            onOpenNotifications = { onOpenOverlay("notifications") },
+            onOpenFilter = { onOpenOverlay("search") },
+            onOpenCategory = { onOpenOverlay("category:$it") },
+            onOpenProduct = { onOpenOverlay("product:$it") },
+            onOpenTab = { key -> AppTab.entries.firstOrNull { it.key == key }?.let(onOpenTab) },
+        )
+
+        AppTab.Messages -> MessagesScreen(
+            onOpenThread = { onOpenOverlay("thread:$it") },
+            onBrowseProducts = { onOpenTab(AppTab.Home) },
+        )
+
+        AppTab.Orders -> OrdersScreen(
+            onOpenOrder = { onOpenOverlay("order:$it") },
+            onBrowseProducts = { onOpenTab(AppTab.Home) },
+        )
+
+        AppTab.Cart -> CartScreen(
+            state = cart,
+            onCheckout = { onOpenOverlay("checkout") },
+            onBrowseProducts = { onOpenTab(AppTab.Home) },
+        )
+
+        AppTab.Profile -> ProfileScreen(
+            onOpenSettings = { onOpenOverlay("settings") },
+            onOpenEditProfile = { onOpenOverlay(SettingsPage.EditProfile.key) },
+            onOpenPersonalInfo = { onOpenOverlay(SettingsPage.PersonalInfo.key) },
+            onOpenAddresses = { onOpenOverlay(SettingsPage.Addresses.key) },
+            onOpenOrders = { onOpenTab(AppTab.Orders) },
+            onOpenWishlist = { onOpenOverlay("wishlist") },
+            onOpenMessages = { onOpenTab(AppTab.Messages) },
+            onSignOut = onSignOut,
+        )
     }
 }
