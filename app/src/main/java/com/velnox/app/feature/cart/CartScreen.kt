@@ -336,7 +336,7 @@ private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
             }
             Row(
                 modifier = Modifier
-                    .height(46.dp)
+                    .height(48.dp)
                     .clip(Squircle)
                     .background(buttonBackground)
                     .clickable(enabled = canCheckout, role = Role.Button, onClick = onCheckout)

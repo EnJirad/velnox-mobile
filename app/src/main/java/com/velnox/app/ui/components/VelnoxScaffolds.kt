@@ -412,7 +412,7 @@ fun PrimaryPill(
 ) {
     Row(
         modifier = modifier
-            .height(42.dp)
+            .height(48.dp)
             .clip(Squircle)
             .background(VelnoxPrimary)
             .clickable(role = Role.Button, onClick = onClick)

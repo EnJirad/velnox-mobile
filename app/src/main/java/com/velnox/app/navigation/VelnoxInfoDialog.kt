@@ -68,7 +68,7 @@ fun VelnoxInfoDialog(
             ) {
                 Box(
                     modifier = Modifier
-                        .height(40.dp)
+                        .height(48.dp)
                         .clip(Squircle)
                         .background(VelnoxPrimary)
                         .clickable(role = Role.Button, onClick = onDismiss)

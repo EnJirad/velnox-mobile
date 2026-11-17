@@ -488,17 +488,7 @@ private fun RememberToggle(
     val shape = SquircleXs
     Box(
         modifier = Modifier
-            .size(18.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else 0.6f }
-            .clip(shape)
-            .background(if (checked) VelnoxPrimary else Color.Transparent)
-            .border(
-                BorderStroke(
-                    1.dp,
-                    if (checked) VelnoxPrimary else MaterialTheme.colorScheme.outline,
-                ),
-                shape,
-            )
+            .size(48.dp)
             .toggleable(
                 value = checked,
                 enabled = enabled,
@@ -507,13 +497,29 @@ private fun RememberToggle(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) {
-            Icon(
-                imageVector = VelnoxIcons.ShieldCheck,
-                contentDescription = null,
-                tint = VelnoxPrimaryForeground,
-                modifier = Modifier.size(11.dp),
-            )
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .graphicsLayer { alpha = if (enabled) 1f else 0.6f }
+                .clip(shape)
+                .background(if (checked) VelnoxPrimary else Color.Transparent)
+                .border(
+                    BorderStroke(
+                        1.dp,
+                        if (checked) VelnoxPrimary else MaterialTheme.colorScheme.outline,
+                    ),
+                    shape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) {
+                Icon(
+                    imageVector = VelnoxIcons.Check,
+                    contentDescription = null,
+                    tint = VelnoxPrimaryForeground,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
         }
     }
 }
@@ -528,7 +534,7 @@ private fun PrimaryButton(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp)
+            .height(48.dp)
             .clip(shape)
             .background(VelnoxPrimary)
             .clickable(enabled = !loading, role = Role.Button, onClick = onClick),
@@ -585,7 +591,7 @@ private fun SocialButton(
     val shape = Squircle
     Row(
         modifier = modifier
-            .height(46.dp)
+            .height(48.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.6f }
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
@@ -720,6 +726,14 @@ private fun LoginScreenPreview() {
 @Composable
 private fun LoginScreenSmallPreview() {
     VelnoxTheme(darkTheme = false) {
+        LoginScreen(onSignedIn = {})
+    }
+}
+
+@Preview(name = "Login dark", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun LoginScreenDarkPreview() {
+    VelnoxTheme(darkTheme = true) {
         LoginScreen(onSignedIn = {})
     }
 }
