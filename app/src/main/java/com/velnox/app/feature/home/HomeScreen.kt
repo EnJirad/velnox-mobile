@@ -32,7 +32,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -623,6 +622,7 @@ private fun SeasonalBanner(
             .clip(SquircleLg)
             .background(MaterialTheme.colorScheme.primary),
     ) {
+        val onPrimary = MaterialTheme.colorScheme.onPrimary
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
                 color = VelnoxBrand.copy(alpha = 0.22f),
@@ -630,7 +630,7 @@ private fun SeasonalBanner(
                 center = Offset(size.width * 0.92f, size.height * 0.10f),
             )
             drawCircle(
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f),
+                color = onPrimary.copy(alpha = 0.08f),
                 radius = size.minDimension * 0.36f,
                 center = Offset(size.width * 0.10f, size.height * 0.95f),
             )
