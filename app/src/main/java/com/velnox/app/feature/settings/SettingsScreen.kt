@@ -207,7 +207,7 @@ private fun SettingsSection(title: String, content: @Composable () -> Unit) {
 @Composable
 fun rememberAppVersion(): String {
     val context = LocalContext.current
-    return remember(versionName = context) {
+    return remember(context) {
         runCatching {
             @Suppress("DEPRECATION")
             context.packageManager.getPackageInfo(context.packageName, 0).versionName

@@ -48,8 +48,10 @@ import com.velnox.app.ui.theme.VelnoxDestructiveSoft
 import com.velnox.app.ui.theme.VelnoxPrimary
 import com.velnox.app.ui.theme.VelnoxPrimaryForeground
 import com.velnox.app.ui.theme.VelnoxSuccessSoft
+import com.velnox.app.ui.theme.VelnoxSuccessSoftForeground
 import com.velnox.app.ui.theme.VelnoxWarning
 import com.velnox.app.ui.theme.VelnoxWarningSoft
+import com.velnox.app.ui.theme.VelnoxWarningSoftForeground
 
 // ------------------------------------------------------------------- scrolling
 

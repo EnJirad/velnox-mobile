@@ -6,17 +6,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
 import com.velnox.app.core.preferences.AppLanguage
 
 /**
  * Applies the selected language to the composition immediately.
  *
- * `stringResource` resolves through [LocalResources], which in turn follows the
- * context and configuration. Providing a context created with the chosen locale
- * means every string in the tree changes on the same frame the preference is
- * written — no activity recreation, no restart, and it works on API 26+ rather
- * than only the API 33 per-app language API.
+ * `stringResource` reads resources from the local context, so providing a
+ * context created with the chosen locale changes every string in the tree on the
+ * same frame the preference is written — no activity recreation, no restart, and
+ * it works on API 26+ rather than only the API 33 per-app language API.
  */
 @Composable
 fun VelnoxLocaleProvider(
@@ -37,7 +35,6 @@ fun VelnoxLocaleProvider(
     CompositionLocalProvider(
         LocalConfiguration provides configuration,
         LocalContext provides localizedContext,
-        LocalResources provides localizedContext.resources,
     ) {
         content()
     }
