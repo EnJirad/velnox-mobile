@@ -191,9 +191,9 @@ fun HomeScreen(
 
                     item(key = "featured", contentType = "section") {
                         FeaturedSection(
-                            products = catalog.products().take(6),
+                            products = catalog.productsIn(selectedCategory).take(6),
                             onOpenProduct = onOpenProduct,
-                            onSeeAll = { onOpenListing(HomeCatalog.ALL_CATEGORY) },
+                            onSeeAll = { onOpenListing(selectedCategory) },
                         )
                     }
 
