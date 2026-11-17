@@ -213,6 +213,8 @@
     <string name="settings_field_handle">ชื่อผู้ใช้</string>
     <string name="settings_field_email">อีเมล</string>
     <string name="settings_field_phone">เบอร์โทรศัพท์</string>
+    <string name="settings_field_phone_placeholder">08X-XXX-XXXX</string>
+    <string name="settings_field_password_placeholder">••••••</string>
     <string name="settings_save">บันทึก</string>
     <string name="settings_saved_local">บันทึกในเครื่องแล้ว</string>
     <string name="settings_personal_info_title">ข้อมูลส่วนตัว</string>

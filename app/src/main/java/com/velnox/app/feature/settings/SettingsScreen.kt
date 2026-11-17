@@ -77,6 +77,7 @@ fun SettingsScreen(
                 icon = VelnoxIcons.Globe,
                 title = stringResource(R.string.settings_language),
                 value = stringResource(preferences.language.labelRes),
+                selected = true,
                 onClick = { onOpen(SettingsPage.Language) },
             )
             CardDivider()
@@ -84,6 +85,7 @@ fun SettingsScreen(
                 icon = VelnoxIcons.Moon,
                 title = stringResource(R.string.settings_appearance),
                 value = stringResource(preferences.themeMode.labelRes),
+                selected = true,
                 onClick = { onOpen(SettingsPage.Appearance) },
             )
             CardDivider()
@@ -130,7 +132,7 @@ fun SettingsScreen(
             )
             CardDivider()
             SettingRow(
-                icon = VelnoxIcons.ShieldCheck,
+                icon = VelnoxIcons.EyeOff,
                 title = stringResource(R.string.settings_privacy),
                 onClick = { onOpen(SettingsPage.Privacy) },
             )

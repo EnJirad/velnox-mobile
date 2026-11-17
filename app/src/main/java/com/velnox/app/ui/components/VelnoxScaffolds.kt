@@ -210,10 +210,21 @@ fun SettingRow(
     subtitle: String? = null,
     value: String? = null,
     danger: Boolean = false,
+    selected: Boolean = false,
     showChevron: Boolean = true,
     onClick: () -> Unit,
 ) {
     val contentColor = if (danger) VelnoxDestructive else MaterialTheme.colorScheme.onSurface
+    val iconBackground = when {
+        danger -> VelnoxDestructiveSoft
+        selected -> VelnoxBrandSoft
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val iconTint = when {
+        danger -> VelnoxDestructive
+        selected -> VelnoxBrand
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -226,15 +237,13 @@ fun SettingRow(
             modifier = Modifier
                 .size(32.dp)
                 .clip(SquircleSm)
-                .background(
-                    if (danger) VelnoxDestructiveSoft else MaterialTheme.colorScheme.surfaceVariant,
-                ),
+                .background(iconBackground),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (danger) VelnoxDestructive else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = iconTint,
                 modifier = Modifier.size(16.dp),
             )
         }

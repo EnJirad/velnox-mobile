@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -294,7 +295,7 @@ private fun EditProfilePage() {
             LabeledField(
                 label = stringResource(R.string.settings_field_phone),
                 value = phone,
-                placeholder = "08X-XXX-XXXX",
+                placeholder = stringResource(R.string.settings_field_phone_placeholder),
                 keyboardType = KeyboardType.Phone,
                 onValueChange = { phone = it; saved = false },
             )
@@ -342,9 +343,15 @@ private fun PersonalInfoPage() {
             CardDivider()
             DetailLine(stringResource(R.string.settings_field_email), stringResource(R.string.profile_demo_email))
             CardDivider()
-            DetailLine(stringResource(R.string.settings_field_phone), "08X-XXX-XXXX")
+            DetailLine(
+                stringResource(R.string.settings_field_phone),
+                stringResource(R.string.settings_field_phone_placeholder),
+            )
             CardDivider()
-            DetailLine(stringResource(R.string.settings_dob), "—")
+            DetailLine(
+                stringResource(R.string.settings_dob),
+                stringResource(R.string.common_value_placeholder),
+            )
             CardDivider()
             DetailLine(stringResource(R.string.settings_gender), stringResource(R.string.settings_gender_unspecified))
         }
@@ -374,11 +381,13 @@ private fun AddressesPage() {
         SettingRow(
             icon = VelnoxIcons.MapPin,
             title = stringResource(R.string.profile_address_secondary),
-            subtitle = stringResource(R.string.orders_demo_address),
+            subtitle = stringResource(R.string.profile_address_secondary_detail),
             showChevron = false,
             onClick = {},
         )
-        CardDivider()
+    }
+    Spacer(Modifier.height(8.dp))
+    SectionCard {
         SettingRow(
             icon = VelnoxIcons.Plus,
             title = stringResource(R.string.settings_address_add),
@@ -415,14 +424,14 @@ private fun PasswordPage() {
             LabeledField(
                 label = stringResource(R.string.settings_password_current),
                 value = current,
-                placeholder = "••••••",
+                placeholder = stringResource(R.string.settings_field_password_placeholder),
                 masked = true,
                 onValueChange = { current = it },
             )
             LabeledField(
                 label = stringResource(R.string.settings_password_new),
                 value = next,
-                placeholder = "••••••",
+                placeholder = stringResource(R.string.settings_field_password_placeholder),
                 masked = true,
                 onValueChange = { next = it },
             )
@@ -598,7 +607,7 @@ private fun LabeledField(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp)
+                .heightIn(min = 48.dp)
                 .clip(Squircle)
                 .background(MaterialTheme.colorScheme.surface)
                 .border(1.dp, MaterialTheme.colorScheme.outline, Squircle)
