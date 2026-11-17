@@ -1,11 +1,14 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 
 package com.velnox.app.feature.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,39 +28,57 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.stickyHeader
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.BrandMark
 import com.velnox.app.ui.components.ContentMaxWidth
+import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.PageGutter
 import com.velnox.app.ui.components.SectionHeader
-import com.velnox.app.ui.components.VelnoxSpacing
 import com.velnox.app.ui.components.TrustRow
+import com.velnox.app.ui.components.VelnoxSpacing
+import com.velnox.app.ui.components.velnoxClickable
 import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.Circle
 import com.velnox.app.ui.theme.Squircle
@@ -67,489 +88,592 @@ import com.velnox.app.ui.theme.SquircleXs
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxBrandForeground
-import com.velnox.app.ui.theme.VelnoxBrandSoft
-import com.velnox.app.ui.theme.VelnoxBrandSoftForeground
-import com.velnox.app.ui.theme.VelnoxDestructiveSoft
-import com.velnox.app.ui.theme.VelnoxDestructiveSoftForeground
-import com.velnox.app.ui.theme.VelnoxForeground
-import com.velnox.app.ui.theme.VelnoxPrimary
-import com.velnox.app.ui.theme.VelnoxPrimaryForeground
-import com.velnox.app.ui.theme.VelnoxSecondary
-import com.velnox.app.ui.theme.VelnoxSlate50
-import com.velnox.app.ui.theme.VelnoxSlate200
-import com.velnox.app.ui.theme.VelnoxSlate600
-import com.velnox.app.ui.theme.VelnoxSlate700
 import com.velnox.app.ui.theme.VelnoxTheme
-import com.velnox.app.ui.theme.VelnoxWarningSoft
-import com.velnox.app.ui.theme.VelnoxWarningSoftForeground
 
 /**
- * Velnox Home — the marketplace feed of the app.
+ * Velnox Home — a fixed toolbar over one coherent lazy feed.
  *
- * Layout order follows discovery priority: who/where → what can I find →
- * browse by category → promoted collection → curated rails → full catalogue.
- * Content is inset by [PageGutter] and capped at [ContentMaxWidth], and every
- * column count is derived from the measured width, so the same code serves a
- * 320dp phone and a 600dp tablet.
- *
- * All product data is UI preview data from [HomeCatalog]; nothing here talks to
- * a backend.
+ * Order: fixed search toolbar → seasonal banner → sticky Popular Categories →
+ * featured rail → complete local product feed. Search filters the same feed
+ * locally; category chips filter it in place. The toolbar never scrolls, and
+ * the category header pins to the bottom edge of the toolbar until the user
+ * returns toward the seasonal banner.
  */
 @Composable
 fun HomeScreen(
-    onOpenNotifications: () -> Unit,
-    onOpenFilter: () -> Unit,
-    onOpenCategory: (String) -> Unit,
+    onOpenCategoryHub: () -> Unit,
+    onOpenListing: (String) -> Unit,
     onOpenProduct: (String) -> Unit,
-    onOpenTab: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    catalog: CatalogSource = HomeCatalog,
 ) {
-    // The feed is capped and centred so tablets keep a readable line length.
-    // The bottom bar is owned by the nav shell, not by this screen.
-    var selectedCategory by rememberSaveable { mutableStateOf("all") }
-    Box(
-        modifier = Modifier
+    val context = LocalContext.current
+    var query by rememberSaveable { mutableStateOf("") }
+    var selectedCategory by rememberSaveable { mutableStateOf(HomeCatalog.ALL_CATEGORY) }
+    val listState = rememberLazyListState()
+
+    val searchResults = remember(query, context, catalog) {
+        if (query.isBlank()) emptyList() else catalog.search(query, context)
+    }
+    val isSearching = query.isNotBlank()
+    val products = remember(isSearching, selectedCategory, searchResults, catalog) {
+        if (isSearching) searchResults else catalog.productsIn(selectedCategory)
+    }
+    val selectedCategoryLabel = catalog.categories()
+        .firstOrNull { it.id == selectedCategory }
+        ?.label
+        ?.let { stringResource(it) }
+        ?: stringResource(R.string.home_all_products_title)
+    val categories = remember(catalog) { catalog.categories() }
+
+    LaunchedEffect(query) {
+        if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(0)
+    }
+
+    Column(
+        modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.TopCenter,
     ) {
-        HomeFeed(
-            modifier = Modifier
-                .widthIn(max = ContentMaxWidth)
-                .fillMaxHeight(),
-            onOpenNotifications = onOpenNotifications,
-            onOpenFilter = onOpenFilter,
-            onOpenCategory = onOpenCategory,
-            onOpenProduct = onOpenProduct,
-            selectedCategory = selectedCategory,
-            onSelectCategory = { selectedCategory = it },
+        HomeToolbar(
+            query = query,
+            onQueryChange = { query = it },
+            onClearQuery = { query = "" },
+            notifications = HomeNotifications.items,
         )
-    }
-}
 
-@Composable
-private fun HomeFeed(
-    modifier: Modifier = Modifier,
-    onOpenNotifications: () -> Unit,
-    onOpenFilter: () -> Unit,
-    onOpenCategory: (String) -> Unit,
-    onOpenProduct: (String) -> Unit,
-    selectedCategory: String,
-    onSelectCategory: (String) -> Unit,
-) {
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(bottom = 20.dp),
-    ) {
-        item { HomeHeader(onOpenNotifications) }
-
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = PageGutter),
-            ) {
-                Spacer(Modifier.height(VelnoxSpacing.lg))
-                SearchBar(onOpenFilter = onOpenFilter)
-                Spacer(Modifier.height(VelnoxSpacing.lg))
-                TrustRow()
-                Spacer(Modifier.height(VelnoxSpacing.xl))
+        BoxWithConstraints(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            val columns = when {
+                maxWidth < 400.dp -> 2
+                maxWidth < 600.dp -> 3
+                else -> 4
             }
-        }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .widthIn(max = ContentMaxWidth)
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
+                contentPadding = PaddingValues(bottom = VelnoxSpacing.xxl),
+            ) {
+                if (!isSearching) {
+                    item(key = "seasonal", contentType = "seasonal") {
+                        SeasonalBanner(
+                            onClick = { onOpenListing(HomeCatalog.ALL_CATEGORY) },
+                            modifier = Modifier.padding(
+                                start = PageGutter,
+                                top = VelnoxSpacing.md,
+                                end = PageGutter,
+                                bottom = VelnoxSpacing.md,
+                            ),
+                        )
+                    }
 
-        item {
-            HomeBand(title = stringResource(R.string.home_categories_title)) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = PageGutter),
-                    horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
-                ) {
-                    items(HomeCatalog.categories) { category ->
-                        CategoryCard(
-                            category = category,
-                            selected = selectedCategory == category.id,
-                            onClick = {
-                                onSelectCategory(category.id)
-                                onOpenCategory(category.id)
+                    // Sticky: pins directly below the fixed toolbar.
+                    stickyHeader(key = "popular-categories", contentType = "categories") {
+                        PopularCategoriesHeader(
+                            categories = categories,
+                            selectedCategory = selectedCategory,
+                            onSelectCategory = { selectedCategory = it },
+                            onOpenCategories = onOpenCategoryHub,
+                        )
+                    }
+
+                    item(key = "trust", contentType = "trust") {
+                        Box(Modifier.padding(horizontal = PageGutter, vertical = VelnoxSpacing.md)) {
+                            TrustRow()
+                        }
+                    }
+
+                    item(key = "featured", contentType = "section") {
+                        FeaturedSection(
+                            products = catalog.products().take(6),
+                            onOpenProduct = onOpenProduct,
+                            onSeeAll = { onOpenListing(HomeCatalog.ALL_CATEGORY) },
+                        )
+                    }
+
+                    item(key = "feed-header", contentType = "section") {
+                        SectionHeader(
+                            title = if (selectedCategory == HomeCatalog.ALL_CATEGORY) {
+                                stringResource(R.string.home_all_products_title)
+                            } else {
+                                selectedCategoryLabel
+                            },
+                            modifier = Modifier.padding(
+                                start = PageGutter,
+                                top = VelnoxSpacing.lg,
+                                end = PageGutter,
+                                bottom = VelnoxSpacing.sm,
+                            ),
+                        )
+                    }
+                } else {
+                    item(key = "search-header", contentType = "section") {
+                        Column(
+                            modifier = Modifier.padding(
+                                start = PageGutter,
+                                top = VelnoxSpacing.lg,
+                                end = PageGutter,
+                                bottom = VelnoxSpacing.sm,
+                            ),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.home_search_results_title),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                        }
+                    }
+                }
+
+                if (products.isEmpty()) {
+                    item(key = "empty", contentType = "empty") {
+                        EmptyState(
+                            icon = if (isSearching) VelnoxIcons.Search else VelnoxIcons.Tag,
+                            title = stringResource(
+                                if (isSearching) R.string.home_search_no_results_title
+                                else R.string.home_category_empty_title
+                            ),
+                            body = stringResource(
+                                if (isSearching) R.string.home_search_no_results_body
+                                else R.string.home_category_empty_body
+                            ),
+                            actionLabel = if (isSearching) {
+                                stringResource(R.string.home_search_clear)
+                            } else {
+                                stringResource(R.string.home_all_products_title)
+                            },
+                            onAction = {
+                                if (isSearching) {
+                                    query = ""
+                                } else {
+                                    selectedCategory = HomeCatalog.ALL_CATEGORY
+                                }
                             },
                         )
                     }
-                }
-            }
-            Spacer(Modifier.height(VelnoxSpacing.xxl))
-        }
-
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = PageGutter),
-            ) {
-                HeroBanner(onClick = { onOpenCategory("all") })
-            }
-        }
-
-        item {
-            Spacer(Modifier.height(VelnoxSpacing.xxxl))
-            HomeBand(
-                title = stringResource(R.string.home_rail_categories_title),
-                subtitle = stringResource(R.string.home_rail_categories_subtitle),
-            ) {
-                ShopByCategoryRail(onOpenCategory = onOpenCategory)
-            }
-        }
-
-        item {
-            Spacer(Modifier.height(VelnoxSpacing.xxxl))
-            GridSection(
-                eyebrow = stringResource(R.string.home_grid_eyebrow),
-                title = stringResource(R.string.home_featured_title),
-                subtitle = stringResource(R.string.home_featured_subtitle),
-                products = HomeCatalog.recommended,
-                onOpenProduct = onOpenProduct,
-            )
-        }
-
-        item {
-            Spacer(Modifier.height(VelnoxSpacing.xxxl))
-            HomeBand(
-                title = stringResource(R.string.home_popular_title),
-                subtitle = stringResource(R.string.home_popular_subtitle),
-                action = stringResource(R.string.home_see_all),
-                onAction = { onOpenCategory("popular") },
-            ) {
-                ProductRail(
-                    products = HomeCatalog.popular,
-                    onOpenProduct = onOpenProduct,
-                    cardWidth = 156,
-                )
-            }
-        }
-
-        item {
-            Spacer(Modifier.height(VelnoxSpacing.xxxl))
-            HomeBand(
-                title = stringResource(R.string.home_new_title),
-                action = stringResource(R.string.home_see_all),
-                onAction = { onOpenCategory("new") },
-            ) {
-                ProductRail(
-                    products = HomeCatalog.newArrivals,
-                    onOpenProduct = onOpenProduct,
-                    cardWidth = 156,
-                )
-            }
-        }
-
-        item {
-            Spacer(Modifier.height(VelnoxSpacing.xxxl))
-            Text(
-                text = stringResource(R.string.home_preview_note),
-                style = Text2xs,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = PageGutter),
-            )
-        }
-    }
-}
-
-// --------------------------------------------------------------------- header
-
-@Composable
-private fun HomeHeader(onOpenNotifications: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .statusBarsPadding()
-            .padding(horizontal = PageGutter)
-            .padding(top = 14.dp, bottom = 16.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            BrandMark(size = 40)
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(greetingRes()),
-                    style = Text2xs,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = VelnoxIcons.Home,
-                        contentDescription = null,
-                        tint = VelnoxForeground,
-                        modifier = Modifier.size(12.dp),
+                } else {
+                    productRows(
+                        products = products,
+                        columns = columns,
+                        onOpenProduct = onOpenProduct,
                     )
+                }
+
+                item(key = "preview-note", contentType = "note") {
                     Text(
-                        text = stringResource(R.string.home_location),
-                        style = TextXs.copy(fontWeight = FontWeight.Medium),
-                        color = VelnoxForeground,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                    Icon(
-                        imageVector = VelnoxIcons.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .padding(start = 2.dp)
-                            .size(12.dp),
+                        text = stringResource(R.string.home_preview_note),
+                        style = Text2xs,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(
+                            start = PageGutter,
+                            top = VelnoxSpacing.lg,
+                            end = PageGutter,
+                        ),
                     )
                 }
             }
-            IconCircleButton(
-                icon = VelnoxIcons.Bell,
-                contentDescription = stringResource(R.string.home_notifications),
-                onClick = onOpenNotifications,
-                showDot = true,
-            )
         }
     }
 }
 
-private fun greetingRes(): Int = when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
-    in 5..11 -> R.string.home_greeting_morning
-    in 12..17 -> R.string.home_greeting_afternoon
-    else -> R.string.home_greeting_evening
-}
+// ------------------------------------------------------------------- toolbar
 
 @Composable
-private fun IconCircleButton(
-    icon: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-    showDot: Boolean = false,
+private fun HomeToolbar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClearQuery: () -> Unit,
+    notifications: List<HomeNotification>,
 ) {
     Box(
         modifier = Modifier
-            .size(48.dp)
-            .clip(Circle)
-            .background(MaterialTheme.colorScheme.background)
-            .border(1.dp, MaterialTheme.colorScheme.outline, Circle)
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(18.dp),
-        )
-        if (showDot) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 11.dp, end = 11.dp)
-                    .size(6.dp)
-                    .clip(Circle)
-                    .background(VelnoxBrand),
-            )
-        }
-    }
-}
-
-// --------------------------------------------------------------------- search
-
-@Composable
-private fun SearchBar(onOpenFilter: () -> Unit) {
-    Row(
-        modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
-            .clip(Squircle)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, Squircle),
-        verticalAlignment = Alignment.CenterVertically,
+            .statusBarsPadding(),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Row(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxSize()
-                .clip(Squircle)
-                .clickable(role = Role.Button, onClick = onOpenFilter)
-                .padding(horizontal = 12.dp),
+                .widthIn(max = ContentMaxWidth)
+                .fillMaxWidth()
+                .padding(horizontal = VelnoxSpacing.md, vertical = VelnoxSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = VelnoxIcons.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+            BrandMark(size = 40)
+            Spacer(Modifier.width(VelnoxSpacing.sm))
+            HomeSearchField(
+                query = query,
+                onQueryChange = onQueryChange,
+                onClearQuery = onClearQuery,
+                modifier = Modifier.weight(1f),
             )
-            Text(
-                text = stringResource(R.string.home_search_placeholder),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 8.dp),
-                maxLines = 1,
-            )
+            Spacer(Modifier.width(VelnoxSpacing.sm))
+            NotificationBell(notifications = notifications)
         }
-        Box(
-            modifier = Modifier
-                .padding(end = 4.dp)
-                .size(40.dp)
-                .clip(SquircleSm)
-                .background(VelnoxPrimary)
-                .clickable(role = Role.Button, onClick = onOpenFilter),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = VelnoxIcons.Sliders,
-                contentDescription = stringResource(R.string.home_filter),
-                tint = VelnoxPrimaryForeground,
-                modifier = Modifier.size(18.dp),
-            )
-        }
+        HorizontalDivider(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            color = MaterialTheme.colorScheme.outline,
+        )
     }
 }
 
-// ------------------------------------------------------------------- sections
-
 @Composable
-private fun HomeBand(
-    title: String,
-    subtitle: String? = null,
-    action: String? = null,
-    onAction: (() -> Unit)? = null,
-    content: @Composable () -> Unit,
+private fun HomeSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClearQuery: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(horizontal = PageGutter)) {
-            SectionHeader(title = title, action = action, onAction = onAction)
-            if (subtitle != null) {
+    val focusManager = LocalFocusManager.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val borderColor = if (focused) VelnoxBrand else MaterialTheme.colorScheme.outline
+
+    Row(
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .clip(Squircle)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, borderColor, Squircle)
+            .padding(start = VelnoxSpacing.md, end = VelnoxSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = VelnoxIcons.Search,
+            contentDescription = null,
+            tint = VelnoxBrand,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(VelnoxSpacing.sm))
+        Box(modifier = Modifier.weight(1f)) {
+            if (query.isEmpty()) {
                 Text(
-                    text = subtitle,
-                    style = TextXs,
+                    text = stringResource(R.string.home_search_placeholder),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+                cursorBrush = SolidColor(VelnoxBrand),
+                interactionSource = interactionSource,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = VelnoxSpacing.md),
+            )
+        }
+        if (query.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(Circle)
+                    .velnoxClickable(role = Role.Button, onClick = onClearQuery),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = VelnoxIcons.Close,
+                    contentDescription = stringResource(R.string.home_search_clear),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
-        Spacer(Modifier.height(VelnoxSpacing.md))
-        content()
     }
 }
 
-/** Responsive category chips: 4 across on phones, 5-6 on larger widths. */
 @Composable
-private fun CategoryCard(
+private fun NotificationBell(notifications: List<HomeNotification>) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val hasUnread = notifications.any { it.unread }
+
+    Box {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(Circle)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .velnoxClickable(role = Role.Button, onClick = { expanded = true }),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = VelnoxIcons.Bell,
+                contentDescription = stringResource(R.string.home_notifications),
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(19.dp),
+            )
+            if (hasUnread) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 9.dp, end = 9.dp)
+                        .size(7.dp)
+                        .clip(Circle)
+                        .background(VelnoxBrand),
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 280.dp, max = 340.dp),
+            shape = SquircleLg,
+            containerColor = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shadowElevation = 8.dp,
+        ) {
+            Column(modifier = Modifier.padding(VelnoxSpacing.lg)) {
+                Text(
+                    text = stringResource(R.string.home_notifications),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(VelnoxSpacing.md))
+                if (notifications.isEmpty()) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(SquircleSm)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = VelnoxIcons.Bell,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(17.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(VelnoxSpacing.md))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.notifications_empty_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(Modifier.height(VelnoxSpacing.xs))
+                            Text(
+                                text = stringResource(R.string.notifications_empty_body),
+                                style = TextXs,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
+                    notifications.forEach { item ->
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = item.body,
+                            style = TextXs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        item.time?.let { time ->
+                            Text(
+                                text = time,
+                                style = Text2xs,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.height(VelnoxSpacing.md))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --------------------------------------------------------------- categories
+
+@Composable
+private fun PopularCategoriesHeader(
+    categories: List<Category>,
+    selectedCategory: String,
+    onSelectCategory: (String) -> Unit,
+    onOpenCategories: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp)
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = PageGutter, top = VelnoxSpacing.md, end = PageGutter),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.home_categories_title),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(Circle)
+                    .velnoxClickable(role = Role.Button, onClick = onOpenCategories),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = VelnoxIcons.ArrowRight,
+                    contentDescription = stringResource(R.string.home_category_open),
+                    tint = VelnoxBrand,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = PageGutter),
+            horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
+            modifier = Modifier.padding(bottom = VelnoxSpacing.sm),
+        ) {
+            items(categories, key = { it.id }, contentType = { "category" }) { category ->
+                CategoryChip(
+                    category = category,
+                    selected = category.id == selectedCategory,
+                    onClick = { onSelectCategory(category.id) },
+                )
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+    }
+}
+
+@Composable
+private fun CategoryChip(
     category: Category,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) VelnoxPrimary else MaterialTheme.colorScheme.surface
-    val contentColor = if (selected) VelnoxBrand else MaterialTheme.colorScheme.onSurface
-    val border = if (selected) VelnoxPrimary else MaterialTheme.colorScheme.outline
-
-    Column(
+    val background = if (selected) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val content = if (selected) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
         modifier = Modifier
-            .width(74.dp)
+            .heightIn(min = 44.dp)
             .clip(Squircle)
             .background(background)
-            .border(1.dp, border, Squircle)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .border(
+                width = 1.dp,
+                color = if (selected) VelnoxBrand else MaterialTheme.colorScheme.outline,
+                shape = Squircle,
+            )
+            .velnoxClickable(role = Role.Button, onClick = onClick)
+            .semantics { this.selected = selected }
+            .padding(horizontal = VelnoxSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = category.icon,
             contentDescription = null,
-            tint = contentColor,
-            modifier = Modifier.size(20.dp),
+            tint = if (selected) VelnoxBrand else content,
+            modifier = Modifier.size(15.dp),
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.width(6.dp))
         Text(
             text = stringResource(category.label),
-            style = Text2xs,
-            color = contentColor,
+            style = TextXs.copy(fontWeight = FontWeight.Medium),
+            color = content,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
-// ----------------------------------------------------------------- hero banner
+// ---------------------------------------------------------------- seasonal
 
 @Composable
-private fun HeroBanner(onClick: () -> Unit) {
-    BoxWithConstraints(
-        modifier = Modifier
+private fun SeasonalBanner(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
             .fillMaxWidth()
             .clip(SquircleLg)
-            .background(VelnoxPrimary)
-            .clickable(role = Role.Button, onClick = onClick),
+            .background(MaterialTheme.colorScheme.primary),
     ) {
-        // Decorative emerald arc + dotted grid: keeps the hero branded without photos.
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val arc = Path().apply {
-                addOval(
-                    androidx.compose.ui.geometry.Rect(
-                        left = size.width * 0.52f,
-                        top = -size.height * 0.35f,
-                        right = size.width * 1.25f,
-                        bottom = size.height * 1.15f,
-                    )
-                )
-            }
-            drawPath(path = arc, color = VelnoxBrand.copy(alpha = 0.20f))
             drawCircle(
-                color = VelnoxBrand.copy(alpha = 0.55f),
-                radius = 3.dp.toPx(),
-                center = Offset(size.width * 0.82f, size.height * 0.28f),
+                color = VelnoxBrand.copy(alpha = 0.22f),
+                radius = size.minDimension * 0.55f,
+                center = Offset(size.width * 0.92f, size.height * 0.10f),
             )
-            drawLine(
-                color = Color.White.copy(alpha = 0.12f),
-                start = Offset(size.width * 0.70f, size.height * 0.12f),
-                end = Offset(size.width * 0.95f, size.height * 0.12f),
-                strokeWidth = 1.dp.toPx(),
-                cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(
-                    floatArrayOf(4.dp.toPx(), 4.dp.toPx()),
-                ),
+            drawCircle(
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f),
+                radius = size.minDimension * 0.36f,
+                center = Offset(size.width * 0.10f, size.height * 0.95f),
             )
         }
-
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
+            modifier = Modifier.padding(VelnoxSpacing.xl),
         ) {
             BrandBadge(text = stringResource(R.string.home_hero_badge))
             Spacer(Modifier.height(VelnoxSpacing.md))
             Text(
                 text = stringResource(R.string.home_hero_title),
                 style = MaterialTheme.typography.headlineMedium,
-                color = VelnoxPrimaryForeground,
-                modifier = Modifier.widthIn(max = 220.dp),
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.widthIn(max = 240.dp),
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(VelnoxSpacing.xs))
             Text(
                 text = stringResource(R.string.home_hero_body),
                 style = TextXs,
-                color = Color.White.copy(alpha = 0.72f),
-                modifier = Modifier.widthIn(max = 230.dp),
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.74f),
+                modifier = Modifier.widthIn(max = 260.dp),
             )
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(VelnoxSpacing.lg))
             Row(
                 modifier = Modifier
                     .heightIn(min = 44.dp)
                     .clip(SquircleSm)
-                    .background(VelnoxBrand)
-                    .clickable(role = Role.Button, onClick = onClick)
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                    .background(MaterialTheme.colorScheme.secondary)
+                    .velnoxClickable(role = Role.Button, onClick = onClick)
+                    .padding(horizontal = VelnoxSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = stringResource(R.string.home_hero_cta),
                     style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                    color = VelnoxBrandForeground,
+                    color = MaterialTheme.colorScheme.onSecondary,
                 )
                 Icon(
                     imageVector = VelnoxIcons.ArrowRight,
                     contentDescription = null,
-                    tint = VelnoxBrandForeground,
+                    tint = MaterialTheme.colorScheme.onSecondary,
                     modifier = Modifier
-                        .padding(start = 6.dp)
+                        .padding(start = VelnoxSpacing.xs)
                         .size(14.dp),
                 )
             }
@@ -557,120 +681,72 @@ private fun HeroBanner(onClick: () -> Unit) {
     }
 }
 
-// ------------------------------------------------------- shop by category rail
+// ----------------------------------------------------------------- featured
 
 @Composable
-private fun ShopByCategoryRail(onOpenCategory: (String) -> Unit) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val cardWidth = if (maxWidth < 400.dp) 176.dp else 196.dp
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = PageGutter),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(HomeCatalog.categories.drop(1)) { category ->
-                Column(
-                    modifier = Modifier
-                        .width(cardWidth)
-                        .clip(SquircleLg)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
-                        .clickable(role = Role.Button) { onOpenCategory(category.id) }
-                        .padding(14.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(SquircleSm)
-                                .background(VelnoxBrandSoft),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = category.icon,
-                                contentDescription = null,
-                                tint = VelnoxBrand,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                        Spacer(Modifier.weight(1f))
-                        Icon(
-                            imageVector = VelnoxIcons.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(22.dp))
-                    Text(
-                        text = stringResource(category.label),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ----------------------------------------------------------------- product grid
-
-@Composable
-private fun GridSection(
-    eyebrow: String,
-    title: String,
-    subtitle: String,
+private fun FeaturedSection(
     products: List<ProductPreview>,
     onOpenProduct: (String) -> Unit,
+    onSeeAll: () -> Unit,
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        // 320dp → 2 columns · 400dp → 3 · 600dp → 4
-        val columns = when {
-            maxWidth < 400.dp -> 2
-            maxWidth < 600.dp -> 3
-            else -> 4
-        }
-        Column {
-            Column(modifier = Modifier.padding(horizontal = PageGutter)) {
-                Text(
-                    text = eyebrow,
-                    style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
-                    color = VelnoxBrand,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(
+            title = stringResource(R.string.home_featured_title),
+            action = stringResource(R.string.home_see_all),
+            onAction = onSeeAll,
+            modifier = Modifier.padding(horizontal = PageGutter),
+        )
+        Spacer(Modifier.height(VelnoxSpacing.md))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = PageGutter),
+            horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
+        ) {
+            items(products, key = { it.id }, contentType = { "featuredProduct" }) { product ->
+                ProductCard(
+                    product = product,
+                    modifier = Modifier.width(152.dp),
+                    onClick = { onOpenProduct(product.id) },
                 )
-                Spacer(Modifier.height(2.dp))
-                SectionHeader(title = title)
-                Text(
-                    text = subtitle,
-                    style = TextXs,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.height(VelnoxSpacing.md))
-            Column(
-                modifier = Modifier.padding(horizontal = PageGutter),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                products.chunked(columns).forEach { rowItems ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        rowItems.forEach { product ->
-                            ProductCard(
-                                product = product,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onOpenProduct(product.id) },
-                            )
-                        }
-                        // Keep the last row aligned when it is not full.
-                        repeat(columns - rowItems.size) {
-                            Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
             }
         }
     }
 }
 
+// --------------------------------------------------------------- product grid
+
+private fun LazyListScope.productRows(
+    products: List<ProductPreview>,
+    columns: Int,
+    onOpenProduct: (String) -> Unit,
+) {
+    items(
+        items = products.chunked(columns),
+        key = { row -> row.joinToString("|") { it.id } },
+        contentType = { "productRow" },
+    ) { row ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = PageGutter),
+            horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
+        ) {
+            row.forEach { product ->
+                ProductCard(
+                    product = product,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onOpenProduct(product.id) },
+                )
+            }
+            repeat(columns - row.size) {
+                Spacer(Modifier.weight(1f))
+            }
+        }
+        Spacer(Modifier.height(VelnoxSpacing.sm))
+    }
+}
+
 @Composable
-private fun ProductCard(
+internal fun ProductCard(
     product: ProductPreview,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
@@ -680,8 +756,8 @@ private fun ProductCard(
             .clip(SquircleLg)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(8.dp),
+            .velnoxClickable(role = Role.Button, onClick = onClick)
+            .padding(VelnoxSpacing.sm),
     ) {
         ProductArtTile(art = product.art, modifier = Modifier.aspectRatio(1f))
         Spacer(Modifier.height(VelnoxSpacing.sm))
@@ -704,11 +780,13 @@ private fun ProductCard(
             Text(
                 text = stringResource(product.tag),
                 style = Text2xs,
-                color = VelnoxBrand,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier
                     .clip(SquircleXs)
-                    .background(VelnoxBrandSoft)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
                     .padding(horizontal = 6.dp, vertical = 3.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.weight(1f))
             Icon(
@@ -721,32 +799,9 @@ private fun ProductCard(
     }
 }
 
-// ---------------------------------------------------------------- product rail
-
-@Composable
-private fun ProductRail(
-    products: List<ProductPreview>,
-    onOpenProduct: (String) -> Unit,
-    cardWidth: Int,
-) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = PageGutter),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        items(products) { product ->
-            ProductCard(
-                product = product,
-                modifier = Modifier.width(cardWidth.dp),
-                onClick = { onOpenProduct(product.id) },
-            )
-        }
-    }
-}
-
 /**
- * Flat vector product art. Colour is derived from the design tokens and the
- * catalogue position, so the feed reads as a curated set without shipping
- * photography or implying real inventory.
+ * Flat vector product art. Colour is derived from theme roles, so a card never
+ * ships a bright light-mode tile in dark mode.
  */
 @Composable
 fun ProductArtTile(
@@ -762,13 +817,10 @@ fun ProductArtTile(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            // Soft corner glow anchors the tile without a shadow.
             drawCircle(
                 color = tint.strong.copy(alpha = 0.10f),
-                radius = w * 0.52f,
-                center = Offset(w * 0.18f, h * 0.12f),
+                radius = size.width * 0.52f,
+                center = Offset(size.width * 0.18f, size.height * 0.12f),
             )
         }
         ProductGlyph(
@@ -781,15 +833,16 @@ fun ProductArtTile(
 
 private data class ArtTint(val soft: Color, val strong: Color)
 
+@Composable
 private fun artTint(art: ProductArt): ArtTint = when (art) {
-    ProductArt.Jacket -> ArtTint(VelnoxSlate200, VelnoxSlate600)
-    ProductArt.Headphones -> ArtTint(VelnoxBrandSoft, VelnoxBrandSoftForeground)
-    ProductArt.Tote -> ArtTint(VelnoxSecondary, VelnoxSlate700)
-    ProductArt.Watch -> ArtTint(VelnoxWarningSoft, VelnoxWarningSoftForeground)
-    ProductArt.Mug -> ArtTint(VelnoxWarningSoft, VelnoxDestructiveSoftForeground)
-    ProductArt.Lamp -> ArtTint(VelnoxWarningSoft, VelnoxWarningSoftForeground)
-    ProductArt.Sneaker -> ArtTint(VelnoxSlate50, VelnoxForeground)
-    ProductArt.Serum -> ArtTint(VelnoxDestructiveSoft, VelnoxDestructiveSoftForeground)
+    ProductArt.Headphones, ProductArt.Serum -> ArtTint(
+        soft = MaterialTheme.colorScheme.secondaryContainer,
+        strong = MaterialTheme.colorScheme.onSecondaryContainer,
+    )
+    else -> ArtTint(
+        soft = MaterialTheme.colorScheme.surfaceVariant,
+        strong = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** Minimal line glyphs, drawn on the same 24-unit grid as the icon set. */
@@ -955,13 +1008,7 @@ private fun ProductGlyph(
 @Composable
 private fun HomePhonePreview() {
     VelnoxTheme(darkTheme = false) {
-        HomeScreen(
-            onOpenNotifications = {},
-            onOpenFilter = {},
-            onOpenCategory = {},
-            onOpenProduct = {},
-            onOpenTab = {},
-        )
+        HomeScreen(onOpenCategoryHub = {}, onOpenListing = {}, onOpenProduct = {})
     }
 }
 
@@ -969,13 +1016,7 @@ private fun HomePhonePreview() {
 @Composable
 private fun HomeWidePreview() {
     VelnoxTheme(darkTheme = false) {
-        HomeScreen(
-            onOpenNotifications = {},
-            onOpenFilter = {},
-            onOpenCategory = {},
-            onOpenProduct = {},
-            onOpenTab = {},
-        )
+        HomeScreen(onOpenCategoryHub = {}, onOpenListing = {}, onOpenProduct = {})
     }
 }
 
@@ -983,13 +1024,7 @@ private fun HomeWidePreview() {
 @Composable
 private fun HomeCompactPreview() {
     VelnoxTheme(darkTheme = false) {
-        HomeScreen(
-            onOpenNotifications = {},
-            onOpenFilter = {},
-            onOpenCategory = {},
-            onOpenProduct = {},
-            onOpenTab = {},
-        )
+        HomeScreen(onOpenCategoryHub = {}, onOpenListing = {}, onOpenProduct = {})
     }
 }
 
@@ -997,12 +1032,6 @@ private fun HomeCompactPreview() {
 @Composable
 private fun HomeDarkPreview() {
     VelnoxTheme(darkTheme = true) {
-        HomeScreen(
-            onOpenNotifications = {},
-            onOpenFilter = {},
-            onOpenCategory = {},
-            onOpenProduct = {},
-            onOpenTab = {},
-        )
+        HomeScreen(onOpenCategoryHub = {}, onOpenListing = {}, onOpenProduct = {})
     }
 }

@@ -1,8 +1,9 @@
 package com.velnox.app.navigation
 
+import com.velnox.app.ui.components.velnoxClickable
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,8 +28,6 @@ import com.velnox.app.R
 import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.SquircleLg
 import com.velnox.app.ui.theme.TextXs
-import com.velnox.app.ui.theme.VelnoxPrimary
-import com.velnox.app.ui.theme.VelnoxPrimaryForeground
 
 /**
  * Small Velnox-styled dialog used by destinations that are not part of
@@ -70,15 +69,15 @@ fun VelnoxInfoDialog(
                     modifier = Modifier
                         .height(48.dp)
                         .clip(Squircle)
-                        .background(VelnoxPrimary)
-                        .clickable(role = Role.Button, onClick = onDismiss)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .velnoxClickable(role = Role.Button, onClick = onDismiss)
                         .padding(horizontal = 18.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = stringResource(R.string.common_close),
                         style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                        color = VelnoxPrimaryForeground,
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
                 }
             }

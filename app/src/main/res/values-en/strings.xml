@@ -25,7 +25,17 @@
     <string name="home_greeting_evening">Good evening</string>
     <string name="home_location">Bangkok 10110</string>
     <string name="home_notifications">Notifications</string>
+    <string name="notifications_empty_title">No notifications yet</string>
+    <string name="notifications_empty_body">Order updates and Velnox news will appear here when available.</string>
     <string name="home_search_placeholder">Search products, brands or categories</string>
+    <string name="home_search_clear">Clear search</string>
+    <string name="home_search_results_title">Search results</string>
+    <string name="home_search_no_results_title">No products found</string>
+    <string name="home_search_no_results_body">Try a different product name, store or category.</string>
+    <string name="home_category_open">Open all categories</string>
+    <string name="home_category_empty_title">No products in this category yet</string>
+    <string name="home_category_empty_body">Try another category or browse all products.</string>
+    <string name="home_all_products_title">All products</string>
     <string name="home_filter">Filters</string>
     <string name="home_trust_delivery">Free delivery over limit</string>
     <string name="home_trust_secure">Secure payment</string>

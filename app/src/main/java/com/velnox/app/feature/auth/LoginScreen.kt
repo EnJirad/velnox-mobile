@@ -2,16 +2,16 @@
 
 package com.velnox.app.feature.auth
 
+import com.velnox.app.ui.components.velnoxClickable
+import com.velnox.app.ui.components.velnoxToggleable
+
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -79,11 +78,6 @@ import com.velnox.app.ui.theme.SquircleXs
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxBrandSoft
-import com.velnox.app.ui.theme.VelnoxBrandSoftForeground
-import com.velnox.app.ui.theme.VelnoxDestructive
-import com.velnox.app.ui.theme.VelnoxPrimary
-import com.velnox.app.ui.theme.VelnoxPrimaryForeground
 import com.velnox.app.ui.theme.VelnoxTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -252,13 +246,13 @@ fun LoginScreen(onSignedIn: () -> Unit) {
                                 ),
                                 style = TextXs.copy(fontWeight = FontWeight.Medium),
                                 color = if (passwordVisible) {
-                                    VelnoxBrandSoftForeground
+                                    MaterialTheme.colorScheme.onSecondaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 },
                                 modifier = Modifier
                                     .clip(SquircleXs)
-                                    .clickable(
+                                    .velnoxClickable(
                                         enabled = !isSubmitting,
                                         role = Role.Button,
                                         onClick = { passwordVisible = !passwordVisible },
@@ -285,7 +279,7 @@ fun LoginScreen(onSignedIn: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
                             .clip(SquircleXs)
-                            .clickable(enabled = !isSubmitting) { rememberMe = !rememberMe }
+                            .velnoxClickable(enabled = !isSubmitting) { rememberMe = !rememberMe }
                             .padding(vertical = 8.dp),
                     )
                     Spacer(Modifier.weight(1f))
@@ -295,7 +289,7 @@ fun LoginScreen(onSignedIn: () -> Unit) {
                         color = VelnoxBrand,
                         modifier = Modifier
                             .clip(SquircleXs)
-                            .clickable(enabled = !isSubmitting) {
+                            .velnoxClickable(enabled = !isSubmitting) {
                                 notice = LoginNotice.ComingSoon
                             }
                             .padding(vertical = 8.dp, horizontal = 4.dp),
@@ -392,7 +386,7 @@ private fun FieldGroup(
             Text(
                 text = error.orEmpty(),
                 style = TextXs,
-                color = VelnoxDestructive,
+                color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 6.dp),
             )
         }
@@ -416,15 +410,11 @@ private fun VelnoxTextField(
     val focused by interactionSource.collectIsFocusedAsState()
 
     val shape = Squircle
-    val borderColor by animateColorAsState(
-        targetValue = when {
-            isError -> VelnoxDestructive
-            focused -> VelnoxBrand
-            else -> MaterialTheme.colorScheme.outline
-        },
-        animationSpec = tween(durationMillis = 160),
-        label = "fieldBorder",
-    )
+    val borderColor = when {
+        isError -> MaterialTheme.colorScheme.error
+        focused -> VelnoxBrand
+        else -> MaterialTheme.colorScheme.outline
+    }
 
     Row(
         modifier = Modifier
@@ -489,7 +479,7 @@ private fun RememberToggle(
     Box(
         modifier = Modifier
             .size(48.dp)
-            .toggleable(
+            .velnoxToggleable(
                 value = checked,
                 enabled = enabled,
                 role = Role.Checkbox,
@@ -502,11 +492,11 @@ private fun RememberToggle(
                 .size(20.dp)
                 .graphicsLayer { alpha = if (enabled) 1f else 0.6f }
                 .clip(shape)
-                .background(if (checked) VelnoxPrimary else Color.Transparent)
+                .background(if (checked) MaterialTheme.colorScheme.primary else Color.Transparent)
                 .border(
                     BorderStroke(
                         1.dp,
-                        if (checked) VelnoxPrimary else MaterialTheme.colorScheme.outline,
+                        if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     ),
                     shape,
                 ),
@@ -516,7 +506,7 @@ private fun RememberToggle(
                 Icon(
                     imageVector = VelnoxIcons.Check,
                     contentDescription = null,
-                    tint = VelnoxPrimaryForeground,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(12.dp),
                 )
             }
@@ -536,8 +526,8 @@ private fun PrimaryButton(
             .fillMaxWidth()
             .height(48.dp)
             .clip(shape)
-            .background(VelnoxPrimary)
-            .clickable(enabled = !loading, role = Role.Button, onClick = onClick),
+            .background(MaterialTheme.colorScheme.primary)
+            .velnoxClickable(enabled = !loading, role = Role.Button, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -552,7 +542,7 @@ private fun PrimaryButton(
         Text(
             text = label,
             style = MaterialTheme.typography.titleSmall,
-            color = VelnoxPrimaryForeground,
+            color = MaterialTheme.colorScheme.onPrimary,
         )
     }
 }
@@ -596,7 +586,7 @@ private fun SocialButton(
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .velnoxClickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -637,7 +627,7 @@ private fun SignUpRow(enabled: Boolean, onClick: () -> Unit) {
             modifier = Modifier
                 .graphicsLayer { alpha = if (enabled) 1f else 0.6f }
                 .clip(SquircleXs)
-                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                .velnoxClickable(enabled = enabled, role = Role.Button, onClick = onClick)
                 .padding(horizontal = 6.dp, vertical = 6.dp),
         )
     }
@@ -653,9 +643,13 @@ private sealed interface LoginNotice {
 @Composable
 private fun NoticeBanner(notice: LoginNotice?) {
     val isSuccess = notice is LoginNotice.Success
-    val background = if (isSuccess) VelnoxBrandSoft else MaterialTheme.colorScheme.surface
+    val background = if (isSuccess) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
     val foreground = if (isSuccess) {
-        VelnoxBrandSoftForeground
+        MaterialTheme.colorScheme.onSecondaryContainer
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -684,7 +678,9 @@ private fun NoticeBanner(notice: LoginNotice?) {
             modifier = Modifier
                 .size(6.dp)
                 .clip(Circle)
-                .background(if (isSuccess) VelnoxBrand else VelnoxPrimary),
+                .background(
+                    if (isSuccess) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
         )
         Spacer(Modifier.width(10.dp))
         Text(

@@ -2,9 +2,10 @@
 
 package com.velnox.app.feature.profile
 
+import com.velnox.app.ui.components.velnoxClickable
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import com.velnox.app.R
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
-import com.velnox.app.ui.components.DangerRow
 import com.velnox.app.ui.components.InitialsAvatar
 import com.velnox.app.ui.components.IconActionButton
 import com.velnox.app.ui.components.PageGutter
@@ -52,9 +52,6 @@ import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxBrandSoft
-import com.velnox.app.ui.theme.VelnoxBrandSoftForeground
-import com.velnox.app.ui.theme.VelnoxForeground
 import com.velnox.app.ui.theme.VelnoxTheme
 
 /**
@@ -72,7 +69,6 @@ fun ProfileScreen(
     onOpenOrders: () -> Unit,
     onOpenWishlist: () -> Unit,
     onOpenMessages: () -> Unit,
-    onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -158,7 +154,7 @@ fun ProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
-                            .clickable(role = Role.Button, onClick = onOpenAddresses)
+                            .velnoxClickable(role = Role.Button, onClick = onOpenAddresses)
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -172,19 +168,9 @@ fun ProfileScreen(
                         Text(
                             text = stringResource(R.string.profile_add_address),
                             style = TextXs.copy(fontWeight = FontWeight.Medium),
-                            color = VelnoxBrandSoftForeground,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                     }
-                }
-            }
-
-            item {
-                SectionCard {
-                    DangerRow(
-                        icon = VelnoxIcons.LogOut,
-                        title = stringResource(R.string.profile_sign_out),
-                        onClick = onSignOut,
-                    )
                 }
             }
 
@@ -243,7 +229,7 @@ private fun ProfileHeaderCard(onOpenEditProfile: () -> Unit) {
                     .size(44.dp)
                     .clip(SquircleSm)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(role = Role.Button, onClick = onOpenEditProfile),
+                    .velnoxClickable(role = Role.Button, onClick = onOpenEditProfile),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -297,14 +283,14 @@ private fun StatTile(
             .clip(Squircle)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, Squircle)
-            .clickable(role = Role.Button, onClick = onClick)
+            .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = value,
             style = MaterialTheme.typography.titleLarge,
-            color = VelnoxForeground,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = label,
@@ -346,13 +332,13 @@ private fun AddressLine(label: String, detail: String, isDefault: Boolean) {
             Box(
                 modifier = Modifier
                     .clip(SquircleSm)
-                    .background(VelnoxBrandSoft)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             ) {
                 Text(
                     text = stringResource(R.string.settings_address_default),
                     style = Text2xs,
-                    color = VelnoxBrandSoftForeground,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
             }
         }
@@ -371,7 +357,6 @@ private fun ProfilePreview() {
             onOpenOrders = {},
             onOpenWishlist = {},
             onOpenMessages = {},
-            onSignOut = {},
         )
     }
 }
@@ -388,7 +373,6 @@ private fun ProfileCompactPreview() {
             onOpenOrders = {},
             onOpenWishlist = {},
             onOpenMessages = {},
-            onSignOut = {},
         )
     }
 }
@@ -405,7 +389,6 @@ private fun ProfileDarkPreview() {
             onOpenOrders = {},
             onOpenWishlist = {},
             onOpenMessages = {},
-            onSignOut = {},
         )
     }
 }

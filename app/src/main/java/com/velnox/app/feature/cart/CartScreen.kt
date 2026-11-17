@@ -2,9 +2,11 @@
 
 package com.velnox.app.feature.cart
 
+import com.velnox.app.ui.components.velnoxClickable
+import com.velnox.app.ui.components.velnoxToggleable
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -53,8 +54,6 @@ import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.SquircleXs
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
-import com.velnox.app.ui.theme.VelnoxPrimary
-import com.velnox.app.ui.theme.VelnoxPrimaryForeground
 import com.velnox.app.ui.theme.VelnoxTheme
 
 /**
@@ -114,7 +113,7 @@ fun CartScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
                             .clip(SquircleXs)
-                            .clickable(role = Role.Checkbox) { state.toggleAll() }
+                            .velnoxClickable(role = Role.Checkbox) { state.toggleAll() }
                             .padding(vertical = 6.dp, horizontal = 2.dp),
                     )
                     Spacer(Modifier.weight(1f))
@@ -223,7 +222,7 @@ private fun CartLine(
                     modifier = Modifier
                         .heightIn(min = 44.dp)
                         .clip(SquircleSm)
-                        .clickable(role = Role.Button, onClick = onRemove)
+                        .velnoxClickable(role = Role.Button, onClick = onRemove)
                         .padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -252,17 +251,21 @@ private fun SelectionBox(checked: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(48.dp)
-            .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onClick() }),
+            .velnoxToggleable(value = checked, role = Role.Checkbox, onValueChange = { onClick() }),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
                 .size(24.dp)
                 .clip(shape)
-                .background(if (checked) VelnoxPrimary else MaterialTheme.colorScheme.surface)
+                .background(
+                    if (checked) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.surface,
+                )
                 .border(
                     width = 1.dp,
-                    color = if (checked) VelnoxPrimary else MaterialTheme.colorScheme.outline,
+                    color = if (checked) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outline,
                     shape = shape,
                 ),
             contentAlignment = Alignment.Center,
@@ -271,7 +274,7 @@ private fun SelectionBox(checked: Boolean, onClick: () -> Unit) {
                 Icon(
                     imageVector = VelnoxIcons.Check,
                     contentDescription = null,
-                    tint = VelnoxPrimaryForeground,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -308,9 +311,13 @@ private fun SummaryRow(label: String, value: String, strong: Boolean = false) {
 @Composable
 private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
     val canCheckout = selectedCount > 0
-    val buttonBackground = if (canCheckout) VelnoxPrimary else MaterialTheme.colorScheme.surfaceVariant
+    val buttonBackground = if (canCheckout) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
     val buttonForeground = if (canCheckout) {
-        VelnoxPrimaryForeground
+        MaterialTheme.colorScheme.onPrimary
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -339,7 +346,7 @@ private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
                     .height(48.dp)
                     .clip(Squircle)
                     .background(buttonBackground)
-                    .clickable(enabled = canCheckout, role = Role.Button, onClick = onCheckout)
+                    .velnoxClickable(enabled = canCheckout, role = Role.Button, onClick = onCheckout)
                     .padding(horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

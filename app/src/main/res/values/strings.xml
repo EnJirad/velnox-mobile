@@ -25,7 +25,17 @@
     <string name="home_greeting_evening">สวัสดีตอนเย็น</string>
     <string name="home_location">กรุงเทพฯ 10110</string>
     <string name="home_notifications">การแจ้งเตือน</string>
+    <string name="notifications_empty_title">ยังไม่มีการแจ้งเตือน</string>
+    <string name="notifications_empty_body">เมื่อมีการอัปเดตคำสั่งซื้อหรือข่าวสารจาก Velnox รายการจะแสดงที่นี่</string>
     <string name="home_search_placeholder">ค้นหาสินค้า แบรนด์ หรือหมวดหมู่</string>
+    <string name="home_search_clear">ล้างคำค้นหา</string>
+    <string name="home_search_results_title">ผลการค้นหา</string>
+    <string name="home_search_no_results_title">ไม่พบสินค้า</string>
+    <string name="home_search_no_results_body">ลองค้นหาด้วยชื่อสินค้า ร้านค้า หรือหมวดหมู่อื่น</string>
+    <string name="home_category_open">เปิดหมวดหมู่ทั้งหมด</string>
+    <string name="home_category_empty_title">ยังไม่มีสินค้าในหมวดนี้</string>
+    <string name="home_category_empty_body">ลองเลือกหมวดหมู่อื่น หรือกลับไปดูสินค้าทั้งหมด</string>
+    <string name="home_all_products_title">สินค้าทั้งหมด</string>
     <string name="home_filter">ตัวกรอง</string>
     <string name="home_trust_delivery">ส่งฟรีเมื่อครบยอด</string>
     <string name="home_trust_secure">ชำระเงินปลอดภัย</string>

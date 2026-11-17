@@ -2,10 +2,11 @@
 
 package com.velnox.app.feature.messages
 
+import com.velnox.app.ui.components.velnoxClickable
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,7 +47,6 @@ import com.velnox.app.ui.theme.SquircleLg
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxBrandSoft
 import com.velnox.app.ui.theme.VelnoxTheme
 
 /** One sample conversation. Preview content only. */
@@ -126,7 +126,7 @@ private fun ThreadRow(thread: DemoThread, onClick: () -> Unit) {
             .clip(SquircleLg)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
-            .clickable(role = Role.Button, onClick = onClick)
+            .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -266,7 +266,7 @@ private fun Bubble(text: String, incoming: Boolean) {
                     if (incoming) {
                         MaterialTheme.colorScheme.surface
                     } else {
-                        VelnoxBrandSoft
+                        MaterialTheme.colorScheme.secondaryContainer
                     }
                 )
                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -279,7 +279,7 @@ private fun Bubble(text: String, incoming: Boolean) {
                 color = if (incoming) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
-                    MaterialTheme.colorScheme.secondaryContainer
+                    MaterialTheme.colorScheme.onSecondaryContainer
                 },
             )
         }

@@ -28,8 +28,6 @@ import com.velnox.app.ui.components.StandaloneScreen
 import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.TextXs
-import com.velnox.app.ui.theme.VelnoxDestructive
-import com.velnox.app.ui.theme.VelnoxPrimary
 
 /**
  * Settings hub. Every entry opens a real screen; nothing here pretends to talk
@@ -186,13 +184,16 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.settings_sign_out_confirm),
-                        color = VelnoxDestructive,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSignOut = false }) {
-                    Text(text = stringResource(R.string.common_close), color = VelnoxPrimary)
+                    Text(
+                        text = stringResource(R.string.common_close),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             },
         )
@@ -243,4 +244,3 @@ enum class SettingsPage {
         }
     }
 }
-

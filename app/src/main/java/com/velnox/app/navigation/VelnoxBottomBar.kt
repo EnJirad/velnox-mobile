@@ -1,8 +1,9 @@
 package com.velnox.app.navigation
 
+import com.velnox.app.ui.components.velnoxClickable
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,7 +33,6 @@ import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxForeground
 
 /** The five main destinations. Order is the bottom-bar order. */
 enum class AppTab(
@@ -98,7 +98,7 @@ private fun BottomBarItem(
     Column(
         modifier = modifier
             .clip(SquircleSm)
-            .clickable(role = Role.Tab, onClick = onClick)
+            .velnoxClickable(role = Role.Tab, onClick = onClick)
             .semantics { this.selected = selected }
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -109,7 +109,7 @@ private fun BottomBarItem(
                 .clip(SquircleSm)
                 .background(
                     if (selected) {
-                        MaterialTheme.colorScheme.secondaryContainer
+                        VelnoxBrand.copy(alpha = 0.16f)
                     } else {
                         androidx.compose.ui.graphics.Color.Transparent
                     }
@@ -127,7 +127,11 @@ private fun BottomBarItem(
         Text(
             text = stringResource(tab.labelRes),
             style = Text2xs,
-            color = if (selected) VelnoxForeground else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
             maxLines = 1,
         )
     }

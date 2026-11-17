@@ -2,9 +2,10 @@
 
 package com.velnox.app.feature.settings
 
+import com.velnox.app.ui.components.velnoxClickable
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,9 +57,6 @@ import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxBrandSoft
-import com.velnox.app.ui.theme.VelnoxBrandSoftForeground
-import com.velnox.app.ui.theme.VelnoxPrimaryForeground
 
 /**
  * Renders the child page for a [SettingsPage]. Every page shares the standalone
@@ -220,7 +218,7 @@ private fun ToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Switch) { onCheckedChange(!checked) }
+            .velnoxClickable(role = Role.Switch) { onCheckedChange(!checked) }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -242,10 +240,10 @@ private fun ToggleRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = VelnoxPrimaryForeground,
-                checkedTrackColor = VelnoxBrand,
+                checkedThumbColor = MaterialTheme.colorScheme.onSecondary,
+                checkedTrackColor = MaterialTheme.colorScheme.secondary,
                 uncheckedThumbColor = MaterialTheme.colorScheme.surface,
-                uncheckedTrackColor = MaterialTheme.colorScheme.outline,
+                uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
                 uncheckedBorderColor = MaterialTheme.colorScheme.outline,
             ),
         )
@@ -311,21 +309,21 @@ private fun EditProfilePage() {
         Row(
             modifier = Modifier
                 .clip(Squircle)
-                .background(VelnoxBrandSoft)
+                .background(MaterialTheme.colorScheme.secondaryContainer)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = VelnoxIcons.Check,
                 contentDescription = null,
-                tint = VelnoxBrand,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = stringResource(R.string.settings_saved_local),
                 style = Text2xs,
-                color = VelnoxBrandSoftForeground,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
         }
     }
@@ -643,4 +641,3 @@ private fun LabeledField(
         }
     }
 }
-

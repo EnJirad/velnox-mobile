@@ -1,12 +1,13 @@
 package com.velnox.app.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -16,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -28,9 +31,6 @@ import com.velnox.app.ui.theme.SquircleXs
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxBrandForeground
-import com.velnox.app.ui.theme.VelnoxBrandSoft
-import com.velnox.app.ui.theme.VelnoxPrimary
 
 /**
  * Shared Velnox layout scale (§9 spacing). Every screen derives spacing from
@@ -64,25 +64,30 @@ fun BrandMark(
     tile: TileStyle = TileStyle.Dark,
 ) {
     val background = when (tile) {
-        TileStyle.Dark -> VelnoxPrimary
+        TileStyle.Dark -> MaterialTheme.colorScheme.surface
         TileStyle.Brand -> VelnoxBrand
     }
-    val foreground = when (tile) {
-        TileStyle.Dark -> VelnoxBrand
-        TileStyle.Brand -> VelnoxBrandForeground
+    // Derive Light/Dark from the applied scheme rather than the OS setting: a
+    // manual Light choice on a dark-system phone must still show the slate mark.
+    val lightSurface = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    val mark = when {
+        tile == TileStyle.Brand -> R.drawable.ic_velnox_mark_white
+        lightSurface -> R.drawable.ic_velnox_mark_slate
+        else -> R.drawable.ic_velnox_mark_white
     }
     Box(
         modifier = modifier
             .size(size.dp)
             .clip(SquircleSm)
-            .background(background),
+            .background(background)
+            .border(1.dp, MaterialTheme.colorScheme.outline, SquircleSm),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_velnox_mark),
+            painter = painterResource(mark),
             contentDescription = null,
-            tint = foreground,
-            modifier = Modifier.size(width = size.dp * 0.56f, height = size.dp * 0.42f),
+            tint = Color.Unspecified,
+            modifier = Modifier.size(width = size.dp * 0.62f, height = size.dp * 0.47f),
         )
     }
 }
@@ -110,9 +115,10 @@ fun SectionHeader(
         if (action != null && onAction != null) {
             Row(
                 modifier = Modifier
+                    .heightIn(min = 44.dp)
                     .clip(SquircleXs)
-                    .clickable(role = Role.Button, onClick = onAction)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .velnoxClickable(role = Role.Button, onClick = onAction)
+                    .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -140,10 +146,10 @@ fun BrandBadge(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         style = Text2xs,
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
         modifier = modifier
             .clip(SquircleXs)
-            .background(VelnoxBrandSoft)
+            .background(MaterialTheme.colorScheme.secondaryContainer)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )
 }

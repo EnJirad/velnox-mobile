@@ -23,6 +23,7 @@ import com.velnox.app.core.preferences.VelnoxPreferencesProvider
 import com.velnox.app.feature.auth.LoginScreen
 import com.velnox.app.feature.cart.CartScreen
 import com.velnox.app.feature.cart.CartState
+import com.velnox.app.feature.home.CategoryScreen
 import com.velnox.app.feature.home.HomeScreen
 import com.velnox.app.feature.messages.ConversationScreen
 import com.velnox.app.feature.messages.MessagesScreen
@@ -86,11 +87,12 @@ private fun VelnoxNavHost() {
         overlayKey = null
     }
 
-    // Child page → Settings hub → tabs → Home tab. On Home, the system exits.
+    // Child page → Settings hub / category hub → tabs → Home tab. On Home, the system exits.
     BackHandler(enabled = signedIn && (overlayKey != null || tab != AppTab.Home)) {
         val current = overlayKey
         when {
             current != null && current.startsWith("settings/") -> overlayKey = "settings"
+            current != null && current.startsWith("category:") -> overlayKey = "category"
             current != null -> closeOverlay()
             tab != AppTab.Home -> openTab(AppTab.Home)
         }
@@ -123,11 +125,6 @@ private fun VelnoxNavHost() {
                                 cart = cart,
                                 onOpenOverlay = { overlayKey = it },
                                 onOpenTab = ::openTab,
-                                onSignOut = {
-                                    signedIn = false
-                                    tabKey = AppTab.Home.key
-                                    overlayKey = null
-                                },
                             )
                         }
                     }
@@ -142,25 +139,46 @@ private fun VelnoxNavHost() {
                         },
                     )
 
+                    "category" -> CategoryScreen(
+                        initialCategoryId = null,
+                        onBack = ::closeOverlay,
+                        onOpenListing = { overlayKey = "category:$it" },
+                        onOpenProduct = { overlayKey = "product:$it" },
+                    )
+
                     else -> {
-                        val page = SettingsPage.fromKey(overlay)
-                        if (page != null) {
-                            SettingsDetailScreen(page = page, onBack = ::closeOverlay)
-                        } else if (overlay.startsWith("order:")) {
-                            OrderDetailScreen(
-                                orderId = overlay.removePrefix("order:"),
-                                onBack = ::closeOverlay,
-                            )
-                        } else if (overlay.startsWith("thread:")) {
-                            ConversationScreen(
-                                threadId = overlay.removePrefix("thread:"),
-                                onBack = ::closeOverlay,
+                        if (overlay.startsWith("category:")) {
+                            CategoryScreen(
+                                initialCategoryId = overlay.removePrefix("category:"),
+                                onBack = { overlayKey = "category" },
+                                onOpenListing = { overlayKey = "category:$it" },
+                                onOpenProduct = { overlayKey = "product:$it" },
                             )
                         } else {
-                            PlaceholderDestination(
-                                overlayKey = overlay,
-                                onBack = ::closeOverlay,
-                            )
+                            val page = SettingsPage.fromKey(overlay)
+                            if (page != null) {
+                                // A child page always returns to the Settings hub; the
+                                // hub's own Back is the one that closes the overlay.
+                                SettingsDetailScreen(
+                                    page = page,
+                                    onBack = { overlayKey = "settings" },
+                                )
+                            } else if (overlay.startsWith("order:")) {
+                                OrderDetailScreen(
+                                    orderId = overlay.removePrefix("order:"),
+                                    onBack = ::closeOverlay,
+                                )
+                            } else if (overlay.startsWith("thread:")) {
+                                ConversationScreen(
+                                    threadId = overlay.removePrefix("thread:"),
+                                    onBack = ::closeOverlay,
+                                )
+                            } else {
+                                PlaceholderDestination(
+                                    overlayKey = overlay,
+                                    onBack = ::closeOverlay,
+                                )
+                            }
                         }
                     }
                 }
@@ -175,15 +193,12 @@ private fun TabContent(
     cart: CartState,
     onOpenOverlay: (String) -> Unit,
     onOpenTab: (AppTab) -> Unit,
-    onSignOut: () -> Unit,
 ) {
     when (tab) {
         AppTab.Home -> HomeScreen(
-            onOpenNotifications = { onOpenOverlay("notifications") },
-            onOpenFilter = { onOpenOverlay("search") },
-            onOpenCategory = { onOpenOverlay("category:$it") },
+            onOpenCategoryHub = { onOpenOverlay("category") },
+            onOpenListing = { onOpenOverlay("category:$it") },
             onOpenProduct = { onOpenOverlay("product:$it") },
-            onOpenTab = { key -> AppTab.entries.firstOrNull { it.key == key }?.let(onOpenTab) },
         )
 
         AppTab.Messages -> MessagesScreen(
@@ -210,7 +225,6 @@ private fun TabContent(
             onOpenOrders = { onOpenTab(AppTab.Orders) },
             onOpenWishlist = { onOpenOverlay("wishlist") },
             onOpenMessages = { onOpenTab(AppTab.Messages) },
-            onSignOut = onSignOut,
         )
     }
 }

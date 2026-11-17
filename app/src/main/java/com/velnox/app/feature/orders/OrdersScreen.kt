@@ -2,10 +2,11 @@
 
 package com.velnox.app.feature.orders
 
+import com.velnox.app.ui.components.velnoxClickable
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,8 +58,6 @@ import com.velnox.app.ui.theme.SquircleLg
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxPrimary
-import com.velnox.app.ui.theme.VelnoxPrimaryForeground
 import com.velnox.app.ui.theme.VelnoxTheme
 
 enum class OrderStatus(@StringRes val labelRes: Int, val tone: StatusTone) {
@@ -175,19 +174,26 @@ private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .heightIn(min = 44.dp)
             .clip(Squircle)
-            .background(if (selected) VelnoxPrimary else MaterialTheme.colorScheme.surface)
+            .background(
+                if (selected) MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.surface,
+            )
             .border(
                 width = 1.dp,
-                color = if (selected) VelnoxPrimary else MaterialTheme.colorScheme.outline,
+                color = if (selected) VelnoxBrand else MaterialTheme.colorScheme.outline,
                 shape = Squircle,
             )
-            .clickable(role = Role.Button, onClick = onClick),
+            .velnoxClickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
             style = Text2xs,
-            color = if (selected) VelnoxPrimaryForeground else MaterialTheme.colorScheme.onSurface,
+            color = if (selected) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
             maxLines = 1,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
@@ -202,7 +208,7 @@ private fun OrderCard(order: DemoOrder, onClick: () -> Unit) {
             .clip(SquircleLg)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
-            .clickable(role = Role.Button, onClick = onClick)
+            .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

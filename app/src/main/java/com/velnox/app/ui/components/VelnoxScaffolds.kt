@@ -2,7 +2,6 @@ package com.velnox.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,14 +40,6 @@ import com.velnox.app.ui.theme.SquircleXs
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxBrandSoft
-import com.velnox.app.ui.theme.VelnoxBrandSoftForeground
-import com.velnox.app.ui.theme.VelnoxDestructive
-import com.velnox.app.ui.theme.VelnoxDestructiveSoft
-import com.velnox.app.ui.theme.VelnoxPrimary
-import com.velnox.app.ui.theme.VelnoxPrimaryForeground
-import com.velnox.app.ui.theme.VelnoxSuccessSoft
-import com.velnox.app.ui.theme.VelnoxSuccessSoftForeground
 import com.velnox.app.ui.theme.VelnoxWarning
 import com.velnox.app.ui.theme.VelnoxWarningSoft
 import com.velnox.app.ui.theme.VelnoxWarningSoftForeground
@@ -158,7 +149,7 @@ fun IconActionButton(
         modifier = modifier
             .size(48.dp)
             .clip(Circle)
-            .clickable(role = Role.Button, onClick = onClick),
+            .velnoxClickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -214,14 +205,18 @@ fun SettingRow(
     showChevron: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (danger) VelnoxDestructive else MaterialTheme.colorScheme.onSurface
+    val contentColor = if (danger) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
     val iconBackground = when {
-        danger -> VelnoxDestructiveSoft
-        selected -> VelnoxBrandSoft
+        danger -> MaterialTheme.colorScheme.errorContainer
+        selected -> MaterialTheme.colorScheme.secondaryContainer
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
     val iconTint = when {
-        danger -> VelnoxDestructive
+        danger -> MaterialTheme.colorScheme.error
         selected -> VelnoxBrand
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -229,7 +224,7 @@ fun SettingRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clickable(role = Role.Button, onClick = onClick)
+            .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -297,14 +292,14 @@ fun DangerRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
-            .clickable(role = Role.Button, onClick = onClick)
+            .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = VelnoxDestructive,
+            tint = MaterialTheme.colorScheme.error,
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.size(10.dp))
@@ -312,7 +307,7 @@ fun DangerRow(
             text = title,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = VelnoxDestructive,
+            color = MaterialTheme.colorScheme.error,
         )
     }
 }
@@ -323,18 +318,18 @@ enum class StatusTone { Brand, Success, Warning, Danger, Neutral }
 
 @Composable
 fun StatusChip(text: String, tone: StatusTone, modifier: Modifier = Modifier) {
+    // Core Material container roles follow the active appearance; amber has no
+    // M3 role in this scheme, so its paper pair stays as the documented warning.
     val background = when (tone) {
-        StatusTone.Brand -> VelnoxBrandSoft
-        StatusTone.Success -> VelnoxSuccessSoft
+        StatusTone.Brand, StatusTone.Success -> MaterialTheme.colorScheme.secondaryContainer
         StatusTone.Warning -> VelnoxWarningSoft
-        StatusTone.Danger -> VelnoxDestructiveSoft
+        StatusTone.Danger -> MaterialTheme.colorScheme.errorContainer
         StatusTone.Neutral -> MaterialTheme.colorScheme.surfaceVariant
     }
     val foreground = when (tone) {
-        StatusTone.Brand -> VelnoxBrandSoftForeground
-        StatusTone.Success -> VelnoxSuccessSoftForeground
+        StatusTone.Brand, StatusTone.Success -> MaterialTheme.colorScheme.onSecondaryContainer
         StatusTone.Warning -> VelnoxWarningSoftForeground
-        StatusTone.Danger -> VelnoxDestructive
+        StatusTone.Danger -> MaterialTheme.colorScheme.onErrorContainer
         StatusTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Text(
@@ -414,8 +409,8 @@ fun PrimaryPill(
         modifier = modifier
             .height(48.dp)
             .clip(Squircle)
-            .background(VelnoxPrimary)
-            .clickable(role = Role.Button, onClick = onClick)
+            .background(MaterialTheme.colorScheme.primary)
+            .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -423,7 +418,7 @@ fun PrimaryPill(
         Text(
             text = label,
             style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-            color = VelnoxPrimaryForeground,
+            color = MaterialTheme.colorScheme.onPrimary,
         )
     }
 }
@@ -441,7 +436,7 @@ fun ChoiceRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clickable(role = Role.RadioButton, onClick = onClick)
+            .velnoxClickable(role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -518,7 +513,7 @@ private fun StepButton(
         modifier = Modifier
             .size(30.dp)
             .clip(SquircleSm)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+            .velnoxClickable(role = Role.Button, enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -572,7 +567,10 @@ fun InitialsAvatar(
         modifier = modifier
             .size(size.dp)
             .clip(Circle)
-            .background(if (brand) VelnoxBrandSoft else MaterialTheme.colorScheme.surfaceVariant),
+            .background(
+                if (brand) MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -580,7 +578,11 @@ fun InitialsAvatar(
             style = if (size >= 56) MaterialTheme.typography.titleLarge else TextXs.copy(
                 fontWeight = FontWeight.SemiBold,
             ),
-            color = if (brand) VelnoxBrandSoftForeground else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (brand) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         )
     }
 }

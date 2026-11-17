@@ -25,7 +25,17 @@
     <string name="home_greeting_evening">ညနေခင်း မင်္ဂလာပါ</string>
     <string name="home_location">ဘန်ကောက် ၁၀၁၁၀</string>
     <string name="home_notifications">အသိပေးချက်များ</string>
+    <string name="notifications_empty_title">အသိပေးချက် မရှိသေးပါ</string>
+    <string name="notifications_empty_body">အမှာစာ အပ်ဒိတ်နှင့် Velnox သတင်းများ ရရှိပါက ဤနေရာတွင် ပြပါမည်။</string>
     <string name="home_search_placeholder">ကုန်ပစ္စည်း၊ တံဆိပ် သို့မဟုတ် အမျိုးအစား ရှာရန်</string>
+    <string name="home_search_clear">ရှာဖွေမှု ရှင်းလင်းရန်</string>
+    <string name="home_search_results_title">ရှာဖွေမှု ရလဒ်များ</string>
+    <string name="home_search_no_results_title">ကုန်ပစ္စည်း မတွေ့ပါ</string>
+    <string name="home_search_no_results_body">အခြားကုန်ပစ္စည်းအမည်၊ ဆိုင် သို့မဟုတ် အမျိုးအစားဖြင့် ထပ်ရှာပါ။</string>
+    <string name="home_category_open">အမျိုးအစားအားလုံး ဖွင့်ရန်</string>
+    <string name="home_category_empty_title">ဤအမျိုးအစားတွင် ကုန်ပစ္စည်း မရှိသေးပါ</string>
+    <string name="home_category_empty_body">အခြားအမျိုးအစားကို ရွေးပါ သို့မဟုတ် ကုန်ပစ္စည်းအားလုံးကို ကြည့်ပါ။</string>
+    <string name="home_all_products_title">ကုန်ပစ္စည်းအားလုံး</string>
     <string name="home_filter">စစ်ထုတ်ရန်</string>
     <string name="home_trust_delivery">သတ်မှတ်ပမာဏအထက် အခမဲ့ပို့</string>
     <string name="home_trust_secure">လုံခြုံသော ငွေပေးချေမှု</string>
