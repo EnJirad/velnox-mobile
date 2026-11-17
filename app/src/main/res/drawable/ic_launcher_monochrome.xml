@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon layer (Android 13+): same approved Velnox symbol as a white silhouette.
+     Same geometry as ic_launcher_foreground.xml; the system tints this layer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.11708"
+        android:scaleY="0.11708"
+        android:translateX="28.125"
+        android:translateY="34.663">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M192.71 171.5L195.89 177L208.59 155L124.88 10L7.47 10L85.13 144.5L88.3 150L101 128L45.58 32L112.17 32Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M198 216.33L161.72 153.5L158.55 148L145.85 170L198 260.33L329.83 32L396.42 32L341 128L353.7 150L356.87 144.5L434.53 10L317.12 10Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M186.45 320L209.55 320L296.15 170L283.45 148L280.28 153.5L198 296L122.27 164.84L145.27 125L104.86 55L79.45 55L82.63 60.5L119.87 125L96.87 164.84Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M233.32 314.5L230.15 320L255.55 320L345.13 164.84L322.13 125L359.37 60.5L362.55 55L337.14 55L296.73 125L319.73 164.84Z" />
+    </group>
+</vector>
