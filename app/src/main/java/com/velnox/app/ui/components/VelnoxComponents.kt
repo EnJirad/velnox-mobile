@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -55,7 +56,7 @@ val ContentMaxWidth = 560.dp
 
 enum class TileStyle { Dark, Brand }
 
-/** The Velnox mark: a squircle tile carrying the emerald V. */
+/** The Velnox mark: a squircle tile carrying the approved logo symbol. */
 @Composable
 fun BrandMark(
     modifier: Modifier = Modifier,
@@ -77,14 +78,11 @@ fun BrandMark(
             .background(background),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = stringResource(R.string.brand_mark),
-            style = if (size >= 32) {
-                MaterialTheme.typography.titleMedium
-            } else {
-                MaterialTheme.typography.labelMedium
-            },
-            color = foreground,
+        Icon(
+            painter = painterResource(R.drawable.ic_velnox_mark),
+            contentDescription = null,
+            tint = foreground,
+            modifier = Modifier.size(width = size.dp * 0.56f, height = size.dp * 0.42f),
         )
     }
 }

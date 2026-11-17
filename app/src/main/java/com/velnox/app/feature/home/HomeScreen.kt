@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -32,6 +33,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +56,7 @@ import com.velnox.app.ui.components.BrandMark
 import com.velnox.app.ui.components.ContentMaxWidth
 import com.velnox.app.ui.components.PageGutter
 import com.velnox.app.ui.components.SectionHeader
+import com.velnox.app.ui.components.VelnoxSpacing
 import com.velnox.app.ui.components.TrustRow
 import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.Circle
@@ -65,10 +69,20 @@ import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxBrandForeground
 import com.velnox.app.ui.theme.VelnoxBrandSoft
+import com.velnox.app.ui.theme.VelnoxBrandSoftForeground
+import com.velnox.app.ui.theme.VelnoxDestructiveSoft
+import com.velnox.app.ui.theme.VelnoxDestructiveSoftForeground
 import com.velnox.app.ui.theme.VelnoxForeground
 import com.velnox.app.ui.theme.VelnoxPrimary
 import com.velnox.app.ui.theme.VelnoxPrimaryForeground
+import com.velnox.app.ui.theme.VelnoxSecondary
+import com.velnox.app.ui.theme.VelnoxSlate50
+import com.velnox.app.ui.theme.VelnoxSlate200
+import com.velnox.app.ui.theme.VelnoxSlate600
+import com.velnox.app.ui.theme.VelnoxSlate700
 import com.velnox.app.ui.theme.VelnoxTheme
+import com.velnox.app.ui.theme.VelnoxWarningSoft
+import com.velnox.app.ui.theme.VelnoxWarningSoftForeground
 
 /**
  * Velnox Home — the marketplace feed of the app.
@@ -92,6 +106,7 @@ fun HomeScreen(
 ) {
     // The feed is capped and centred so tablets keep a readable line length.
     // The bottom bar is owned by the nav shell, not by this screen.
+    var selectedCategory by rememberSaveable { mutableStateOf("all") }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -106,6 +121,8 @@ fun HomeScreen(
             onOpenFilter = onOpenFilter,
             onOpenCategory = onOpenCategory,
             onOpenProduct = onOpenProduct,
+            selectedCategory = selectedCategory,
+            onSelectCategory = { selectedCategory = it },
         )
     }
 }
@@ -117,6 +134,8 @@ private fun HomeFeed(
     onOpenFilter: () -> Unit,
     onOpenCategory: (String) -> Unit,
     onOpenProduct: (String) -> Unit,
+    selectedCategory: String,
+    onSelectCategory: (String) -> Unit,
 ) {
     LazyColumn(
         modifier = modifier,
@@ -130,30 +149,33 @@ private fun HomeFeed(
                     .fillMaxWidth()
                     .padding(horizontal = PageGutter),
             ) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(VelnoxSpacing.lg))
                 SearchBar(onOpenFilter = onOpenFilter)
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(VelnoxSpacing.lg))
                 TrustRow()
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(VelnoxSpacing.xl))
             }
         }
 
         item {
             HomeBand(title = stringResource(R.string.home_categories_title)) {
-                Row(
-                    modifier = Modifier.padding(horizontal = PageGutter),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = PageGutter),
+                    horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
                 ) {
-                    HomeCatalog.categories.forEach { category ->
+                    items(HomeCatalog.categories) { category ->
                         CategoryCard(
                             category = category,
-                            selected = category.id == "all",
-                            onClick = { onOpenCategory(category.id) },
+                            selected = selectedCategory == category.id,
+                            onClick = {
+                                onSelectCategory(category.id)
+                                onOpenCategory(category.id)
+                            },
                         )
                     }
                 }
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(VelnoxSpacing.xxl))
         }
 
         item {
@@ -162,12 +184,12 @@ private fun HomeFeed(
                     .fillMaxWidth()
                     .padding(horizontal = PageGutter),
             ) {
-                HeroBanner(onClick = { onOpenCategory("select") })
+                HeroBanner(onClick = { onOpenCategory("all") })
             }
         }
 
         item {
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(VelnoxSpacing.xxxl))
             HomeBand(
                 title = stringResource(R.string.home_rail_categories_title),
                 subtitle = stringResource(R.string.home_rail_categories_subtitle),
@@ -177,7 +199,7 @@ private fun HomeFeed(
         }
 
         item {
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(VelnoxSpacing.xxxl))
             GridSection(
                 eyebrow = stringResource(R.string.home_grid_eyebrow),
                 title = stringResource(R.string.home_featured_title),
@@ -188,7 +210,7 @@ private fun HomeFeed(
         }
 
         item {
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(VelnoxSpacing.xxxl))
             HomeBand(
                 title = stringResource(R.string.home_popular_title),
                 subtitle = stringResource(R.string.home_popular_subtitle),
@@ -204,7 +226,7 @@ private fun HomeFeed(
         }
 
         item {
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(VelnoxSpacing.xxxl))
             HomeBand(
                 title = stringResource(R.string.home_new_title),
                 action = stringResource(R.string.home_see_all),
@@ -219,7 +241,7 @@ private fun HomeFeed(
         }
 
         item {
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(VelnoxSpacing.xxxl))
             Text(
                 text = stringResource(R.string.home_preview_note),
                 style = Text2xs,
@@ -299,7 +321,7 @@ private fun IconCircleButton(
 ) {
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(48.dp)
             .clip(Circle)
             .background(MaterialTheme.colorScheme.background)
             .border(1.dp, MaterialTheme.colorScheme.outline, Circle)
@@ -316,7 +338,7 @@ private fun IconCircleButton(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 9.dp, end = 10.dp)
+                    .padding(top = 11.dp, end = 11.dp)
                     .size(6.dp)
                     .clip(Circle)
                     .background(VelnoxBrand),
@@ -404,7 +426,7 @@ private fun HomeBand(
                 )
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(VelnoxSpacing.md))
         content()
     }
 }
@@ -493,7 +515,7 @@ private fun HeroBanner(onClick: () -> Unit) {
                 .padding(18.dp),
         ) {
             BrandBadge(text = stringResource(R.string.home_hero_badge))
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(VelnoxSpacing.md))
             Text(
                 text = stringResource(R.string.home_hero_title),
                 style = MaterialTheme.typography.headlineMedium,
@@ -510,6 +532,7 @@ private fun HeroBanner(onClick: () -> Unit) {
             Spacer(Modifier.height(14.dp))
             Row(
                 modifier = Modifier
+                    .heightIn(min = 44.dp)
                     .clip(SquircleSm)
                     .background(VelnoxBrand)
                     .clickable(role = Role.Button, onClick = onClick)
@@ -621,7 +644,7 @@ private fun GridSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(VelnoxSpacing.md))
             Column(
                 modifier = Modifier.padding(horizontal = PageGutter),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -661,7 +684,7 @@ private fun ProductCard(
             .padding(8.dp),
     ) {
         ProductArtTile(art = product.art, modifier = Modifier.aspectRatio(1f))
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(VelnoxSpacing.sm))
         Text(
             text = stringResource(product.name),
             style = TextXs.copy(fontWeight = FontWeight.Medium),
@@ -759,14 +782,14 @@ fun ProductArtTile(
 private data class ArtTint(val soft: Color, val strong: Color)
 
 private fun artTint(art: ProductArt): ArtTint = when (art) {
-    ProductArt.Jacket -> ArtTint(Color(0xFFE2E8F0), Color(0xFF475569))
-    ProductArt.Headphones -> ArtTint(Color(0xFFECFDF5), Color(0xFF047857))
-    ProductArt.Tote -> ArtTint(Color(0xFFF1F5F9), Color(0xFF334155))
-    ProductArt.Watch -> ArtTint(Color(0xFFFEF3C7), Color(0xFF92400E))
-    ProductArt.Mug -> ArtTint(Color(0xFFFFF7ED), Color(0xFF9A3412))
-    ProductArt.Lamp -> ArtTint(Color(0xFFFEF9C3), Color(0xFF854D0E))
-    ProductArt.Sneaker -> ArtTint(Color(0xFFF8FAFC), Color(0xFF0F172A))
-    ProductArt.Serum -> ArtTint(Color(0xFFFCE7F3), Color(0xFF9D174D))
+    ProductArt.Jacket -> ArtTint(VelnoxSlate200, VelnoxSlate600)
+    ProductArt.Headphones -> ArtTint(VelnoxBrandSoft, VelnoxBrandSoftForeground)
+    ProductArt.Tote -> ArtTint(VelnoxSecondary, VelnoxSlate700)
+    ProductArt.Watch -> ArtTint(VelnoxWarningSoft, VelnoxWarningSoftForeground)
+    ProductArt.Mug -> ArtTint(VelnoxWarningSoft, VelnoxDestructiveSoftForeground)
+    ProductArt.Lamp -> ArtTint(VelnoxWarningSoft, VelnoxWarningSoftForeground)
+    ProductArt.Sneaker -> ArtTint(VelnoxSlate50, VelnoxForeground)
+    ProductArt.Serum -> ArtTint(VelnoxDestructiveSoft, VelnoxDestructiveSoftForeground)
 }
 
 /** Minimal line glyphs, drawn on the same 24-unit grid as the icon set. */
@@ -946,6 +969,34 @@ private fun HomePhonePreview() {
 @Composable
 private fun HomeWidePreview() {
     VelnoxTheme(darkTheme = false) {
+        HomeScreen(
+            onOpenNotifications = {},
+            onOpenFilter = {},
+            onOpenCategory = {},
+            onOpenProduct = {},
+            onOpenTab = {},
+        )
+    }
+}
+
+@Preview(name = "Home 320dp", showBackground = true, widthDp = 320, heightDp = 760)
+@Composable
+private fun HomeCompactPreview() {
+    VelnoxTheme(darkTheme = false) {
+        HomeScreen(
+            onOpenNotifications = {},
+            onOpenFilter = {},
+            onOpenCategory = {},
+            onOpenProduct = {},
+            onOpenTab = {},
+        )
+    }
+}
+
+@Preview(name = "Home dark", showBackground = true, widthDp = 390, heightDp = 900)
+@Composable
+private fun HomeDarkPreview() {
+    VelnoxTheme(darkTheme = true) {
         HomeScreen(
             onOpenNotifications = {},
             onOpenFilter = {},

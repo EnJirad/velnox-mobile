@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- In-app Velnox mark. The four paths are copied verbatim from the approved
+     .ai/velnox-logo-pack/svg/app-icons/velnox-app-icon-emerald.svg white symbol.
+     The viewport is the symbol's own bounding box, so it stays crisp in headers
+     and on the login screen without a simplified letter V. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="427.06"
+    android:viewportHeight="320.33">
+    <group android:translateX="-7.47" android:translateY="-10">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M192.71 171.5L195.89 177L208.59 155L124.88 10L7.47 10L85.13 144.5L88.3 150L101 128L45.58 32L112.17 32Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M198 216.33L161.72 153.5L158.55 148L145.85 170L198 260.33L329.83 32L396.42 32L341 128L353.7 150L356.87 144.5L434.53 10L317.12 10Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M186.45 320L209.55 320L296.15 170L283.45 148L280.28 153.5L198 296L122.27 164.84L145.27 125L104.86 55L79.45 55L82.63 60.5L119.87 125L96.87 164.84Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M233.32 314.5L230.15 320L255.55 320L345.13 164.84L322.13 125L359.37 60.5L362.55 55L337.14 55L296.73 125L319.73 164.84Z" />
+    </group>
+</vector>
