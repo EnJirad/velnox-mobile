@@ -1,32 +1,33 @@
 # AI_HANDOFF.md — Velnox Mobile Current Snapshot
 
-> **Current snapshot (not a log).** What works, what's broken, decisions, next steps.
+> **Current snapshot (not a log).** Supersedes the Phase 2/UI-audit snapshots,
+> archived verbatim in `.ai/history/`.
 > Statuses: **VERIFIED / UNVERIFIED / FAILED / BLOCKED / SKIPPED / NOT TESTED**.
-> Supersedes the 2026-11-17 Phase 2 handoff, archived verbatim in `.ai/history/`.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Current State (2026-11-17, run 44140832100)
+## Current State (2026-11-17, run 44157230905)
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Five-tab navigation | **VERIFIED (source unchanged)** | Home, Messages, Orders, Cart, Profile; shared bottom bar |
-| Tab state preservation | **VERIFIED (source unchanged)** | `SaveableStateHolder` per tab key; runtime not exercised |
-| Back behaviour | **VERIFIED (source unchanged)** | Settings child → hub → tab root → Home → system exit |
-| Home | **VERIFIED (compile)** | Scrollable category row, saved selection, corrected hero CTA, token rhythm, 320dp/dark previews |
-| Profile | **VERIFIED (compile)** | Larger edit/add targets, corrected default badge, truncated-safe name, 320dp/dark previews |
-| Settings | **VERIFIED (compile)** | Hub + 13 child screens unchanged; selected language/appearance cues, distinct Privacy icon, separated add-address card |
-| Messages / Orders / Cart | **VERIFIED (compile)** | Neutral disabled states, localized placeholders, 44–48dp targets, accessible chevron |
-| Login / dialog / empty states | **VERIFIED (compile)** | 48dp primary/social/close targets, larger checkbox target, dark preview |
-| Localisation | **VERIFIED (packaged)** | 282 keys × th/en/my, identical key sets, no raw UI literals in Kotlin |
-| Theme | **VERIFIED (compile)** | Light / Dark / System logic unchanged; dark previews added |
-| Persistence | **VERIFIED (source unchanged)** | DataStore preferences and locale provider untouched |
-| Launcher branding | **VERIFIED (APK contents)** | Approved SVG paths in standard/round/monochrome layers and in-app `BrandMark` |
-| CI build | **VERIFIED** | `BUILD SUCCESSFUL in 1m 51s`, run 44140832100 |
-| APK artifact | **VERIFIED** | 10,732,671 bytes; SHA-256 `27621718ed67e32f7bd282b366b2f465d25f0dfa29101aa6d4c560669f2a4d2c`; `unzip -t` clean |
-| Inspo MCP | **VERIFIED AVAILABLE** | Marketplace mobile references found; patterns adapted, no brand copied |
-| On-device runtime | **NOT TESTED** | No install route in this session; no claim of device verification |
+| Five-tab navigation | **VERIFIED (source unchanged)** | Home, Messages, Orders, Cart, Profile; per-tab `SaveableStateHolder` |
+| Home fixed toolbar | **VERIFIED (compile)** | Logo, editable search, notification bell; status-bar inset; never scrolls |
+| Home sticky categories | **VERIFIED (compile)** | Seasonal banner → sticky Popular Categories → featured → full feed; one `LazyColumn` |
+| Home search | **VERIFIED (compile + static logic)** | Localized local search over name/store/tag/category; clear action and empty state |
+| Category destination | **VERIFIED (compile)** | `category` hub and `category:<id>` filtered listing; Back chain to Home |
+| Product feed | **VERIFIED (compile)** | Lazy rows, stable product ids, content types, no nested vertical list |
+| Notification popover | **VERIFIED (compile)** | Anchored `DropdownMenu`, outside/back dismiss, honest empty state, no fake data |
+| Profile Sign Out | **VERIFIED (source)** | Removed from Profile; Settings sign-out confirmation and reset preserved |
+| Settings child Back | **VERIFIED (source)** | Arrow and system Back return to Settings hub; hub Back returns to Profile/tab |
+| Dark Mode | **VERIFIED (compile)** | Selected tab, Profile, Messages, Settings, dialogs and emerald pairs use semantic roles |
+| Brand mark | **VERIFIED (APK/source)** | Slate SVG for Light, white SVG for Dark, chosen from the applied scheme |
+| Localisation | **VERIFIED (packaged)** | 292 keys × th/en/my, identical key sets, no raw UI literals in Kotlin |
+| Theme modes | **VERIFIED (source)** | Light / Dark / System still resolve through `ThemeMode` + DataStore |
+| Tap effects | **VERIFIED (source)** | Shared no-indication clickable/toggleable across custom controls |
+| CI build | **VERIFIED** | `BUILD SUCCESSFUL in 2m 23s`, run 44157230905 |
+| APK artifact | **VERIFIED** | 10,773,857 bytes; SHA-256 `cc4ddbde961045d9e9ddc788669b657c7460ce692419ab76e61e4abbec7663d2`; `unzip -t` clean |
+| On-device runtime | **NOT TESTED** | No install route in this session; no device-level claim |
 
 ---
 
@@ -34,49 +35,66 @@
 
 ```
 MainActivity
-└── VelnoxApp (theme + locale providers)
-    ├── signedIn seam (demo, Phase 3)
+└── VelnoxApp (preferences → locale → theme)
+    ├── signedIn seam (demo, Phase 3 backend later)
     └── VelnoxBottomBar + five tabs
         └── Home / Messages / Orders / Cart / Profile
-            └── Overlay destinations: settings, settings/<page>, order/<id>,
-                thread/<id>, placeholder screens
+            ├── Home: fixed toolbar + one LazyColumn
+            │   ├── seasonal banner
+            │   ├── sticky Popular Categories
+            │   ├── featured rail
+            │   └── complete product rows
+            └── Overlay destinations
+                settings, settings/<page>, category, category:<id>,
+                order/<id>, thread/<id>, product:<id>, placeholders
 ```
 
-- `CartState` is hoisted in the nav host, so the cart survives tab switches.
-- Language and theme live in DataStore only; nothing is written to a server.
-- `signedIn` remains the single Phase 3 seam; there is no mock authentication.
-- No Navigation Compose, database, backend auth, payment or new dependency was added.
+- `HomeCatalog` implements `CatalogSource`; a future repository can replace the
+  four read methods without changing Home.
+- `HomeNotifications.items` is empty; no notification backend exists.
+- `CartState` remains hoisted in the nav host.
+- No Navigation Compose, database, backend auth, payment or new dependency.
 
 ---
 
 ## Decisions
 
-1. **Brand source stays untouched.** The approved logo pack is read-only; Android resources are
-   derived copies, never renames. The source SVG's four paths are byte-for-byte identical in the
-   VectorDrawables.
-2. **Adaptive safe zone wins over raw artwork size.** The white symbol is centred and scaled to
-   ≈50 × 36.33dp inside the 108dp viewport, leaving it inside the 66dp safe circle.
-3. **Existing architecture wins.** Navigation, Back chain, DataStore keys and localized-context
-   switching were deliberately not touched.
-4. **Visual fixes are local.** Touch targets, token use, empty/disabled states and hierarchy were
-   corrected without changing screen contracts or introducing new components.
-5. **Rules document is stale.** `.ai/AI_RULES.md` still names VelShop/velshop-mobile and an older
-   artifact name. Source and current workflow were followed instead.
+1. **One vertical lazy system.** `LazyColumn` owns Home; `stickyHeader` provides
+   the category pin. Featured/category rails are horizontal `LazyRow`s only.
+2. **Stable local ids.** `p1`–`p8` are unique; the old `p1b`/`p6b` duplicates were
+   removed. Rows use the joined product ids as their lazy key.
+3. **Search is honest.** Localized local substring search only; the UI states the
+   preview nature and the `CatalogSource` seam is ready for an API.
+4. **Theme-aware branding without OS checks.** `BrandMark` uses
+   `colorScheme.surface.luminance()`, so manual Light/Dark choices win over the
+   system setting.
+5. **Navigation stays one-level with derived parents.** `settings/<page>` →
+   `settings`, `category:<id>` → `category`; no new navigation library.
+6. **No fake notifications.** The popover ships with an empty state and an empty
+   model, not invented order or payment events.
 
 ---
 
 ## What changed this phase
 
-- `res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml`,
-  `ic_launcher_monochrome.xml`, `ic_velnox_mark.xml`
-- `res/mipmap-anydpi-v26/ic_launcher.xml`, `ic_launcher_round.xml`
-- `feature/home/HomeScreen.kt`, `feature/profile/ProfileScreen.kt`
-- `feature/cart/CartScreen.kt`, `feature/messages/MessagesScreen.kt`,
-  `feature/orders/OrdersScreen.kt`
-- `feature/settings/SettingsScreen.kt`, `SettingsDetailScreen.kt`
-- `feature/auth/LoginScreen.kt`, `navigation/VelnoxInfoDialog.kt`
-- `ui/components/VelnoxComponents.kt`, `VelnoxScaffolds.kt`, `ui/icons/VelnoxIcons.kt`
-- `values/strings.xml`, `values-en/strings.xml`, `values-my/strings.xml` (+5 keys each)
+- `feature/home/HomeScreen.kt` — fixed toolbar, sticky categories, search, lazy feed
+- `feature/home/HomeCatalog.kt` — `CatalogSource`, unique products, localized search
+- `feature/home/CategoryScreen.kt` — category hub + filtered listing
+- `feature/home/HomeNotifications.kt` — notification model with empty source
+- `ui/components/VelnoxInteractions.kt` — no-indication clickable/toggleable
+- `ui/components/VelnoxComponents.kt` — theme-aware `BrandMark`, theme-safe badges
+- `ui/components/VelnoxScaffolds.kt` — semantic selected/danger/status roles
+- `navigation/VelnoxApp.kt` — category routes, Settings child Back, Profile sign-out wiring removed
+- `navigation/VelnoxBottomBar.kt` — readable selected label, emerald indicator
+- `feature/profile/ProfileScreen.kt` — Sign Out removed, theme-safe stats/address
+- `feature/settings/SettingsScreen.kt`, `SettingsDetailScreen.kt` — dialog/selected/switch/saved-state colours
+- `feature/messages/MessagesScreen.kt` — readable outgoing bubble
+- `feature/orders/OrdersScreen.kt` — emerald selected filters
+- `feature/cart/CartScreen.kt` — semantic primary/selection colours
+- `feature/auth/LoginScreen.kt` — semantic errors/focus/primary, no colour animation
+- `navigation/VelnoxInfoDialog.kt` — semantic primary button
+- `res/drawable/ic_velnox_mark_slate.xml`, `ic_velnox_mark_white.xml`
+- `values/`, `values-en/`, `values-my/strings.xml` — +10 keys each (292 total)
 
 Full evidence: `.ai/reports/LATEST.md`. Previous snapshots: `.ai/history/`.
 
@@ -84,10 +102,15 @@ Full evidence: `.ai/reports/LATEST.md`. Previous snapshots: `.ai/history/`.
 
 ## Known issues
 
-- Runtime behaviour is still verified only by compilation and APK inspection.
-- Search, filters, product detail and checkout remain honest placeholder destinations.
-- GitHub Actions emits deprecation annotations for `setup-java@v4` / Node 20 actions; not changed here.
-- Unused legacy string keys remain for future screens.
+- Runtime behaviour is verified only by compilation, static logic checks and APK
+  inspection; no device/emulator run.
+- Search is local preview data; no server-wide search or paging.
+- Notifications have no source; only the empty state exists.
+- Category listing is a scrollable column over the small local catalogue; a real
+  backend will need lazy paging there.
+- Product detail and checkout remain placeholder destinations.
+- `.ai/AI_RULES.md` and `.ai/context/project-map.md` still use older VelShop names.
+- GitHub Actions emits `setup-java@v4` / Node 20 deprecation annotations.
 
 ---
 
@@ -109,5 +132,5 @@ No secrets in `.ai/`. No tokens, keystores or passwords in this repository.
 
 ## Signature
 
-> This handoff supersedes the previous Phase 2 snapshot.
-> **Last updated:** 2026-11-17 by the UI audit and brand refinement session.
+> This handoff supersedes the previous snapshots.
+> **Last updated:** 2026-11-17 by the Phase 3 Home/brand/UX session.

@@ -1,17 +1,18 @@
 # LATEST.md — Velnox Mobile Latest Change Report
 
-> **Current snapshot (overwritten each task).** Previous phase archived in `.ai/history/20261117_175235_*`.
+> **Current snapshot (overwritten each task).** Previous phase archived in
+> `.ai/history/20261117_192312_*`.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Task: UI/UX Audit, Visual Refinement and Brand Identity Upgrade
+## Task: Phase 3 — Emerald Identity, Home Experience & UX Fixes
 
 **Date:** 2026-11-17
-**Commits:** `0a496d7` (launcher), `ae00aa8` (Home), `6da1cca` (Profile),
-`d56979c` (commerce screens), `b5c932a` (Settings), `56446f0` (login/shared)
-**Verified CI run:** [44140832100](https://github.com/EnJirad/velnox-mobile/actions/runs/44140832100)
-**Status:** **VERIFIED — BUILD SUCCESSFUL** (`BUILD SUCCESSFUL in 1m 51s`)
+**Commits:** `2a7e887` (Home/navigation/theme), `fa22249` (compile fix),
+`9e3ae6f` (featured rail filtering)
+**Verified CI run:** [44157230905](https://github.com/EnJirad/velnox-mobile/actions/runs/44157230905)
+**Status:** **VERIFIED — BUILD SUCCESSFUL** (`BUILD SUCCESSFUL in 2m 23s`)
 
 ---
 
@@ -19,142 +20,227 @@
 
 | Check | Result |
 |---|---|
-| `git fetch origin main` | Done before any edit |
-| Local vs `origin/main` at start | `a166471` on both sides; divergence `0 0` |
-| Uncommitted tracked work at start | None; only generated `.codegraph/` was untracked |
-| `.codegraph/` | Added to local `.git/info/exclude` only; left on disk, never committed |
-| Navigation, DataStore, i18n provider, CI workflow | Not changed in this phase |
+| `git fetch origin main` | Done before edits |
+| Local vs `origin/main` at start | `bb825a5` on both sides; divergence `0 0` |
+| Uncommitted work at start | None |
+| Prior successful CI | Run 44142464456 (before this phase) |
 | Local Android build | Not run, per `.ai/AI_RULES.md` |
-
-The repository rules still use the older VelShop/velshop-mobile names. Source code and
-the current workflow are authoritative; the rules document was left unchanged.
+| Navigation architecture, DataStore keys, package identity | Preserved |
 
 ---
 
-## 2. UI audit findings and fixes
+## 2. Dark Mode root cause and fix
 
-| Area | Finding before this phase | Action |
-|---|---|---|
-| Launcher | Placeholder dark square with a simplified emerald "V"; both standard and round entries pointed at it | Rebuilt from the approved emerald logo pack SVG |
-| Home | Category chips were a fixed-width `Row` (566dp for 7 items) and clipped at 320dp; selection was hardcoded to `"all"`; hero CTA used a non-existent category id | Switched to scrolling `LazyRow`, added saved selected-category state, corrected CTA id |
-| Home | Icon button 40dp, hero CTA ~32dp, ad-hoc 6/12/16/20/24/28/32dp spacing, arbitrary product-art colours | 48dp icon target, 44dp CTA, `VelnoxSpacing` tokens, design-system slate/brand/warning/destructive tints |
-| Profile | Edit-pencil target 32dp, add-address row below 48dp, secondary address mislabelled as "primary", long name could clip | 44dp pencil, 48dp row, real secondary-address string with default badge only on primary, ellipsis + weight for name |
-| Messages | Disabled send control used emerald soft colours, implying an active action | Muted surface-variant background and foreground |
-| Orders | Filter pills below 44dp, chevron without content description, hardcoded em-dash placeholders | 44dp centred pills, localized accessibility label, localized placeholder |
-| Cart | Checkbox target 20dp, remove target ~32dp, disabled checkout used emerald soft, hardcoded em-dashes | 48dp checkbox/remove targets, neutral disabled state, localized placeholder |
-| Settings | Current language/appearance rows had no selected cue; Privacy reused the Security shield; address rows and add action mixed in one card | Emerald selected icon tint, new Lucide-style `EyeOff` icon, separate add-address card |
-| Settings detail | Hardcoded phone and password placeholders, hardcoded em-dash, fixed 46dp field | Localized placeholders in all three locales, 48dp minimum field height |
-| Login/dialog | Primary/social buttons and dialog close had inconsistent heights (50/46/40dp); remember checkbox target 18dp | 48dp buttons and dialog close; 48dp touch wrapper around the 20dp checkbox |
-| Shared components | Brand header and login used a text "V" rather than the approved mark; icon buttons 40dp; primary pill 42dp | Approved vector mark in `BrandMark`; 48dp icon buttons; 48dp primary pill |
-| Previews | Mostly 390dp light-only | Added 320dp and dark previews across Home, Profile, Messages, Orders, Cart and Login |
+**Root cause:** static Light-mode tokens were used for text on dynamic surfaces.
+The selected bottom-tab label used `VelnoxForeground` (`#0F172A`) while the dark
+surface is `#0B1220`, so the label disappeared. The same class of bug existed in
+Profile statistics, Messages bubbles, Settings dialog buttons and several
+emerald-soft pairs.
 
-No screen was redesigned for its own sake. Working navigation, preview-data boundaries and
-existing component structure were preserved.
+**Fix:** all user-facing text/icons now resolve through the active scheme:
 
----
-
-## 3. Components changed or reused
-
-**Changed:** `BrandMark`, `SettingRow`, `PrimaryPill`, `IconActionButton`, `SectionHeader`
-consumers, `VelnoxIcons` (one added `EyeOff` glyph).
-
-**Reused:** `VelnoxSpacing`, `Squircle*` shapes, `Text*` type scale, `VelnoxBrand`,
-`VelnoxPrimary`, `VelnoxBrandSoft*`, `VelnoxDestructive*`, `VelnoxWarning*`,
-`SectionCard`, `CardDivider`, `EmptyState`, `PreviewNotice`, `StatusChip`, `StandaloneScreen`,
-`ChoiceRow`, `ProductArtTile`, `TrustRow`, `PageGutter` and `ContentMaxWidth`.
-
-No new dependency, no duplicate design system, no emoji icon, no new brand colour.
+- Bottom tab selected label → `colorScheme.onSurface`; unselected →
+  `colorScheme.onSurfaceVariant`.
+- Profile statistic value → `onSurface`; add-address text and default badge →
+  `onSecondaryContainer` on `secondaryContainer`.
+- Messages outgoing bubble → `secondaryContainer` background with
+  `onSecondaryContainer` text (previously text and background were the same light
+  emerald).
+- Settings sign-out dialog → `colorScheme.error` / `colorScheme.primary`.
+- Login errors, focus borders and success notice → `error`, `secondary` and
+  `onSecondaryContainer`.
+- `SettingRow`, `ChoiceRow`, `StatusChip`, `InitialsAvatar`, `BrandBadge`,
+  `PreviewNotice`, `PrimaryPill`, `VelnoxInfoDialog` → semantic roles.
+- `BrandMark` derives Light/Dark from the **applied** `colorScheme.surface`
+  luminance, not `isSystemInDarkTheme()`, so a manual Light choice on a dark-system
+  phone still shows the slate logo.
 
 ---
 
-## 4. Logo conversion and launcher implementation
+## 3. Emerald identity
 
-Source: `.ai/velnox-logo-pack/svg/app-icons/velnox-app-icon-emerald.svg` (untouched).
+Used only existing tokens (`VelnoxBrand`, `secondaryContainer`,
+`onSecondaryContainer`):
 
-- The SVG contains a full-bleed `#10B981` rect and a white four-path symbol with
-  `translate(130.41 227.1) scale(1.73)`.
-- All four `d` attributes were copied verbatim into three VectorDrawables; a script confirmed
-  `SVG paths: 4 / VectorDrawable paths: 4 / exact match: True`.
-- `ic_launcher_background.xml`: full-bleed `#10B981` at the 108dp adaptive viewport.
-- `ic_launcher_foreground.xml`: white symbol only. Raw bounding box
-  `x 7.47..434.53`, `y 10..320.33` (427.06 × 310.33) was centred at (54,54) with
-  `scale 0.11708` and `translate 28.125, 34.663`; result ≈50 × 36.33dp,
-  diagonal ≈61.8dp, inside the 66dp adaptive safe circle.
-- `ic_launcher_monochrome.xml`: same geometry for Android 13+ themed icons.
-- `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` both reference the new
-  background, foreground and monochrome layers; manifest references were already correct.
-- `ic_velnox_mark.xml`: tight-viewport version of the same four paths for in-app branding;
-  `BrandMark` now renders this vector in Home and Login instead of a text letter.
-- XML well-formedness and path equality were checked locally. Standard, round, monochrome,
-  foreground and in-app mark resources are all present in the downloaded APK.
+- Selected bottom-tab indicator: emerald tint (`VelnoxBrand.copy(alpha = 0.16f)`)
+  with emerald icon.
+- Selected Popular Categories chip: emerald container, emerald border and icon.
+- Search icon and focus border: emerald.
+- Orders filter pills: selected state is emerald instead of slate.
+- Category hub icon tiles, featured tags, message bubbles, success notice and
+  notification empty-state tile: emerald container roles.
+- Add to Cart / checkout remains dark primary; destructive remains red; warning
+  remains amber. No new brand colour was introduced.
 
 ---
 
-## 5. Inspo MCP availability and actual research
+## 4. Fixed Home toolbar
 
-**Available.** No paywall was encountered in this phase.
+`HomeScreen` is now a `Column`:
 
-| Call | Result used |
+```
+HomeToolbar (fixed, statusBarsPadding, surface, bottom divider)
+└── BoxWithConstraints → LazyColumn (one scrolling system)
+```
+
+The toolbar is `[BrandMark] [editable search field] [notification bell]`.
+Greeting, location row and the separate search row were removed. The search
+field is the only search entry point on Home.
+
+---
+
+## 5. Sticky category discovery
+
+Feed order:
+
+1. Seasonal collection banner
+2. **Sticky** Popular Categories header (`LazyColumn.stickyHeader`)
+3. Trust row
+4. Featured rail (filtered by the active category)
+5. Complete local product grid
+
+The sticky header is opaque, has a 2dp shadow and a bottom divider, and pins to the
+bottom edge of the fixed toolbar. Scrolling back to the banner returns it to its
+natural position. The duplicate "Shop by Category" rail was deleted.
+
+The header title has an emerald right-arrow that opens the dedicated category
+screen. The category chip row scrolls horizontally; the selected chip filters the
+feed in place.
+
+---
+
+## 6. Dedicated Category screen and listing
+
+New `feature/home/CategoryScreen.kt`:
+
+- `category` overlay → category hub with every local category and a product count.
+- `category:<id>` overlay → filtered product listing with the selected chip,
+  product grid and an empty state.
+- Listing Back arrow → category hub; hub Back arrow → Home.
+- System Back follows the same chain via the `category:` branch in `VelnoxApp`.
+- All labels come from the three locale files; no hardcoded UI text.
+
+---
+
+## 7. Local search
+
+`HomeCatalog` now exposes a replaceable `CatalogSource` interface:
+
+```kotlin
+fun categories(): List<Category>
+fun products(): List<ProductPreview>
+fun productsIn(categoryId: String): List<ProductPreview>
+fun search(query: String, context: Context): List<ProductPreview>
+```
+
+Search resolves `name`, `store`, qualitative tag and category labels through the
+localized `Context` supplied by `VelnoxLocaleProvider`, then does case-insensitive
+substring matching. It works in Thai, English and Burmese and filters the same
+lazy feed in place.
+
+**Limitation:** this is local preview data only. There is no server-wide search,
+no Neon/API connection and no paging. A future repository can implement the same
+four methods without rewriting the Home UI.
+
+---
+
+## 8. Lazy product feed
+
+- One `LazyColumn` owns vertical scrolling; there is no nested vertical list.
+- Product rows are `items(products.chunked(columns), key = row.joinToString("|") { id }, contentType = "productRow")`.
+- Product ids are unique across the complete catalogue; the previous `p1b`/`p6b`
+  duplicates were removed.
+- Off-screen rows leave composition through Compose's lazy layout; there is no
+  manual deletion, fading or artificial paging.
+- Horizontal featured/category rails are `LazyRow`s with stable ids and content
+  types; they do not fight vertical gestures.
+- 320dp → 2 columns, <600dp → 3, wider → 4.
+
+---
+
+## 9. Notification popover
+
+- Bell opens an M3 `DropdownMenu` anchored to the bell, below the toolbar.
+- Outside tap and system Back dismiss it; the user stays on Home.
+- Empty state: "No notifications yet" plus an honest local-data note.
+- `HomeNotifications.items` is an empty list; no fake orders, payments, shipping
+  or security events were invented.
+- Unread dot is rendered only when `notifications.any { it.unread }`; with the
+  empty source it is absent.
+
+---
+
+## 10. Navigation and interaction fixes
+
+| Fix | Detail |
 |---|---|
-| `search_screens(query="mobile marketplace ecommerce home screen category discovery product cards search clean white", device="mobile", limit=8)` | Real slugs returned: `amazon-com`, `fellowproducts-com`, `parachutehome-com`, `bandcamp-com`, `bose-com`, `columbia-com`, `italic-com`, `apple-com` |
-| `find_components(type="pricing", device="mobile")` | Returned no usable component catalogue data; nothing was inferred from it |
-
-Patterns adapted, never copied: search-first header with a compact category entry, clear section
-titles with generous spacing between sections, card grids with restrained accent colour, one
-primary CTA per hero block, and muted product-story surfaces. No brand identity, copy or pixel
-layout from those sites was reproduced.
+| Profile Sign Out removed | Duplicate `DangerRow` and `onSignOut` wiring deleted; Settings sign-out dialog and session reset untouched |
+| Settings child Back | `SettingsDetailScreen` now receives `onBack = { overlayKey = "settings" }`; every child arrow returns to the hub, and system Back matches |
+| Settings hub Back | Still `closeOverlay()` → Profile (or the originating tab) |
+| Tap effects | New `VelnoxInteractions.kt` provides `velnoxClickable` / `velnoxToggleable` with remembered `MutableInteractionSource`, `indication = null`, preserved `Role`, enabled state and semantics; applied across all custom controls |
+| Animated colour | Removed the login field's `animateColorAsState`; focus/error borders switch directly |
+| Preserved | Switch behaviour, loading spinner, keyboard actions, disabled states, TalkBack roles, 44–48dp targets |
 
 ---
 
-## 6. Localization and theme verification
+## 11. Theme-aware brand mark
+
+Source assets (untouched):
+
+- `.ai/velnox-logo-pack/svg/mark/velnox-mark-slate.svg`
+- `.ai/velnox-logo-pack/svg/mark/velnox-mark-white.svg`
+
+Converted to `res/drawable/ic_velnox_mark_slate.xml` and
+`ic_velnox_mark_white.xml`. A script confirmed all four `d` paths are byte-for-byte
+identical to the SVGs and the fills are `#0F172A` / `#FFFFFF`.
+`BrandMark` picks the drawable from `colorScheme.surface.luminance()`, so Light,
+Dark and System all switch immediately without an OS-theme check.
+
+---
+
+## 12. Localization and accessibility
 
 | Check | Result |
 |---|---|
-| Key counts | 282 in `values`, `values-en`, `values-my` |
-| Key-name hash | Identical (`7f62e02afa70b1ee9c60964a1d57c834`) across all three files |
-| Raw Thai/Burmese literals in Kotlin | None found |
-| Literal `text = "..."` user strings in Kotlin | None found |
-| Theme modes | `ThemeMode.LIGHT`, `DARK`, `SYSTEM` unchanged; `VelnoxApp.kt` still resolves `SYSTEM` via `isSystemInDarkTheme()` |
-| Language switching | `VelnoxLocaleProvider` and DataStore keys untouched; live localized-context approach unchanged |
-| Diff scope | `VelnoxApp.kt`, `VelnoxBottomBar.kt`, `PlaceholderDestination.kt`, `core/preferences/*`, `core/i18n/*`, workflow: unchanged; only `VelnoxInfoDialog.kt` changed inside `navigation/` |
-| Compile-time layout checks | New 320dp and dark previews added; compiled successfully in CI |
+| String counts | 292 in `values`, `values-en`, `values-my` |
+| Key-name hash | Identical (`f0f855027049a802c4a050a26881762d`) |
+| Raw Thai/Myanmar literals in Kotlin | None |
+| Literal `text = "..."` user strings | None |
+| New keys | search clear/results/empty, category open/empty, all products, notification empty |
+| Search logic check | Thai `หูฟังไร้สาย`, English `ANC`, Burmese `ANC` all resolve to product `p2`; `electronics` maps to `p2`/`p4` |
+| Icon descriptions | Search clear, category arrow, notification bell, selected states |
+| Touch targets | Toolbar controls 44dp; category chips 44dp; product rows/cards full-width |
 
-Runtime switching and device rendering were **not** exercised; this remains compile + resource verification only.
+Runtime language/theme switching remains **NOT TESTED** on a device.
 
 ---
 
-## 7. Build and APK
+## 13. Build and APK
 
-- GitHub Actions: [run 44140832100](https://github.com/EnJirad/velnox-mobile/actions/runs/44140832100)
-- Job `Assemble debug APK`: **success**, `BUILD SUCCESSFUL in 1m 51s`
-- Workflow log also confirmed `APK size: 10732671 bytes` and `APK integrity: OK`
-- Artifact: `velnox-debug-apk`, downloaded and independently checked
-- Local copy: 10,732,671 bytes
-- SHA-256: `27621718ed67e32f7bd282b366b2f465d25f0dfa29101aa6d4c560669f2a4d2c`
+- Final GitHub Actions: [run 44157230905](https://github.com/EnJirad/velnox-mobile/actions/runs/44157230905)
+- `BUILD SUCCESSFUL in 2m 23s`; `APK size: 10773857 bytes`; `APK integrity: OK`
+- Artifact downloaded: `velnox-debug-apk`
+- APK bytes: **10,773,857**
+- SHA-256: `cc4ddbde961045d9e9ddc788669b657c7460ce692419ab76e61e4abbec7663d2`
 - `unzip -t`: `No errors detected in compressed data`
-- APK contains `res/mipmap-anydpi-v26/ic_launcher.xml`, `ic_launcher_round.xml`,
-  `res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml`,
-  `ic_launcher_monochrome.xml`, `ic_velnox_mark.xml`
+- APK contains `ic_velnox_mark_slate.xml`, `ic_velnox_mark_white.xml`,
+  `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml`
 
-All phase commits had their own green CI run; no failed build was left in this sequence.
-
----
-
-## 8. Git review
-
-Fifteen product/resource files changed across six focused commits. The commit tool also removed
-the stale tracked harness artifact `.harness/commit-msg.txt`; no product code was affected.
-`.codegraph/` remained untracked and excluded locally.
+An intermediate build (`2a7e887`, run 44155550773) failed on two compile errors:
+an unnecessary `stickyHeader` import and a `MaterialTheme` call inside a `Canvas`
+draw scope. Both were fixed in `fa22249`; the final run is green.
 
 ---
 
-## 9. Remaining issues / next steps
+## 14. Remaining limitations / next steps
 
-1. Runtime verification on a device or emulator: theme switching, language switching, Back chain,
-   per-tab state, launcher mask appearance and 320dp clipping.
-2. Search, category listing and product detail are still honest placeholder destinations.
-3. `.ai/AI_RULES.md` and `.ai/context/project-map.md` still describe the older VelShop package
-   and directory layout; they were not part of this task and should be updated deliberately.
-4. GitHub Actions annotations remain for deprecated `setup-java@v4` and Node 20 actions; changing
-   them was outside this UI phase.
-5. No database, backend auth or payment code was added; the app remains ready for Phase 3.
+1. Runtime verification on a device/emulator: sticky-header pinning, search input,
+   popover dismissal, Back chains, theme and language switching, 320dp layout.
+2. Search is local preview data only; no backend, paging or server-wide results.
+3. Notifications have no source yet; only the empty state is implemented.
+4. Category listing composes the small local catalogue in a scrollable column; a
+   backend catalogue will need lazy paging there.
+5. Product detail and checkout remain honest placeholder destinations.
+6. `.ai/AI_RULES.md` still names VelShop/velshop-mobile; source and workflow remain
+   authoritative.
+7. GitHub Actions still emits `setup-java@v4` / Node 20 deprecation annotations.
