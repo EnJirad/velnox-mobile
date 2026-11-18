@@ -43,8 +43,7 @@ class SessionVault(private val context: Context) : SessionStore {
             if (bytes.size <= VERSION_BYTES + IV_BYTES) return null
 
             val version = bytes[0]
-            if (version != FORMAT_VERSION) return null
-
+            if (version != FORMAT_VERSION_BYTE) return null
             val iv = bytes.copyOfRange(VERSION_BYTES, VERSION_BYTES + IV_BYTES)
             val ciphertext = bytes.copyOfRange(VERSION_BYTES + IV_BYTES, bytes.size)
 
@@ -73,7 +72,7 @@ class SessionVault(private val context: Context) : SessionStore {
         val temporary = File(directory, TEMP_NAME)
 
         temporary.outputStream().use { out ->
-            out.write(byteArrayOf(FORMAT_VERSION.toByte()))
+            out.write(byteArrayOf(FORMAT_VERSION_BYTE))
             out.write(cipher.iv)
             out.write(ciphertext)
             out.flush()
@@ -136,6 +135,9 @@ class SessionVault(private val context: Context) : SessionStore {
         const val IV_BYTES = 12
         const val VERSION_BYTES = 1
         const val FORMAT_VERSION = 1
+
+        /** Same value as [FORMAT_VERSION], typed for the on-disk byte compare. */
+        val FORMAT_VERSION_BYTE: Byte = FORMAT_VERSION.toByte()
         const val DIRECTORY = "session"
         const val FILE_NAME = "session.bin"
         const val TEMP_NAME = "session.tmp"

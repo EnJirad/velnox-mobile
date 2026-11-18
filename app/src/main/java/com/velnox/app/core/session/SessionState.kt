@@ -26,7 +26,7 @@ sealed interface SessionState {
 
     data object Guest : SessionState
 
-    data class Authenticated(val user: AuthUser) : SessionState
+    data class Authenticated(override val user: AuthUser) : SessionState
 
     data object ExpiredSession : SessionState
 
