@@ -100,4 +100,9 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    // The mockable android.jar on the unit-test classpath contains *stub*
+    // org.json classes that throw "Stub!" when called. The catalogue parsing is
+    // tested against real captured API bodies, so the tests need the real
+    // implementation; it is test-only and never packaged into the APK.
+    testImplementation("org.json:json:20240303")
 }
