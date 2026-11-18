@@ -49,18 +49,34 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
+        id: unit_tests
+        run: |
+          set -o pipefail
+          ./gradlew :app:testDebugUnitTest --stacktrace 2>&1 | tee unit-tests.log
         env:
           ANDROID_SDK_ROOT: /home/runner/android-sdk
           ANDROID_HOME: /home/runner/android-sdk
           GRADLE_HOME: /home/runner/gradle-8.11.1
+
+      # Compiler and test output is otherwise buried in the job log. Re-emitting
+      # the first failures as annotations puts them on the run summary page.
+      - name: Surface Kotlin and test failures
+        if: failure()
+        run: |
+          grep -E "^e: |^FAILED|^Tests failed|^> Task .* FAILED|error:" unit-tests.log \
+            | head -25 \
+            | while IFS= read -r line; do echo "::error::$line"; done || true
 
       - name: Publish unit test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: velnox-unit-test-report
-          path: app/build/reports/tests/testDebugUnitTest
+          path: |
+            app/build/reports/tests/testDebugUnitTest
+            app/build/test-results/testDebugUnitTest
+            unit-tests.log
+          if-no-files-found: ignore
           retention-days: 30
 
       - name: Build debug APK
