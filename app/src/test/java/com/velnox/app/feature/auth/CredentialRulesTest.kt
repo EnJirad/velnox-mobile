@@ -79,11 +79,14 @@ class CredentialRulesTest {
 
     @Test
     fun `strength grows with length and variety`() {
+        // Score = 1 per satisfied property: length >= 8, >= 12, >= 16,
+        // letters + digits together, a symbol, and mixed case.
         assertEquals(PasswordStrength.Empty, PasswordStrength.of(""))
-        assertEquals(PasswordStrength.Weak, PasswordStrength.of("abc"))
-        assertEquals(PasswordStrength.Fair, PasswordStrength.of("Password1"))
-        assertEquals(PasswordStrength.Good, PasswordStrength.of("Password1234"))
-        assertEquals(PasswordStrength.Strong, PasswordStrength.of("Password1234!xyz"))
+        assertEquals(PasswordStrength.Weak, PasswordStrength.of("abc"))          // 0
+        assertEquals(PasswordStrength.Fair, PasswordStrength.of("Password"))     // 2: length, case
+        assertEquals(PasswordStrength.Good, PasswordStrength.of("Password1"))    // 3: + digit
+        assertEquals(PasswordStrength.Good, PasswordStrength.of("Password1234")) // 4: + length 12
+        assertEquals(PasswordStrength.Strong, PasswordStrength.of("Password1234!xyz")) // 6
     }
 
     @Test

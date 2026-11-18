@@ -63,9 +63,22 @@ jobs:
       - name: Surface Kotlin and test failures
         if: failure()
         run: |
-          grep -E "^e: |^FAILED|^Tests failed|^> Task .* FAILED|error:" unit-tests.log \
-            | head -25 \
+          # Compiler errors first: they mean nothing ran at all.
+          grep -E "^e: |error:" unit-tests.log \
+            | head -15 \
             | while IFS= read -r line; do echo "::error::$line"; done || true
+          # Then the individual failing tests, by name, from the JUnit XML.
+          # Gradle's console lines are prefixed by the runner, so the XML is the
+          # only reliable source for which assertion failed and why.
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          for path in sorted(glob.glob("app/build/test-results/testDebugUnitTest/*.xml")):
+              for case in ET.parse(path).getroot().iter("testcase"):
+                  for failure in case.findall("failure") + case.findall("error"):
+                      name = f"{case.get('classname')}.{case.get('name')}"
+                      msg = (failure.get("message") or "").strip().splitlines()
+                      print(f"::error::{name}: {msg[0] if msg else 'failed'}")
+          PY
 
       - name: Publish unit test results
         if: always()
