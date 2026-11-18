@@ -305,7 +305,6 @@
     <string name="login_error_email_required">Enter your email</string>
     <string name="login_error_email_invalid">Email format is not valid</string>
     <string name="login_error_password_required">Enter your password</string>
-    <string name="login_continue_line">LINE</string>
     <string name="register_eyebrow">Create your Velnox account</string>
     <string name="register_title">Sign up</string>
     <string name="register_subtitle">One account for your orders, shipping addresses and delivery updates.</string>

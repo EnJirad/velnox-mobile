@@ -305,7 +305,6 @@
     <string name="login_error_email_required">กรุณากรอกอีเมล</string>
     <string name="login_error_email_invalid">รูปแบบอีเมลไม่ถูกต้อง</string>
     <string name="login_error_password_required">กรุณากรอกรหัสผ่าน</string>
-    <string name="login_continue_line">LINE</string>
     <string name="register_eyebrow">สร้างบัญชี Velnox</string>
     <string name="register_title">สมัครสมาชิก</string>
     <string name="register_subtitle">ใช้บัญชีเดียวสำหรับคำสั่งซื้อ ที่อยู่จัดส่ง และการติดตามสถานะ</string>

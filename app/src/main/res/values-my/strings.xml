@@ -305,7 +305,6 @@
     <string name="login_error_email_required">အီးမေးလ် ထည့်ပါ</string>
     <string name="login_error_email_invalid">အီးမေးလ် ပုံစံ မမှန်ပါ</string>
     <string name="login_error_password_required">စကားဝှက် ထည့်ပါ</string>
-    <string name="login_continue_line">LINE</string>
     <string name="register_eyebrow">Velnox အကောင့် ဖန်တီးပါ</string>
     <string name="register_title">အကောင့်ဖွင့်ရန်</string>
     <string name="register_subtitle">အော်ဒါ၊ ပို့ဆောင်ရေး လိပ်စာနှင့် ပို့ဆောင်မှု အခြေအနေအတွက် အကောင့်တစ်ခုတည်း။</string>
