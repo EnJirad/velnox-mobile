@@ -103,6 +103,7 @@ fun CategoryScreen(
     }
 
     LaunchedEffect(selected, reloadKey) {
+        // Read once: `selected` is a delegated property and cannot be smart cast.
         val slug = selected ?: return@LaunchedEffect
         products = null
         when (val result = catalog.products(CatalogQuery(category = slug))) {
@@ -135,7 +136,9 @@ fun CategoryScreen(
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            if (selected == null) {
+            // Read once: `selected` is a delegated property and cannot be smart cast.
+            val currentSelection = selected
+            if (currentSelection == null) {
                 CategoryHub(
                     categories = categories,
                     loaded = categoriesLoaded,
@@ -150,7 +153,7 @@ fun CategoryScreen(
             } else {
                 CategoryListing(
                     categories = categories,
-                    selected = selected,
+                    selected = currentSelection,
                     isThai = isThai,
                     products = products,
                     failed = failed,
