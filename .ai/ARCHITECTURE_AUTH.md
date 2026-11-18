@@ -2,7 +2,7 @@
 
 > Scope: how the Android app proves who the user is. Companion to
 > `.ai/AI_HANDOFF.md` and `.ai/reports/LATEST.md`.
-> Last updated: 2026-11-18 (Part 4).
+> Last updated: 2026-11-18 (Part 5).
 
 ---
 
@@ -129,7 +129,8 @@ If the backend later returns `data.token`, only `captureSession()` changes.
 |---|---|---|---|
 | POST | `/api/auth/mobile/login` | none (IP rate limit 8/min) | email + password → session cookie |
 | POST | `/api/auth/mobile/register` | none (5/min) | create customer → session cookie (UI in Part 4) |
-| POST | `/api/auth/mobile/google` | none (10/min) | Google ID token → session (Part 6) |
+| POST | `/api/auth/mobile/google` | none (10/min) | Google ID token → session. Existing email → `409 LINK_REQUIRED` (PR #16) |
+| POST | `/api/auth/mobile/link` | Bearer | attach a verified Google identity to the signed-in account (PR #16) |
 | POST | `/api/auth/mobile/line` | none (10/min) | LINE ID token → session (Part 6) |
 | GET | `/api/auth/mobile/config` | none | `{google, line, email}` availability probe |
 | POST | `/api/auth/forgot-password` | none (3/15min) | uniform reset request — **PR #15, not deployed** |
@@ -152,6 +153,9 @@ redirect flow).
 | 409 `EMAIL_EXISTS` | `EmailExists` | Part 4 registration |
 | 409 `ACCOUNT_CONFLICT` | `AccountConflict` | Part 6 linking |
 | 503 `EMAIL_NOT_CONFIGURED` | `EmailNotConfigured` | "reset email is not available yet" |
+| 401 `INVALID_GOOGLE_TOKEN` | `InvalidProviderToken` | "Google sign-in did not complete" |
+| 409 `LINK_REQUIRED` | `LinkRequired` | switch to password sign-in, then link |
+| 503 `GOOGLE_NOT_CONFIGURED` | `ProviderUnavailable` | "not configured for this build" |
 | 400 `INVALID_RESET_TOKEN` | `InvalidResetToken` | "that link is invalid or expired" |
 | 403 `ACCOUNT_DISABLED` | `AccountDisabled` | "This account is disabled" |
 | 400 `VALIDATION_ERROR` | `Validation` | "Check your details" |
@@ -176,10 +180,23 @@ requestTab / requestOverlay (protected, not Authenticated)
 Back inside the gate returns to sign-in before it leaves the gate, so a user who
 opened Sign up by mistake does not lose the destination they were reaching for.
 
-## 8. Not implemented yet
+## 8. Google Sign-In
 
-- **Google and LINE provider flows** (Part 6). Server side is ready; the app has
-  no SDK and no ID-token source. The buttons exist and say so.
+Implemented with Credential Manager (`GetGoogleIdOption`); `GoogleSignInClient`
+is deprecated and not used. The app obtains an ID token and posts only that token.
+The backend verifies signature, issuer, audience, expiry, `azp`, `email_verified`
+and subject before any session exists.
+
+`Authenticated` still requires a `200` from the API — the same rule as email.
+
+An existing account with the same email is **not** merged. The API answers
+`409 LINK_REQUIRED`; the user signs in with their password, then calls
+`POST /api/auth/mobile/link`, which is the proof of ownership. Configuration and
+current blockers: `.ai/GOOGLE_SETUP.md`.
+
+## 9. Not implemented yet
+
+- **LINE provider flow.** The button exists and says so.
 - **Password recovery delivery** — endpoints are in PR #15 (not deployed) and no
   mail transport is configured.
 - **Refresh tokens** — the backend has none.

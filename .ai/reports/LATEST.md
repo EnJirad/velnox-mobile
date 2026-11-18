@@ -1,309 +1,236 @@
 # LATEST.md — Velnox Mobile Latest Change Report
 
-> **Current snapshot (overwritten each task).** Previous report (Part 3)
-> archived verbatim in `.ai/history/20261118_164500_LATEST_before_part4.md`.
+> **Current snapshot (overwritten each task).** Previous report (Part 4)
+> archived verbatim in `.ai/history/20261118_174000_LATEST_before_part5.md`.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Task: Part 4 — Email Registration & Login
+## Task: Part 5 — Google Sign-In Integration
 
 **Date:** 2026-11-18
-**Commits:** `d523138` (feature), `6677ade` (duplicate resource fix),
-`55ee97c` (test expectation + CI diagnostics)
-**Verified CI run:** [44269003139](https://github.com/EnJirad/velnox-mobile/actions/runs/44269003139) — **success**
-**Backend PR:** [velnox-marketplace#15](https://github.com/EnJirad/velnox-marketplace/pull/15) — open, **not merged, not deployed**
-**Status:** **VERIFIED** — 57 unit tests green, APK built, real registration and login exercised against the live API
+**Commits:** `81e0b97` (feature), `a3c7b36` (compile fixes), `29b700a` (test
+fakes), `751eb2b` (fingerprint annotation), plus docs
+**Verified CI run:** [44278012706](https://github.com/EnJirad/velnox-mobile/actions/runs/44278012706) — **success**
+**Backend PR:** [velnox-marketplace#16](https://github.com/EnJirad/velnox-marketplace/pull/16) — open, **not merged**
+**Status:** **PARTIAL** — implementation complete and compiling; the real OAuth
+flow **cannot be executed** from this environment. Exact blockers in §2 and §7.
 
 ---
 
-## 1. Repository safety
+## 1. Provider configuration — what could and could not be inspected
 
-| Check | Result |
-|---|---|
-| `git fetch origin main` before work | Done; local == remote (`df35203`) |
-| Uncommitted work at start | None |
-| Work preserved | Yes — nothing deleted, no history rewritten |
-| Local Android build | Not run (`.ai/AI_RULES.md` §1) |
-| Database | Read-only queries only. **One test customer row was created by the required live test** (§6.3) |
-
----
-
-## 2. Backend inspection (before writing anything)
-
-Re-read `backend/routes/mobile-auth.ts` at `4b6b09d` and diffed it against the
-Part 1/Part 3 snapshot: **byte-identical**. So the mobile surface is still exactly
-register / login / google / line / config.
-
-| Capability | Before Part 4 | Action |
+| Item | Finding | How |
 |---|---|---|
-| Register | `POST /api/auth/mobile/register` | **Reused** |
-| Login | `POST /api/auth/mobile/login` | **Reused** |
-| Logout | `POST /api/auth/logout` (Bearer) | **Reused** |
-| Session restoration | `GET /api/auth/me` | **Reused** |
-| Token refresh | none | **Not added** — no refresh token exists; documented |
-| Forgot password | **missing** | **Added** (PR #15) |
-| Password reset | **missing** | **Added** (PR #15) |
-| Password hashing | `lib/password.ts`, scrypt N=16384 r=8 p=1 | **Reused unchanged** |
-| Rate limiting | `middleware/rate-limit.ts` | **Reused**; two new limiters |
-| Mail transport | **none in the repo** | New `sendResetEmail` via Resend HTTP, no new dependency |
+| Package name | `com.velnox.app` | `app/build.gradle.kts` |
+| Signing certificate SHA-1 | **`a94659e6d884960206997a4d960a905563568ffb`** | Printed by CI (`apksigner verify --print-certs`) |
+| Signing certificate SHA-256 | `d22a28cd7fd049d8fe34301e670f6344816e3d95ca0ed544fb3623655447f1e3` | same |
+| Web/server OAuth client id | **UNKNOWN** | The backend has one (`config` → `google:true`) but never returns the value in the deployed build |
+| Android OAuth client | **UNKNOWN** | Google Cloud Console is not reachable from this environment; no API access to it |
+| Backend verification requirement | `aud` must equal `MOBILE_GOOGLE_CLIENT_ID ?? GOOGLE_CLIENT_ID` | `backend/routes/mobile-auth.ts` |
+| Authorized redirect URIs | **not required for native** | Credential Manager returns the ID token directly; redirects belong to the web flow |
 
-Only the admin route `/api/admin/employees/:userId/reset-password` existed, and it
-is staff-only (`requireAuth` + RBAC), so it is not a customer recovery path.
+I did not invent any credential. The two unknown values are the reason the flow
+cannot run yet; §7 lists exactly what the owner must do.
 
----
+### 1.1 A blocker that was fixed rather than reported
 
-## 3. What was built (Android)
+The workflow had no signing configuration, so every fresh GitHub runner generated
+its own debug keystore. That makes the SHA-1 **different on every build**, so no
+single fingerprint could ever be registered in Google Cloud Console.
 
-### 3.1 Login (`feature/auth/LoginScreen.kt`)
-
-- Email + password, visibility toggle, inline validation, loading state,
-  per-case error banner.
-- **Forgot password** entry point and **Sign up** entry point.
-- **Google** and **LINE** entry points. Both are inert by design and say
-  "coming soon" instead of starting a flow that cannot finish. Facebook was
-  removed: there is no backend counterpart.
-- The screen never decides that sign-in succeeded — it reports
-  `onSubmit(email, password)` and renders `isSubmitting` / `errorRes` from the
-  caller. Only the API answer can change the session state.
-
-### 3.2 Registration (`feature/auth/RegisterScreen.kt`, new)
-
-- Full name, email, password, confirm password.
-- 4-bar strength meter with a localized label, plus the server's actual rule
-  spelled out ("at least 8 characters with letters and numbers").
-- **Required consent** checkbox; the button stays disabled until the form is
-  valid *and* consent is given, because pressing it creates the account.
-- Back to sign-in, and the same provider entry points.
-
-### 3.3 Recovery (`feature/auth/ForgotPasswordScreen.kt`, new)
-
-- **Forgot password**: one email field, then a neutral
-  "if that address has an account, a reset link is on its way".
-- **Reset password**: new password + confirmation, and a paste-a-code field when
-  no token was supplied. A successful reset signs the user out locally, because
-  the old session must not outlive a password change.
-
-### 3.4 Shared components (`feature/auth/AuthComponents.kt`, new)
-
-`FieldGroup`, `VelnoxTextField`, `PasswordVisibilityToggle`, `ConsentToggle`,
-`PrimaryButton`, `OrDivider`, `SocialButton`, `ErrorBanner`, `NoticeBanner`,
-`SuccessBanner`, `PasswordStrengthMeter`, `AuthScreenFrame`, `AuthBrandHeader`,
-`AuthFooter`. One copy each, so the three screens cannot drift.
-
-### 3.5 Rules (`feature/auth/CredentialRules.kt`, new)
-
-Email shape, name 1–120, password 8–128 with a letter and a digit, confirm match,
-and the strength estimate. These mirror the API; they do not replace it.
-
-### 3.6 Session integration
-
-- `SessionController.register()` and `resetPassword()` added.
-- `AuthRepository.register()` was already implemented in Part 3 but unreachable;
-  it is now wired. `requestPasswordReset` / `resetPassword` added.
-- The gate is **one destination with four steps** (`AuthStep`: login, register,
-  forgot, reset), so the reason card and the pending destination survive moving
-  between them. Back inside the gate returns to sign-in before it leaves the gate.
-- After sign-in **or** registration the originally requested destination is
-  applied. Home is untouched.
-
-### 3.7 New error cases
-
-`AuthError.EmailNotConfigured` (503) and `AuthError.InvalidResetToken` (400), each
-with its own message. A 404 (endpoint not deployed) maps to `Unknown`, so the app
-reports a generic failure rather than a false success.
+Fixed: the workflow now caches `~/.android/debug.keystore` under the immutable key
+`velnox-debug-keystore-v1`, and prints the fingerprint of the built APK. From now
+on the debug SHA-1 is stable — the value above.
 
 ---
 
-## 4. Endpoints and schemas
+## 2. What was implemented
 
-### 4.1 Existing, reused (verified live)
+### 2.1 Android — the supported flow
 
-| Method | Path | Request | Response |
-|---|---|---|---|
-| POST | `/api/auth/mobile/register` | `{name, email, password}` | `201 {success, data:{user:{id,email,name,role}}}` + `Set-Cookie: velnox_session` |
-| POST | `/api/auth/mobile/login` | `{email, password}` | `200` same shape + cookie |
-| GET | `/api/auth/me` | `Authorization: Bearer <token>` | `200 {success, data:{user:{…}}}` |
-| POST | `/api/auth/logout` | Bearer | `200 {success, data:{success:true}}` |
+`core/auth/CredentialManagerGoogleSignIn.kt` uses **Credential Manager** with
+`GetGoogleIdOption`. `GoogleSignInClient` is deprecated and is not used.
 
-Errors: `{success:false, error:{code, message}}` — `EMAIL_EXISTS` (409),
-`INVALID_CREDENTIALS` (401), `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401).
-
-### 4.2 Added (PR #15, not deployed)
-
-| Method | Path | Request | Response |
-|---|---|---|---|
-| POST | `/api/auth/forgot-password` | `{email}` | `200 {success, data:{requested:true}}` · `503 EMAIL_NOT_CONFIGURED` · `400 VALIDATION_ERROR` |
-| POST | `/api/auth/reset-password` | `{token, password}` | `200 {success, data:{reset:true}}` · `400 INVALID_RESET_TOKEN` · `400 VALIDATION_ERROR` |
-
-`GET /api/auth/mobile/config` gains `email: boolean` so the app can hide recovery
-when no transport exists.
-
-**Security properties of the new endpoints**
-
-- Tokens are 32 random bytes; only the **SHA-256** is stored, so a database dump
-  cannot be replayed.
-- One live token per account; a second request invalidates the previous link.
-- 30-minute expiry; consumption is guarded by `used_at` inside a transaction, so
-  two concurrent requests cannot both succeed.
-- Uniform answers for known/unknown addresses, with the unknown branch doing the
-  same work (a short delay) so timing does not leak either.
-- Rate limits: 3 per 15 min (forgot), 5 per 15 min (reset), per IP.
-- No token is ever logged, returned in a body, or written in clear.
-
-### 4.3 Database dependencies
-
-`password_reset_tokens` — added to `db/schema.sql`:
-
-```
-id UUID PK · user_id UUID FK users ON DELETE CASCADE · token_hash TEXT UNIQUE
-expires_at TIMESTAMPTZ · used_at TIMESTAMPTZ NULL · created_at TIMESTAMPTZ
-indexes: (user_id), (expires_at)
-```
-
-Existing tables used unchanged: `users`, `auth_identities`, `revoked_tokens`,
-`customer_profiles`. **No migration was run**; the PR does not apply it.
-
----
-
-## 5. Password security
-
-| Requirement | Status |
+| Case | Handling |
 |---|---|
-| Argon2id or a suitably configured algorithm | **scrypt N=16384, r=8, p=1, 64-byte key, 32-byte random salt** — already in `lib/password.ts`, reused rather than replaced. Argon2id would need a new native dependency on Render; scrypt is memory-hard and OWASP-acceptable at these parameters. |
-| Never store plaintext | Verified: the new test account has `$scrypt$…` in `users.password_hash`. |
-| Never return hashes to Android | `sendSession` returns `{id,email,name,role}` only; `/api/auth/me` returns profile fields and permissions, no hash. |
-| Rate limiting | Existing per-IP limiters on register (5/min) and login (8/min); new 3/15min and 5/15min on recovery. |
-| Backend input validation | `zod` schemas on every route; verified live (weak password → 400). |
-| Generic errors | Login returns one `INVALID_CREDENTIALS` for missing account, missing password auth and wrong password; forgot-password is uniform. |
+| Success | Returns the raw ID token; decides nothing else |
+| User cancellation | `GetCredentialCancellationException` → silent |
+| No account on device | `NoCredentialException` → its own message |
+| Misconfigured build / package+SHA-1 not registered | `GetCredentialProviderConfigurationException` → "not configured", button disables |
+| Interrupted | own message |
+| Unsupported device | treated as not configured |
+| Malformed token | `GoogleIdTokenParsingException` → generic failure |
+| Network | offline message |
+
+`setFilterByAuthorizedAccounts(false)` so a first-time user sees their accounts;
+`setAutoSelectEnabled(false)` so nobody is signed in without choosing.
+
+### 2.2 Client id resolution
+
+`core/auth/GoogleClientIdSource.kt` resolves the **Web** client id:
+
+1. `-PvelnoxGoogleClientId=…` baked into `BuildConfig` (wins), else
+2. `GET /api/auth/mobile/config` → `googleClientId` (PR #16).
+
+It must be the Web client: the ID token's `aud` carries it, and the backend
+compares `aud` against its own value. No value → the UI says unavailable.
+
+### 2.3 Backend integration
+
+`AuthApi.googleSignIn(idToken)` → `POST /api/auth/mobile/google`. **Only the token
+is sent**; no email, name or user id from the client. The existing
+`verifyGoogleToken()` already checks signature (via Google tokeninfo), issuer,
+audience, expiry, `azp`, `email_verified` and subject — unchanged and still
+server-side.
+
+### 2.4 Account linking — no silent merge
+
+The deployed backend auto-linked a verified Google email to an existing account.
+That is a silent merge: a verified address proves control of the mailbox, not that
+the signer is the person who created the password account, and attaching hands
+over its orders, addresses and history.
+
+PR #16 changes `resolveIdentity` to return `link_required` (`409 LINK_REQUIRED`)
+and adds `POST /api/auth/mobile/link` (`requireAuth`):
+
+- holding a session for the account **is** the proof of ownership,
+- the Google email must equal the account email (`409 EMAIL_MISMATCH`),
+- an identity already bound elsewhere is refused (`409 IDENTITY_CONFLICT`),
+- a repeat call is idempotent,
+- `UNIQUE(provider, provider_id)` remains the guard against duplicate mappings.
+
+LINE is unchanged: unverified email stays a plain conflict.
+
+### 2.5 Session integration
+
+`AuthRepository.signInWithGoogle` and `SessionController.signInWithGoogle` reuse
+the Part 3 architecture exactly: `Authenticated` only after the API returns a
+session, `SessionVault` storage, `/api/auth/me` restoration, and the same
+`signOut()`. The nav gate is untouched; `LINK_REQUIRED` switches the gate to the
+password step instead of dead-ending.
 
 ---
 
-## 6. Test results
+## 3. Files changed
 
-### 6.1 Unit tests — 57, all passing (CI)
+**Added**
 
-| Class | Tests | Covers |
-|---|---|---|
-| `JwtTest` | 5 | `exp` parsing, boundaries, malformed |
-| `SessionManagerTest` | 6 | save/read/clear, unreadable store, failed clear |
-| `AuthRepositoryTest` | 18 | restore matrix, sign-in, **register**, **forgot**, **reset**, sign-out |
-| `SessionControllerTest` | 16 | four states, restart, offline, **register**, **duplicate email**, **reset → Guest** |
-| `AccessPolicyTest` | 5 | public/protected, fail-closed, expired reason |
-| `CredentialRulesTest` | 7 | email, password policy, confirm, name, strength |
+- `core/auth/GoogleSignInProvider.kt`, `CredentialManagerGoogleSignIn.kt`,
+  `GoogleClientIdSource.kt`
+- `app/src/test/.../GoogleClientIdSourceTest.kt`
+- `.ai/GOOGLE_SETUP.md`
 
-### 6.2 CI
+**Modified**
+
+- `app/build.gradle.kts` — three Credential Manager/Google artifacts,
+  `GOOGLE_WEB_CLIENT_ID` BuildConfig field
+- `core/auth/{AuthApi,AuthModels,AuthRemoteDataSource,AuthRepository}.kt`
+- `core/session/SessionController.kt`, `VelnoxApplication.kt`
+- `feature/auth/LoginScreen.kt`, `navigation/VelnoxApp.kt`
+- `res/values{,-en,-my}/strings.xml` — 361 keys each
+- `app/src/test/.../{AuthRepositoryTest,SessionControllerTest}.kt`
+- `.github/workflows/gradle-build.yml` — keystore cache + fingerprint step
+
+**Backend (PR #16)**
+
+- `backend/routes/mobile-auth.ts`, `docs/API.md`
+
+---
+
+## 4. Test results
+
+### 4.1 Unit tests — 71, all passing (CI)
+
+14 new: `GoogleClientIdSourceTest` (7 — build value wins, remote fallback,
+caching, unconfigured, blank, missing field, invalidate), `AuthRepositoryTest`
+(4 — token only, LinkRequired stores nothing, rejected token stores nothing,
+provider unavailable), `SessionControllerTest` (3 — Guest→Authenticated,
+LinkRequired stays Guest, Google session survives restart).
+
+### 4.2 CI
 
 | Item | Result |
 |---|---|
-| Run | 44269003139 on `55ee97c` |
+| Run | 44278012706 on `751eb2b` |
+| Restore the debug signing key | **success** |
 | Run unit tests | **success** |
-| Build debug APK | **success** |
-| Verify / integrity / upload | **success** |
-| Artifacts | `velnox-debug-apk` **10,637,196 B** · `velnox-unit-test-report` 23,718 B |
+| Build / verify / integrity / upload | **success** |
+| Print APK signing fingerprints | **success** |
 
-Two earlier runs failed and both were real defects, not flakes:
-`44267358538` — `mergeDebugResources` (duplicate `login_continue_line`);
-`44267996969` — one wrong test expectation. Both fixed; see §8.
+Three runs failed first, all real defects of mine and all fixed:
+`44274992238` (missing `LaunchedEffect` import, `NotConfigured` needing `is`),
+`44276106016` (test fakes missing the new interface members, illegal `:` in a
+test name). `44277127872` and `44278012706` are green.
 
-### 6.3 Real backend tests (production API, not simulated)
+### 4.3 Live backend probes
 
-A customer account was created because the task requires a real registration:
-
-`qa.part4.20261118@example.com` · password `VelnoxQA2026x` · user id
-`29c031fc-5abd-4d2f-b9e0-20c6c281aaa2`
-
-| # | Test | Result |
+| Probe | Result | Meaning |
 |---|---|---|
-| 1 | Register new account | **201**, user returned, `Set-Cookie: velnox_session` present |
-| 2 | Login with those credentials | **200** + cookie; token captured |
-| 3 | `GET /api/auth/me` with Bearer | **200**, real profile (`role: customer`, `status: active`) |
-| 4 | Duplicate registration | **409** `EMAIL_EXISTS` |
-| 5 | Wrong password | **401** `INVALID_CREDENTIALS` |
-| 6 | Weak password on register (`short`) | **400** `VALIDATION_ERROR` |
-| 7 | Letters-only password on register | **400** `VALIDATION_ERROR` |
-| 8 | Logout with Bearer | **200** |
-| 9 | `/api/auth/me` after logout | **401** `UNAUTHORIZED` — "Session revoked" |
-| 10 | Row in Neon | `role=customer`, `status=active`, `password_hash` starts `$scrypt$` |
-| 11 | `POST /api/auth/forgot-password` | **404** — expected: PR #15 not deployed |
+| `GET /api/auth/mobile/config` | `{"google":true,"line":false}` | The server has a Google client id configured |
+| Same, `googleClientId` field | **absent** | PR #16 not deployed — the app therefore reports "not configured" |
+| `POST /api/auth/mobile/google` with a forged token | **401** `INVALID_GOOGLE_TOKEN` | The endpoint is live and refuses untrusted input |
+| `POST /api/auth/mobile/link` | **404** | PR #16 not deployed |
 
-Tests 1–10 are genuine round trips against `velnox-api.onrender.com`. Nothing was
-mocked, and the Bearer path the app uses was proven end to end (3 and 9).
+### 4.4 The real OAuth flow — NOT TESTED
 
-**Cleanup for the owner:** the test account above can be deleted whenever you
-like (`DELETE FROM users WHERE email = 'qa.part4.20261118@example.com'` cascades
-to its profile). It holds no orders or addresses.
-
-### 6.4 Not verified
-
-- No device/emulator run: the screens compile and are previewed, but layout and
-  keyboard behaviour are unverified on hardware.
-- The forgot/reset flow has **never executed end to end**, because the endpoints
-  are not deployed and no mail transport exists. Its client half is unit-tested;
-  its server half is typechecked only.
+**I could not run it, and I will not claim otherwise.** Running it needs all three
+of: a device or emulator with Google Play services and a signed-in Google account;
+the app installed; and an Android OAuth client registered for this package and
+SHA-1. This environment has no device route, and the OAuth client does not exist
+yet. The button being present is not evidence that the flow works.
 
 ---
 
-## 7. Files changed
+## 5. Security properties
 
-**Added (Android)**
-
-- `feature/auth/AuthComponents.kt`, `CredentialRules.kt`, `RegisterScreen.kt`,
-  `ForgotPasswordScreen.kt`
-- `app/src/test/.../feature/auth/CredentialRulesTest.kt`
-
-**Modified (Android)**
-
-- `feature/auth/LoginScreen.kt` (rebuilt on the shared components)
-- `core/auth/{AuthApi,AuthModels,AuthRemoteDataSource,AuthRepository}.kt`
-- `core/session/SessionController.kt`
-- `navigation/{AccessPolicy,VelnoxApp}.kt`
-- `res/values{,-en,-my}/strings.xml` — **357 keys each**, identical sets
-- `app/src/test/.../{AuthRepositoryTest,SessionControllerTest}.kt`
-
-**Modified (CI)**
-
-- `.github/workflows/gradle-build.yml` — failing tests are now named from JUnit XML
-
-**Backend (separate repo, PR #15)**
-
-- `backend/routes/mobile-auth.ts`, `db/schema.sql`, `docs/API.md`
-
-**Documentation**
-
-- `.ai/reports/LATEST.md`, `.ai/AI_HANDOFF.md`, `.ai/ARCHITECTURE_AUTH.md`
+| Property | Where |
+|---|---|
+| Client never supplies identity | Only `{idToken}` is posted; identity comes from verified claims |
+| Signature, issuer, audience, expiry, subject checked | `verifyGoogleToken()` server-side |
+| Client-side flag is not proof | `Authenticated` only after a `200` from the API |
+| No silent merge | `LINK_REQUIRED` + authenticated link endpoint (PR #16) |
+| Duplicate Google mappings prevented | `UNIQUE(provider, provider_id)` + explicit guards |
+| No secret in the APK | Only the public client id; `GOOGLE_CLIENT_SECRET` stays server-side |
+| Token stored encrypted | Part 3 `SessionVault` (Keystore AES-GCM) |
 
 ---
 
-## 8. Defects found and fixed during this part
+## 6. Defects found and fixed during this part
 
-1. **Duplicate string resource.** Adding the LINE entry point both renamed the
-   Facebook string and inserted a new `login_continue_line`, so AAPT failed with
-   `mergeDebugResources`. My local checks missed it because they compared *sets*
-   of keys, not multiplicities; the checker now looks for duplicates too.
-2. **Wrong test expectation.** `PasswordStrength.of("Password1")` is `Good`
-   (score 3), not `Fair`. The implementation was right; the test was wrong.
-3. **CI could not name a failing test.** The annotation step only grepped Gradle
-   console lines, which the runner prefixes, so a test failure appeared as
-   "exit code 1" and nothing else. It now parses the JUnit XML and emits one
-   annotation per failure with class, name and message.
+1. **Debug SHA-1 changed on every build** — no signing config and no keystore
+   cache. Fixed by caching the debug keystore; fingerprint is now stable.
+2. **Missing `LaunchedEffect` import** — the availability probe did not compile.
+3. **`NotConfigured` is a data class** — `when` branches needed `is`.
+4. **Test fakes not updated** for the widened `AuthApi`.
+5. **Illegal `:` in a test name** — rejected by the JVM method-name rule.
 
 ---
 
-## 9. Remaining issues
+## 7. Exact blockers (owner action)
 
-1. **PR #15 is not merged or deployed**, so forgot/reset return 404 today. The app
-   shows a generic failure; it never claims success.
-2. **No mail transport** (`RESEND_API_KEY`, `MAIL_FROM`). Even after deploy, the
-   endpoint answers `503 EMAIL_NOT_CONFIGURED` until those are set.
-3. **`password_reset_tokens` must be created** before the endpoints work.
-4. **Existing JWTs survive a password reset** — there is no session-version
-   mechanism, so sessions end at their 7-day expiry. Documented in the PR.
-5. **No refresh token** exists server-side.
-6. **Google and LINE are entry points only** (Part 6). `mobile/config` reports
-   `line:false`.
-7. **Profile and Settings still show demo identity**, though
-   `SessionState.Authenticated.user` now carries the real account.
-8. **No device verification** of the new screens.
-9. `rememberMe` is still a local toggle; it does not change the 7-day server
-   session lifetime.
+1. **Create the Android OAuth client** — Google Cloud Console → Credentials →
+   Android client, package `com.velnox.app`, SHA-1
+   `a94659e6d884960206997a4d960a905563568ffb`.
+2. **Supply the Web client id** — either merge PR #16 (the app then reads it from
+   `config`) or build with `-PvelnoxGoogleClientId=<web-client-id>`.
+3. **Confirm `MOBILE_GOOGLE_CLIENT_ID` on Render equals that same Web client id**,
+   or every token is rejected with `INVALID_GOOGLE_TOKEN`.
+4. **Configure the OAuth consent screen** — in Testing mode only listed test users
+   can sign in.
+5. **Merge PR #16** to make `LINK_REQUIRED` and `/api/auth/mobile/link` live.
+   Until then the deployed backend still auto-links.
+
+Detailed steps: `.ai/GOOGLE_SETUP.md`.
+
+---
+
+## 8. Remaining issues
+
+1. Google Sign-In is **not usable end to end** until blockers 1–3 are resolved.
+2. The app currently shows "not configured" because `config` does not yet return
+   `googleClientId` — correct behaviour, not a bug.
+3. No device verification of the Credential Manager sheet, or of the new
+   messages, on hardware.
+4. LINE is still an entry point only (its own part).
+5. Existing JWTs still survive a password reset (Part 4 note, unchanged).

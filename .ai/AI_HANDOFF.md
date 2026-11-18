@@ -1,13 +1,13 @@
 # AI_HANDOFF.md — Velnox Mobile Current Snapshot
 
-> **Current snapshot (not a log).** Supersedes the Part 3 snapshot, archived
-> verbatim in `.ai/history/20261118_164500_AI_HANDOFF_before_part4.md`.
+> **Current snapshot (not a log).** Supersedes the Part 4 snapshot, archived
+> verbatim in `.ai/history/20261118_174000_AI_HANDOFF_before_part5.md`.
 > Statuses: **VERIFIED / UNVERIFIED / FAILED / BLOCKED / SKIPPED / NOT TESTED**.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Current State (2026-11-18, commit `55ee97c`, run 44269003139)
+## Current State (2026-11-18, commit `751eb2b`, run 44278012706)
 
 | Area | Status | Notes |
 |------|--------|-------|
@@ -24,12 +24,15 @@
 | Registration | **VERIFIED (live)** | Real account created (201); duplicate → 409, weak password → 400 |
 | Logout + revocation | **VERIFIED (live)** | Bearer logout 200, then `/api/auth/me` → 401 "Session revoked" |
 | Forgot / reset password | **BLOCKED (not deployed)** | Backend PR #15 open; live API answers 404. Client half unit-tested |
-| Google / LINE | **ENTRY POINTS ONLY** | Buttons explain "coming soon"; Part 6. `line:false` |
+| Google Sign-In | **IMPLEMENTED, BLOCKED** | Credential Manager flow compiles and is unit-tested; cannot run until the Android OAuth client exists and the Web client id is supplied. See `.ai/GOOGLE_SETUP.md` |
+| Google account linking | **PR #16, not deployed** | `LINK_REQUIRED` + `POST /api/auth/mobile/link`. Deployed backend still auto-links |
+| LINE | **ENTRY POINT ONLY** | Button says "coming soon"; `line:false` |
+| Debug signing SHA-1 | **VERIFIED, STABLE** | `a94659e6d884960206997a4d960a905563568ffb` — keystore now cached in CI |
 | Login / Register UI | **VERIFIED (compile)** | Shared components; consent-gated register; strength meter |
 | Guest gate | **VERIFIED (unit tests)** | `AccessPolicy`; unknown routes fail closed |
-| Unit tests | **VERIFIED (CI)** | 57 tests, 6 classes, green in run 44269003139 |
-| APK | **VERIFIED (CI)** | 10,637,196 bytes, integrity OK |
-| Localisation | **VERIFIED (packaged)** | 357 keys × th/en/my, identical sets, no duplicates |
+| Unit tests | **VERIFIED (CI)** | 71 tests, 7 classes, green in run 44278012706 |
+| APK | **VERIFIED (CI)** | built, verified, uploaded; signing fingerprints printed |
+| Localisation | **VERIFIED (packaged)** | 361 keys × th/en/my, identical sets, no duplicates |
 | On-device runtime | **NOT TESTED** | No install route; Keystore and UI unverified on hardware |
 
 Architecture detail: **`.ai/ARCHITECTURE_AUTH.md`**. Evidence: `.ai/reports/LATEST.md`.
@@ -117,7 +120,11 @@ WebView, no invented token.
   mechanism; sessions end at 7-day expiry.
 - **No refresh token** (no backend endpoint). Sessions last 7 days, then
   `ExpiredSession` → sign in again.
-- **Google / LINE are entry points only** (Part 6). No SDK, no ID-token source.
+- **Google Sign-In cannot run yet.** Credential Manager flow is implemented, but
+  no Android OAuth client is registered for `com.velnox.app` +
+  `a94659e6d884960206997a4d960a905563568ffb`, and the Web client id is unknown.
+  The app shows "not configured" until both exist.
+- **LINE is still an entry point only.**
 - **Profile/Settings still demo data**; the real account is in
   `SessionState.Authenticated.user` but unused.
 - **`onUnauthorized()` has no caller** until an authenticated feature call exists.
@@ -130,7 +137,8 @@ WebView, no invented token.
 ## Next Agent Startup Order
 
 1. `.ai/AI_HANDOFF.md` ← **YOU ARE HERE**
-2. `.ai/ARCHITECTURE_AUTH.md`
+2. `.ai/GOOGLE_SETUP.md` (Google configuration and what is still missing)
+3. `.ai/ARCHITECTURE_AUTH.md`
 3. `.ai/AI_RULES.md` (stale names; verify against source)
 4. `.ai/VELNOX_DESIGN_THEME.md`
 5. `.ai/reports/LATEST.md`
@@ -148,4 +156,4 @@ The app embeds only the public API origin (`BuildConfig.API_BASE_URL`).
 ## Signature
 
 > This handoff supersedes the previous snapshots.
-> **Last updated:** 2026-11-18 by the Part 4 registration and login session.
+> **Last updated:** 2026-11-18 by the Part 5 Google Sign-In session.
