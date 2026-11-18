@@ -75,6 +75,29 @@ class AuthRepository(
         if (token != null) api.logout(token)
     }
 
+    /**
+     * Ask the server to send a reset link.
+     *
+     * The outcome is intentionally not "does this account exist": the API answers
+     * uniformly, and a caller that branches on the result would rebuild the
+     * enumeration oracle the endpoint avoids.
+     */
+    suspend fun requestPasswordReset(email: String): ApiResult<Unit> =
+        api.forgotPassword(email.trim().lowercase())
+
+    /**
+     * Choose a new password with a reset token.
+     *
+     * A successful reset invalidates the tokens that existed before it, so any
+     * session this device is holding is cleared: the user must sign in again with
+     * the password they just chose.
+     */
+    suspend fun resetPassword(token: String, password: String): ApiResult<Unit> {
+        val result = api.resetPassword(token.trim(), password)
+        if (result is ApiResult.Ok) sessions.clear()
+        return result
+    }
+
     private suspend fun persist(session: AuthSession): SignInResult {
         return try {
             sessions.save(session.token)

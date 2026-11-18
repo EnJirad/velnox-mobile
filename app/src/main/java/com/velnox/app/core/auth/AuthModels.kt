@@ -50,6 +50,16 @@ enum class AuthError {
     /** 429 from the per-IP limiter. */
     RateLimited,
 
+    /**
+     * 503 `EMAIL_NOT_CONFIGURED`: the server has no mail transport, so a reset
+     * link cannot be delivered. Reported honestly instead of pretending an email
+     * was sent.
+     */
+    EmailNotConfigured,
+
+    /** 400 `INVALID_RESET_TOKEN`: the reset code is wrong, used or expired. */
+    InvalidResetToken,
+
     /** The request never reached the server, or the reply never arrived. */
     Network,
 

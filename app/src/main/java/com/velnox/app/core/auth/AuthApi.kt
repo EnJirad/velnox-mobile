@@ -17,4 +17,15 @@ interface AuthApi {
 
     /** Revokes a token server-side. Callers treat a failure as non-fatal. */
     suspend fun logout(token: String): ApiResult<Unit>
+
+    /**
+     * `POST /api/auth/forgot-password` — asks for a reset link.
+     *
+     * Answers the same way whether or not the address exists, so the caller must
+     * show a neutral "if that address has an account…" message.
+     */
+    suspend fun forgotPassword(email: String): ApiResult<Unit>
+
+    /** `POST /api/auth/reset-password` — consumes a reset token. */
+    suspend fun resetPassword(token: String, password: String): ApiResult<Unit>
 }

@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
+import com.velnox.app.core.auth.ApiResult
 import com.velnox.app.core.auth.AuthError
 import com.velnox.app.core.auth.SignInResult
 import com.velnox.app.core.i18n.VelnoxLocaleProvider
@@ -40,7 +41,10 @@ import com.velnox.app.core.preferences.VelnoxPreferencesProvider
 import com.velnox.app.core.session.LocalSession
 import com.velnox.app.core.session.SessionState
 import com.velnox.app.core.session.VelnoxSessionProvider
+import com.velnox.app.feature.auth.ForgotPasswordScreen
 import com.velnox.app.feature.auth.LoginScreen
+import com.velnox.app.feature.auth.RegisterScreen
+import com.velnox.app.feature.auth.ResetPasswordScreen
 import com.velnox.app.feature.cart.CartScreen
 import com.velnox.app.feature.cart.CartState
 import com.velnox.app.feature.home.CategoryScreen
@@ -126,6 +130,14 @@ private fun VelnoxNavHost() {
     var loginReasonKey by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDestinationKey by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // Which authentication screen the gate is showing. Kept separate from
+    // loginReasonKey because the reason belongs to the gate as a whole, while the
+    // step (sign in / sign up / recovery) is what the user navigates between.
+    var authStepKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var resetToken by rememberSaveable { mutableStateOf("") }
+    var authSucceeded by rememberSaveable { mutableStateOf(false) }
+    var forgotSent by rememberSaveable { mutableStateOf(false) }
+
     // Sign-in progress and the last failure, owned here so LoginScreen stays a
     // pure renderer of what the repository reported. `isSubmitting` is plain
     // remember: a rotation cancels the request coroutine, so restoring a stale
@@ -135,6 +147,7 @@ private fun VelnoxNavHost() {
 
     val tab = AppTab.fromKey(tabKey)
     val loginReason = LoginReason.fromKey(loginReasonKey)
+    val authStep = AuthStep.fromKey(authStepKey)
     val cart = remember { CartState() }
     val tabStateHolder = rememberSaveableStateHolder()
 
@@ -155,7 +168,28 @@ private fun VelnoxNavHost() {
         if (sessionState is SessionState.Loading) return
         pendingDestinationKey = destination
         loginReasonKey = AccessPolicy.reasonFor(reason, sessionState).key
+        authStepKey = AuthStep.Login.key
         signInErrorRes = null
+        authSucceeded = false
+        forgotSent = false
+    }
+
+    /** Leave the gate entirely and return to whatever was on screen before. */
+    fun closeAuth() {
+        loginReasonKey = null
+        authStepKey = null
+        pendingDestinationKey = null
+        signInErrorRes = null
+        authSucceeded = false
+        forgotSent = false
+        resetToken = ""
+    }
+
+    /** Move to another step inside the gate, keeping the pending destination. */
+    fun goToStep(step: AuthStep) {
+        authStepKey = step.key
+        signInErrorRes = null
+        forgotSent = false
     }
 
     /** The only way a bottom-bar destination may change. */
@@ -180,9 +214,21 @@ private fun VelnoxNavHost() {
 
     /** Guest declined to sign in: stay exactly where they were. */
     fun dismissLogin() {
-        loginReasonKey = null
+        closeAuth()
+    }
+
+    /** Applies the destination the guest was trying to reach before the gate. */
+    fun applyPendingDestination() {
+        val pending = pendingDestinationKey
         pendingDestinationKey = null
-        signInErrorRes = null
+        if (pending == null) return
+        when {
+            pending.startsWith(TAB_DESTINATION) ->
+                openTab(AppTab.fromKey(pending.removePrefix(TAB_DESTINATION)))
+
+            pending.startsWith(OVERLAY_DESTINATION) ->
+                overlayKey = pending.removePrefix(OVERLAY_DESTINATION)
+        }
     }
 
     /**
@@ -200,31 +246,80 @@ private fun VelnoxNavHost() {
             when (result) {
                 is SignInResult.Success -> {
                     signInErrorRes = null
+                    authStepKey = null
                     loginReasonKey = null
-                    val pending = pendingDestinationKey
-                    pendingDestinationKey = null
-                    if (pending != null) {
-                        when {
-                            pending.startsWith(TAB_DESTINATION) ->
-                                openTab(AppTab.fromKey(pending.removePrefix(TAB_DESTINATION)))
-
-                            pending.startsWith(OVERLAY_DESTINATION) ->
-                                overlayKey = pending.removePrefix(OVERLAY_DESTINATION)
-                        }
-                    }
+                    applyPendingDestination()
                 }
 
                 is SignInResult.Failure -> {
-                    signInErrorRes = signInMessage(result.error)
+                    signInErrorRes = authMessage(result.error)
                 }
             }
         }
     }
 
-    fun signOut() {
-        loginReasonKey = null
-        pendingDestinationKey = null
+    /**
+     * Registration. The API creates the customer and returns a session, so a
+     * successful call leaves the app authenticated exactly like a sign-in and the
+     * pending destination is applied the same way.
+     */
+    fun submitRegistration(name: String, email: String, password: String) {
+        if (isSubmitting) return
+        isSubmitting = true
         signInErrorRes = null
+        scope.launch {
+            val result = session.register(name, email, password)
+            isSubmitting = false
+            when (result) {
+                is SignInResult.Success -> {
+                    signInErrorRes = null
+                    authStepKey = null
+                    loginReasonKey = null
+                    applyPendingDestination()
+                }
+
+                is SignInResult.Failure -> {
+                    signInErrorRes = authMessage(result.error)
+                }
+            }
+        }
+    }
+
+    /**
+     * Request a reset link. The success flag is set on any non-error answer: the
+     * API replies uniformly so this screen cannot reveal whether an address is
+     * registered.
+     */
+    fun submitForgotPassword(email: String) {
+        if (isSubmitting) return
+        isSubmitting = true
+        signInErrorRes = null
+        scope.launch {
+            val result = session.requestPasswordReset(email)
+            isSubmitting = false
+            when (result) {
+                is ApiResult.Ok -> forgotSent = true
+                is ApiResult.Error -> signInErrorRes = authMessage(result.error)
+            }
+        }
+    }
+
+    fun submitResetPassword(token: String, password: String) {
+        if (isSubmitting) return
+        isSubmitting = true
+        signInErrorRes = null
+        scope.launch {
+            val result = session.resetPassword(token, password)
+            isSubmitting = false
+            when (result) {
+                is ApiResult.Ok -> authSucceeded = true
+                is ApiResult.Error -> signInErrorRes = authMessage(result.error)
+            }
+        }
+    }
+
+    fun signOut() {
+        closeAuth()
         overlayKey = null
         tabKey = AppTab.Home.key
         scope.launch { session.signOut() }
@@ -235,6 +330,12 @@ private fun VelnoxNavHost() {
     ) {
         val current = overlayKey
         when {
+            // Inside the gate, Back returns to sign-in before it leaves the gate:
+            // a user who opened Sign up by mistake should not lose the reason
+            // card or the destination they were trying to reach.
+            loginReason != null && authStep != null && authStep != AuthStep.Login ->
+                goToStep(AuthStep.Login)
+
             loginReason != null -> dismissLogin()
             current != null && current.startsWith("settings/") -> overlayKey = "settings"
             current != null && current.startsWith("category:") -> overlayKey = "category"
@@ -256,13 +357,42 @@ private fun VelnoxNavHost() {
             label = "sessionTransition",
         ) { reason ->
             if (reason != null) {
-                LoginScreen(
-                    onSubmit = ::submitCredentials,
-                    isSubmitting = isSubmitting,
-                    errorRes = signInErrorRes,
-                    reason = reason,
-                    onDismiss = ::dismissLogin,
-                )
+                when (authStep ?: AuthStep.Login) {
+                    AuthStep.Login -> LoginScreen(
+                        onSubmit = ::submitCredentials,
+                        isSubmitting = isSubmitting,
+                        errorRes = signInErrorRes,
+                        onRegister = { goToStep(AuthStep.Register) },
+                        onForgotPassword = { goToStep(AuthStep.Forgot) },
+                        reason = reason,
+                        onDismiss = ::dismissLogin,
+                    )
+
+                    AuthStep.Register -> RegisterScreen(
+                        onSubmit = ::submitRegistration,
+                        isSubmitting = isSubmitting,
+                        errorRes = signInErrorRes,
+                        onBackToLogin = { goToStep(AuthStep.Login) },
+                    )
+
+                    AuthStep.Forgot -> ForgotPasswordScreen(
+                        onSubmit = ::submitForgotPassword,
+                        isSubmitting = isSubmitting,
+                        errorRes = signInErrorRes,
+                        submitted = forgotSent,
+                        onBackToLogin = { goToStep(AuthStep.Login) },
+                        onEnterCode = { goToStep(AuthStep.Reset) },
+                    )
+
+                    AuthStep.Reset -> ResetPasswordScreen(
+                        token = resetToken,
+                        onSubmit = ::submitResetPassword,
+                        isSubmitting = isSubmitting,
+                        errorRes = signInErrorRes,
+                        submitted = authSucceeded,
+                        onBackToLogin = { goToStep(AuthStep.Login) },
+                    )
+                }
             } else {
                 when (val overlay = overlayKey) {
                     null -> TabScaffold(selected = tab, onSelectTab = ::requestTab) {
@@ -397,12 +527,15 @@ private fun BoxScope.SessionStatusPill(
  * your details": a user must never be told their password is wrong because the
  * phone was offline.
  */
-private fun signInMessage(error: AuthError): Int = when (error) {
+private fun authMessage(error: AuthError): Int = when (error) {
     AuthError.InvalidCredentials -> R.string.login_error_invalid_credentials
     AuthError.Network -> R.string.login_error_network
     AuthError.RateLimited -> R.string.login_error_rate_limited
     AuthError.AccountDisabled -> R.string.login_error_account_disabled
     AuthError.Validation -> R.string.login_error_validation
+    AuthError.EmailExists -> R.string.register_error_email_exists
+    AuthError.EmailNotConfigured -> R.string.login_error_email_not_configured
+    AuthError.InvalidResetToken -> R.string.login_error_invalid_reset_token
     else -> R.string.login_error_generic
 }
 

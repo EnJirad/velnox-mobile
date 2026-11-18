@@ -31,6 +31,8 @@ class SessionControllerTest {
         var loginResult: ApiResult<AuthSession> = ApiResult.Error(AuthError.Network)
         var logoutResult: ApiResult<Unit> = ApiResult.Ok(Unit)
         var logoutCalls = 0
+        var forgotResult: ApiResult<Unit> = ApiResult.Ok(Unit)
+        var resetResult: ApiResult<Unit> = ApiResult.Ok(Unit)
 
         override suspend fun login(email: String, password: String) = loginResult
         override suspend fun register(name: String, email: String, password: String) = loginResult
@@ -39,6 +41,11 @@ class SessionControllerTest {
             logoutCalls++
             return logoutResult
         }
+
+        override suspend fun forgotPassword(email: String): ApiResult<Unit> = forgotResult
+
+        override suspend fun resetPassword(token: String, password: String): ApiResult<Unit> =
+            resetResult
     }
 
     private class FakeStore(var token: String? = null) : SessionStore {
@@ -245,5 +252,46 @@ class SessionControllerTest {
         controller.restoreOnce()
 
         assertEquals(1, reads)
+    }
+
+    @Test
+    fun `registration moves Guest straight to Authenticated`() = runBlocking {
+        val api = FakeApi().apply { loginResult = ApiResult.Ok(AuthSession("new-token", user)) }
+        val store = FakeStore()
+        val controller = controller(api, store)
+        controller.restoreOnce()
+
+        val result = controller.register("Ann", "a@b.co", "Password1")
+
+        assertEquals(SignInResult.Success(user), result)
+        assertEquals(SessionState.Authenticated(user), controller.state)
+        assertEquals("new-token", store.token)
+    }
+
+    @Test
+    fun `a duplicate email leaves the state Guest`() = runBlocking {
+        val api = FakeApi().apply { loginResult = ApiResult.Error(AuthError.EmailExists) }
+        val controller = controller(api, FakeStore())
+        controller.restoreOnce()
+
+        val result = controller.register("Ann", "a@b.co", "Password1")
+
+        assertEquals(SignInResult.Failure(AuthError.EmailExists), result)
+        assertEquals(SessionState.Guest, controller.state)
+    }
+
+    @Test
+    fun `a completed reset signs the user out and returns to Guest`() = runBlocking {
+        val api = FakeApi().apply { meResult = ApiResult.Ok(user) }
+        val store = FakeStore(token = tokenExpiringAt(1_900_000_000_000L))
+        val controller = controller(api, store)
+        controller.restoreOnce()
+        assertTrue(controller.state.isAuthenticated)
+
+        val result = controller.resetPassword("code", "NewPassword1")
+
+        assertEquals(ApiResult.Ok(Unit), result)
+        assertEquals(SessionState.Guest, controller.state)
+        assertNull(store.token)
     }
 }

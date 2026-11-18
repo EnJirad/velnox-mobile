@@ -30,8 +30,14 @@ class AuthRepositoryTest {
         var loginCalls = 0
         var meCalls = 0
         var logoutCalls = 0
+        var forgotCalls = 0
+        var resetCalls = 0
         var lastLoginEmail: String? = null
         var lastMeToken: String? = null
+        var lastForgotEmail: String? = null
+        var lastResetToken: String? = null
+        var forgotResult: ApiResult<Unit> = ApiResult.Ok(Unit)
+        var resetResult: ApiResult<Unit> = ApiResult.Ok(Unit)
 
         override suspend fun login(email: String, password: String): ApiResult<AuthSession> {
             loginCalls++
@@ -52,6 +58,18 @@ class AuthRepositoryTest {
         override suspend fun logout(token: String): ApiResult<Unit> {
             logoutCalls++
             return logoutResult
+        }
+
+        override suspend fun forgotPassword(email: String): ApiResult<Unit> {
+            forgotCalls++
+            lastForgotEmail = email
+            return forgotResult
+        }
+
+        override suspend fun resetPassword(token: String, password: String): ApiResult<Unit> {
+            resetCalls++
+            lastResetToken = token
+            return resetResult
         }
     }
 
@@ -219,5 +237,71 @@ class AuthRepositoryTest {
         repository(api, FakeStore()).signOut()
 
         assertEquals(0, api.logoutCalls)
+    }
+
+    // ------------------------------------------------------------- registration
+
+    @Test
+    fun `register stores the issued token and returns the account`() = runBlocking {
+        val api = FakeApi().apply { registerResult = ApiResult.Ok(AuthSession("new-token", user)) }
+        val store = FakeStore()
+
+        val result = repository(api, store).register("Ann", " A@B.CO ", "Password1")
+
+        assertEquals(SignInResult.Success(user), result)
+        assertEquals("new-token", store.token)
+    }
+
+    @Test
+    fun `a duplicate email stores nothing and reports EmailExists`() = runBlocking {
+        val api = FakeApi().apply { registerResult = ApiResult.Error(AuthError.EmailExists) }
+        val store = FakeStore()
+
+        val result = repository(api, store).register("Ann", "a@b.co", "Password1")
+
+        assertEquals(SignInResult.Failure(AuthError.EmailExists), result)
+        assertNull(store.token)
+    }
+
+    // ------------------------------------------------------------ password reset
+
+    @Test
+    fun `forgot password normalizes the address and reports the API outcome`() = runBlocking {
+        val api = FakeApi()
+        repository(api, FakeStore()).requestPasswordReset("  Ann@Example.COM ")
+
+        assertEquals(1, api.forgotCalls)
+        assertEquals("ann@example.com", api.lastForgotEmail)
+    }
+
+    @Test
+    fun `forgot password surfaces an unconfigured mail transport`() = runBlocking {
+        val api = FakeApi().apply { forgotResult = ApiResult.Error(AuthError.EmailNotConfigured) }
+        val result = repository(api, FakeStore()).requestPasswordReset("a@b.co")
+
+        assertEquals(ApiResult.Error(AuthError.EmailNotConfigured), result)
+    }
+
+    @Test
+    fun `a successful reset clears any stored session`() = runBlocking {
+        val api = FakeApi()
+        val store = FakeStore(token = "old-token")
+
+        val result = repository(api, store).resetPassword(" reset-code ", "NewPassword1")
+
+        assertEquals(ApiResult.Ok(Unit), result)
+        assertEquals("reset-code", api.lastResetToken)
+        assertNull(store.token)
+    }
+
+    @Test
+    fun `a rejected reset token leaves the session alone`() = runBlocking {
+        val api = FakeApi().apply { resetResult = ApiResult.Error(AuthError.InvalidResetToken) }
+        val store = FakeStore(token = "old-token")
+
+        val result = repository(api, store).resetPassword("bad", "NewPassword1")
+
+        assertEquals(ApiResult.Error(AuthError.InvalidResetToken), result)
+        assertEquals("old-token", store.token)
     }
 }

@@ -42,6 +42,7 @@ class AuthRemoteDataSource(
     override suspend fun login(email: String, password: String): ApiResult<AuthSession> = post(
         path = "/api/auth/mobile/login",
         body = JSONObject().put("email", email).put("password", password),
+        isSignIn = true,
     ).toSessionResult()
 
     /**
@@ -52,6 +53,7 @@ class AuthRemoteDataSource(
     override suspend fun register(name: String, email: String, password: String): ApiResult<AuthSession> = post(
         path = "/api/auth/mobile/register",
         body = JSONObject().put("name", name).put("email", email).put("password", password),
+        isSignIn = true,
     ).toSessionResult()
 
     /**
@@ -105,12 +107,41 @@ class AuthRemoteDataSource(
 
     // ------------------------------------------------------------------ parsing
 
+    /**
+     * `POST /api/auth/forgot-password`.
+     *
+     * The endpoint exists only once the backend branch lands; until then the live
+     * API answers 404, which maps to [AuthError.Unknown] and is shown as "try
+     * again later" rather than as a false success.
+     */
+    override suspend fun forgotPassword(email: String): ApiResult<Unit> = when (
+        val raw = post(path = "/api/auth/forgot-password", body = JSONObject().put("email", email))
+    ) {
+        is Raw.Ok -> ApiResult.Ok(Unit)
+        is Raw.Fail -> ApiResult.Error(raw.error)
+    }
+
+    /** `POST /api/auth/reset-password`. */
+    override suspend fun resetPassword(token: String, password: String): ApiResult<Unit> = when (
+        val raw = post(
+            path = "/api/auth/reset-password",
+            body = JSONObject().put("token", token).put("password", password),
+        )
+    ) {
+        is Raw.Ok -> ApiResult.Ok(Unit)
+        is Raw.Fail -> ApiResult.Error(raw.error)
+    }
+
     private sealed interface Raw {
         data class Ok(val body: String, val setCookies: List<String>) : Raw
         data class Fail(val error: AuthError) : Raw
     }
 
-    private suspend fun post(path: String, body: JSONObject): Raw =
+    private suspend fun post(
+        path: String,
+        body: JSONObject,
+        isSignIn: Boolean = false,
+    ): Raw =
         withContext(Dispatchers.IO) {
             val request = Request.Builder()
                 .url(baseUrl + path)
@@ -123,7 +154,7 @@ class AuthRemoteDataSource(
                     val text = response.body?.string().orEmpty()
                     val codes = response.headers.values("Set-Cookie")
                     if (response.isSuccessful) Raw.Ok(text, codes)
-                    else Raw.Fail(errorFor(response.code, text, isSignIn = true))
+                    else Raw.Fail(errorFor(response.code, text, isSignIn))
                 }
             } catch (_: IOException) {
                 Raw.Fail(AuthError.Network)
@@ -197,6 +228,8 @@ class AuthRemoteDataSource(
             code == "EMAIL_EXISTS" -> AuthError.EmailExists
             code == "ACCOUNT_DISABLED" || code == "ACCOUNT_SUSPENDED" -> AuthError.AccountDisabled
             code == "ACCOUNT_CONFLICT" -> AuthError.AccountConflict
+            code == "EMAIL_NOT_CONFIGURED" -> AuthError.EmailNotConfigured
+            code == "INVALID_RESET_TOKEN" -> AuthError.InvalidResetToken
             status == 400 -> AuthError.Validation
             status >= 500 -> AuthError.Server
             else -> AuthError.Unknown

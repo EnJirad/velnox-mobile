@@ -31,6 +31,24 @@ enum class LoginReason(
 }
 
 /**
+ * Which authentication screen the gate is showing.
+ *
+ * The gate is one destination with several steps, so the pending destination and
+ * the reason survive moving between sign-in, sign-up and recovery.
+ */
+enum class AuthStep(val key: String) {
+    Login("login"),
+    Register("register"),
+    Forgot("forgot"),
+    Reset("reset"),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): AuthStep? = entries.firstOrNull { it.key == key }
+    }
+}
+
+/**
  * The one place that decides what a guest may reach.
  *
  * Both navigation funnels (`requestTab` and `requestOverlay` in `VelnoxNavHost`)

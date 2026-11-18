@@ -3,6 +3,7 @@ package com.velnox.app.core.session
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.velnox.app.core.auth.ApiResult
 import com.velnox.app.core.auth.AuthRepository
 import com.velnox.app.core.auth.RestoreOutcome
 import com.velnox.app.core.auth.SignInResult
@@ -75,6 +76,23 @@ class SessionController(
         }
     }
 
+    /**
+     * Email + password registration. Creates the account and signs in with the
+     * session the API returns; a duplicate email surfaces as
+     * [com.velnox.app.core.auth.AuthError.EmailExists] and changes nothing.
+     */
+    suspend fun register(name: String, email: String, password: String): SignInResult {
+        notice = null
+        return when (val result = repository.register(name, email, password)) {
+            is SignInResult.Success -> {
+                state = SessionState.Authenticated(result.user)
+                result
+            }
+
+            is SignInResult.Failure -> result
+        }
+    }
+
     suspend fun signOut() {
         repository.signOut()
         notice = null
@@ -94,5 +112,22 @@ class SessionController(
     /** Clear the "could not verify" notice once it has been shown. */
     fun acknowledgeNotice() {
         notice = null
+    }
+
+    suspend fun requestPasswordReset(email: String): ApiResult<Unit> =
+        repository.requestPasswordReset(email)
+
+    /**
+     * Complete a password reset. On success the stored session is gone (the server
+     * invalidated it), so the app drops to [SessionState.Guest] and asks the user
+     * to sign in with the new password.
+     */
+    suspend fun resetPassword(token: String, password: String): ApiResult<Unit> {
+        val result = repository.resetPassword(token, password)
+        if (result is ApiResult.Ok) {
+            notice = null
+            state = SessionState.Guest
+        }
+        return result
     }
 }
