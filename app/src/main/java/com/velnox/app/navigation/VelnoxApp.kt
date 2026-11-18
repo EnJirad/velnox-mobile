@@ -6,8 +6,17 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +25,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.velnox.app.R
+import com.velnox.app.core.auth.AuthError
+import com.velnox.app.core.auth.SignInResult
 import com.velnox.app.core.i18n.VelnoxLocaleProvider
 import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.preferences.ThemeMode
@@ -37,6 +53,11 @@ import com.velnox.app.feature.profile.ProfileScreen
 import com.velnox.app.feature.settings.SettingsDetailScreen
 import com.velnox.app.feature.settings.SettingsPage
 import com.velnox.app.feature.settings.SettingsScreen
+import com.velnox.app.ui.components.PageGutter
+import com.velnox.app.ui.components.VelnoxSpacing
+import com.velnox.app.ui.components.velnoxClickable
+import com.velnox.app.ui.theme.Squircle
+import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
 import kotlinx.coroutines.launch
 
@@ -85,9 +106,10 @@ fun VelnoxApp() {
  *
  * Every destination change goes through exactly two funnels, [requestTab] and
  * [requestOverlay]. They consult [AccessPolicy]; a protected destination opened
- * by a guest sets [pendingDestinationKey] and opens Login with a reason instead
- * of navigating. Because the current tab is left untouched, dismissing Login
- * returns to where the guest already was — there is no loop to fall into.
+ * without an authenticated session sets [pendingDestinationKey] and opens Login
+ * with a reason instead of navigating. Because the current tab is left untouched,
+ * dismissing Login returns to where the guest already was — there is no loop to
+ * fall into.
  *
  * Back handling lives in one handler so the order is unambiguous: close Login,
  * then unwind a child page to its hub, then close an overlay, then return to the
@@ -103,6 +125,13 @@ private fun VelnoxNavHost() {
     var overlayKey by rememberSaveable { mutableStateOf<String?>(null) }
     var loginReasonKey by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDestinationKey by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // Sign-in progress and the last failure, owned here so LoginScreen stays a
+    // pure renderer of what the repository reported. `isSubmitting` is plain
+    // remember: a rotation cancels the request coroutine, so restoring a stale
+    // "true" would leave the button spinning forever.
+    var isSubmitting by remember { mutableStateOf(false) }
+    var signInErrorRes by rememberSaveable { mutableStateOf<Int?>(null) }
 
     val tab = AppTab.fromKey(tabKey)
     val loginReason = LoginReason.fromKey(loginReasonKey)
@@ -120,18 +149,19 @@ private fun VelnoxNavHost() {
 
     /** Open Login for [reason], remembering where the guest was trying to go. */
     fun askForSignIn(reason: LoginReason, destination: String) {
-        // While the stored session is still being resolved we do not yet know
-        // whether this is a guest. Prompting would be a guess, so the tap is
-        // ignored for the few milliseconds the restore takes.
-        if (sessionState is SessionState.Restoring) return
+        // While the stored session is still being resolved the answer is unknown.
+        // Prompting would be a guess, so the tap is ignored for the moment the
+        // restore takes instead of opening Login on a false premise.
+        if (sessionState is SessionState.Loading) return
         pendingDestinationKey = destination
-        loginReasonKey = reason.key
+        loginReasonKey = AccessPolicy.reasonFor(reason, sessionState).key
+        signInErrorRes = null
     }
 
     /** The only way a bottom-bar destination may change. */
     fun requestTab(next: AppTab) {
         val reason = AccessPolicy.reasonForTab(next)
-        if (reason != null && !sessionState.isAuthenticated) {
+        if (reason != null && !AccessPolicy.isAllowed(sessionState)) {
             askForSignIn(reason, tabDestination(next))
             return
         }
@@ -141,7 +171,7 @@ private fun VelnoxNavHost() {
     /** The only way an overlay (including checkout) may open. */
     fun requestOverlay(key: String) {
         val reason = AccessPolicy.reasonForOverlay(key)
-        if (reason != null && !sessionState.isAuthenticated) {
+        if (reason != null && !AccessPolicy.isAllowed(sessionState)) {
             askForSignIn(reason, overlayDestination(key))
             return
         }
@@ -152,24 +182,41 @@ private fun VelnoxNavHost() {
     fun dismissLogin() {
         loginReasonKey = null
         pendingDestinationKey = null
+        signInErrorRes = null
     }
 
     /**
-     * Sign-in finished. Part 2 uses the Login screen's pre-existing demo submit;
-     * Part 3 swaps the credential call and this handler keeps working unchanged.
+     * Real credential sign-in. The screen only reports what was typed; the
+     * repository talks to the API and the controller owns the resulting state, so
+     * nothing here can mark the user signed in without a server answer.
      */
-    fun completeSignIn() {
-        session.completeDemoSignIn()
-        loginReasonKey = null
-        val pending = pendingDestinationKey
-        pendingDestinationKey = null
-        if (pending != null) {
-            when {
-                pending.startsWith(TAB_DESTINATION) ->
-                    openTab(AppTab.fromKey(pending.removePrefix(TAB_DESTINATION)))
+    fun submitCredentials(email: String, password: String) {
+        if (isSubmitting) return
+        isSubmitting = true
+        signInErrorRes = null
+        scope.launch {
+            val result = session.signIn(email, password)
+            isSubmitting = false
+            when (result) {
+                is SignInResult.Success -> {
+                    signInErrorRes = null
+                    loginReasonKey = null
+                    val pending = pendingDestinationKey
+                    pendingDestinationKey = null
+                    if (pending != null) {
+                        when {
+                            pending.startsWith(TAB_DESTINATION) ->
+                                openTab(AppTab.fromKey(pending.removePrefix(TAB_DESTINATION)))
 
-                pending.startsWith(OVERLAY_DESTINATION) ->
-                    overlayKey = pending.removePrefix(OVERLAY_DESTINATION)
+                            pending.startsWith(OVERLAY_DESTINATION) ->
+                                overlayKey = pending.removePrefix(OVERLAY_DESTINATION)
+                        }
+                    }
+                }
+
+                is SignInResult.Failure -> {
+                    signInErrorRes = signInMessage(result.error)
+                }
             }
         }
     }
@@ -177,6 +224,7 @@ private fun VelnoxNavHost() {
     fun signOut() {
         loginReasonKey = null
         pendingDestinationKey = null
+        signInErrorRes = null
         overlayKey = null
         tabKey = AppTab.Home.key
         scope.launch { session.signOut() }
@@ -195,6 +243,8 @@ private fun VelnoxNavHost() {
         }
     }
 
+    // A stored token that could not be checked is not a session: it is reported
+    // through SessionNotice and the app keeps browsing as a guest.
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -207,7 +257,9 @@ private fun VelnoxNavHost() {
         ) { reason ->
             if (reason != null) {
                 LoginScreen(
-                    onSignedIn = ::completeSignIn,
+                    onSubmit = ::submitCredentials,
+                    isSubmitting = isSubmitting,
+                    errorRes = signInErrorRes,
                     reason = reason,
                     onDismiss = ::dismissLogin,
                 )
@@ -275,7 +327,83 @@ private fun VelnoxNavHost() {
                 }
             }
         }
+
+        if (sessionState is SessionState.Loading) {
+            SessionStatusPill(
+                textRes = R.string.session_checking,
+                showSpinner = true,
+            )
+        } else if (session.notice != null) {
+            SessionStatusPill(
+                textRes = R.string.session_unverified,
+                showSpinner = false,
+                onClick = session::acknowledgeNotice,
+            )
+        }
     }
+}
+
+/**
+ * A small, non-blocking status pill in the top corner.
+ *
+ * While a stored session is being verified it says so without covering the
+ * catalogue — blocking the whole screen to ask "were you signed in?" would be the
+ * startup screen this part set out to remove. If the API could not be reached it
+ * says the session could not be verified, and tapping it dismisses the message.
+ */
+@Composable
+private fun BoxScope.SessionStatusPill(
+    textRes: Int,
+    showSpinner: Boolean,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .statusBarsPadding()
+            .padding(top = VelnoxSpacing.sm, end = PageGutter)
+            .align(Alignment.TopEnd)
+            .clip(Squircle)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .then(
+                if (onClick != null) {
+                    Modifier.velnoxClickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (showSpinner) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                strokeWidth = 1.5.dp,
+                color = VelnoxBrand,
+            )
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            text = stringResource(textRes),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * Maps a failed sign-in to a message resource.
+ *
+ * Network and server failures say "try again", credential failures say "check
+ * your details": a user must never be told their password is wrong because the
+ * phone was offline.
+ */
+private fun signInMessage(error: AuthError): Int = when (error) {
+    AuthError.InvalidCredentials -> R.string.login_error_invalid_credentials
+    AuthError.Network -> R.string.login_error_network
+    AuthError.RateLimited -> R.string.login_error_rate_limited
+    AuthError.AccountDisabled -> R.string.login_error_account_disabled
+    AuthError.Validation -> R.string.login_error_validation
+    else -> R.string.login_error_generic
 }
 
 @Composable

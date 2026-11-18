@@ -46,7 +46,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,29 +79,31 @@ import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Velnox Login.
  *
  * Same visual language as Home: white surfaces on the slate page, dark primary
- * action, emerald accents, squircle controls and the shared type scale. The
- * screen keeps its original behaviour — inline validation, show/hide password,
- * remember-me — and calls [onSignedIn] so navigation owns the transition.
+ * action, emerald accents, squircle controls and the shared type scale.
  *
  * Since Part 2 this is no longer a startup screen: it is a gate the guest reaches
  * by asking for a protected destination. [reason] explains why it opened, and
  * [onDismiss] returns the guest to browsing without signing in.
+ *
+ * Since Part 3 the submit button is real: it reports the typed credentials to
+ * [onSubmit] and renders [isSubmitting] / [errorRes] from the caller. The screen
+ * never decides that a sign-in succeeded — the API does, and the navigation gate
+ * reacts to the resulting session state.
  */
 @Composable
 fun LoginScreen(
-    onSignedIn: () -> Unit,
+    onSubmit: (email: String, password: String) -> Unit,
+    isSubmitting: Boolean,
+    errorRes: Int?,
     reason: LoginReason? = null,
     onDismiss: (() -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
-    val scope = rememberCoroutineScope()
 
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -112,7 +113,6 @@ fun LoginScreen(
     var emailTouched by rememberSaveable { mutableStateOf(false) }
     var passwordTouched by rememberSaveable { mutableStateOf(false) }
 
-    var isSubmitting by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<LoginNotice?>(null) }
 
     val emailError = emailErrorRes(email)
@@ -127,17 +127,8 @@ fun LoginScreen(
             return
         }
         focusManager.clearFocus()
-        isSubmitting = true
         notice = null
-        // Phase 2 replaces this with the real sign-in call. Until then the
-        // screen waits a moment, then hands control to navigation.
-        scope.launch {
-            delay(700L)
-            isSubmitting = false
-            notice = LoginNotice.Success
-            delay(450L)
-            onSignedIn()
-        }
+        onSubmit(email, password)
     }
 
     BoxWithConstraints(
@@ -342,6 +333,20 @@ fun LoginScreen(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            // A failure from the repository (wrong password, offline, rate
+            // limited) is shown where the old demo "success" notice lived, so the
+            // user always sees the outcome of the request they just made.
+            AnimatedVisibility(
+                visible = errorRes != null,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 3 }),
+                exit = fadeOut(),
+            ) {
+                Column {
+                    Spacer(Modifier.height(12.dp))
+                    ErrorBanner(errorRes)
                 }
             }
 
@@ -707,42 +712,22 @@ private fun SignInReasonCard(reason: LoginReason) {
 
 // --------------------------------------------------------------------- notice
 
+/**
+ * A transient, non-blocking note (currently only "coming soon" for the social
+ * buttons, which are not implemented in this part).
+ */
 private sealed interface LoginNotice {
-    data object Success : LoginNotice
     data object ComingSoon : LoginNotice
 }
 
 @Composable
 private fun NoticeBanner(notice: LoginNotice?) {
-    val isSuccess = notice is LoginNotice.Success
-    val background = if (isSuccess) {
-        MaterialTheme.colorScheme.secondaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val foreground = if (isSuccess) {
-        MaterialTheme.colorScheme.onSecondaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val title = when (notice) {
-        LoginNotice.Success -> stringResource(R.string.login_success_title)
-        LoginNotice.ComingSoon -> stringResource(R.string.common_coming_soon)
-        null -> ""
-    }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(Squircle)
-            .background(background)
-            .border(
-                BorderStroke(
-                    1.dp,
-                    if (isSuccess) VelnoxBrand else MaterialTheme.colorScheme.outline,
-                ),
-                Squircle,
-            )
+            .background(MaterialTheme.colorScheme.surface)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), Squircle)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -750,16 +735,47 @@ private fun NoticeBanner(notice: LoginNotice?) {
             modifier = Modifier
                 .size(6.dp)
                 .clip(Circle)
-                .background(
-                    if (isSuccess) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
+                .background(MaterialTheme.colorScheme.onSurfaceVariant),
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            text = title,
+            text = stringResource(R.string.common_coming_soon),
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
-            color = foreground,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * A failed sign-in. Uses the error role, not the brand accent: the outcome is bad
+ * news, and it must read the same in light and dark schemes.
+ */
+@Composable
+private fun ErrorBanner(errorRes: Int?) {
+    if (errorRes == null) return
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(Squircle)
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.error), Squircle)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = VelnoxIcons.Info,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = stringResource(errorRes),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onErrorContainer,
         )
     }
 }
@@ -772,9 +788,16 @@ private fun emailErrorRes(email: String): Int? = when {
     else -> null
 }
 
+/**
+ * Sign-in only checks that something was typed.
+ *
+ * Strength rules belong to account creation, and are enforced by the API
+ * (`min(8)` plus a server-side strength pattern). Re-imposing a length here would
+ * reject a legacy password that the server still accepts, and duplicating the
+ * pattern would only let the two drift apart.
+ */
 private fun passwordErrorRes(password: String): Int? = when {
     password.isEmpty() -> R.string.login_error_password_required
-    password.length < 6 -> R.string.login_error_password_short
     else -> null
 }
 
@@ -786,7 +809,7 @@ private val EMAIL_PATTERN = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$")
 @Composable
 private fun LoginScreenPreview() {
     VelnoxTheme(darkTheme = false) {
-        LoginScreen(onSignedIn = {})
+        LoginScreen(onSubmit = { _, _ -> }, isSubmitting = false, errorRes = null)
     }
 }
 
@@ -794,7 +817,7 @@ private fun LoginScreenPreview() {
 @Composable
 private fun LoginScreenSmallPreview() {
     VelnoxTheme(darkTheme = false) {
-        LoginScreen(onSignedIn = {})
+        LoginScreen(onSubmit = { _, _ -> }, isSubmitting = false, errorRes = null)
     }
 }
 
@@ -802,6 +825,6 @@ private fun LoginScreenSmallPreview() {
 @Composable
 private fun LoginScreenDarkPreview() {
     VelnoxTheme(darkTheme = true) {
-        LoginScreen(onSignedIn = {})
+        LoginScreen(onSubmit = { _, _ -> }, isSubmitting = false, errorRes = null)
     }
 }

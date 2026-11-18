@@ -11,7 +11,7 @@ import com.velnox.app.VelnoxApplication
  * Session access for composables.
  *
  * The controller is process-scoped (see `VelnoxApplication`); this provider only
- * starts the one-time restore and exposes the controller. Screens read
+ * starts the one-time resolve and exposes the controller. Screens read
  * `LocalSession.current.state` and never construct their own session flags.
  */
 val LocalSession = staticCompositionLocalOf<SessionController> {
@@ -23,8 +23,8 @@ fun VelnoxSessionProvider(content: @Composable () -> Unit) {
     val application = LocalContext.current.applicationContext as VelnoxApplication
     val controller = application.session
 
-    // Runs after the first frame, so Home paints without waiting on storage and
-    // no Login screen can flash while the session is still unknown.
+    // Runs after the first frame: Home paints without waiting on storage or the
+    // network, and no Login screen can flash while the session is still unknown.
     LaunchedEffect(controller) {
         controller.restoreOnce()
     }

@@ -1,30 +1,50 @@
 package com.velnox.app.core.session
 
+import com.velnox.app.core.auth.AuthUser
+
 /**
- * Who the app currently believes it is acting for.
+ * The app's single authentication state.
  *
- * This is the single source of truth for the guest/authenticated decision. No
- * screen may invent its own flag: navigation, the bottom bar and any protected
- * action all read this value through [SessionController] and [AccessPolicy].
+ * Exactly four states, and every screen reads them from one place — no screen
+ * keeps its own signed-in flag.
  *
- * Part 2 ships two reachable states — [Restoring] resolves to [Guest] because no
- * session is persisted yet — and [Authenticated] is what Part 3 produces once a
- * real credential exchange exists. [Authenticated] deliberately carries no
- * account: there is no profile source until the API layer lands, and inventing a
- * fake identity here would be worse than having none.
+ * - [Loading] — a stored session is being resolved. The shell is already on
+ *   screen; protected destinations are not opened yet because the answer is not
+ *   known.
+ * - [Guest] — nobody is signed in. Browsing is allowed, account surfaces are not.
+ * - [Authenticated] — the API confirmed the token and returned the account.
+ * - [ExpiredSession] — a session existed and is no longer valid (expired or
+ *   rejected). The token has been cleared; signing in again is required.
+ *
+ * [Guest] and [ExpiredSession] both block account surfaces, but they are not the
+ * same thing to the user: one is "you never signed in", the other is "you were
+ * signed in and need to again", which the Login gate says out loud.
  */
 sealed interface SessionState {
 
-    /** A stored session is being resolved. Not yet a guest, not yet signed in. */
-    data object Restoring : SessionState
+    data object Loading : SessionState
 
-    /** No session. Browsing is allowed; account surfaces are not. */
     data object Guest : SessionState
 
-    /** A session exists. Account surfaces are allowed. */
-    data object Authenticated : SessionState
+    data class Authenticated(val user: AuthUser) : SessionState
+
+    data object ExpiredSession : SessionState
 
     val isAuthenticated: Boolean get() = this is Authenticated
 
-    val isGuest: Boolean get() = this is Guest
+    /** The signed-in account, or `null` for every other state. */
+    val user: AuthUser? get() = (this as? Authenticated)?.user
+}
+
+/**
+ * Something the user should know about how the session resolved, without
+ * pretending to be a fifth state.
+ *
+ * [NetworkUnavailable] means a token is stored but could not be verified. The
+ * state is [SessionState.Guest] — the app must not act authenticated on an
+ * unproven token — and the token stays on the device so the next launch can try
+ * again.
+ */
+enum class SessionNotice {
+    NetworkUnavailable,
 }

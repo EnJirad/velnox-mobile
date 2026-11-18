@@ -287,7 +287,7 @@
     <string name="login_email_label">အီးမေးလ်</string>
     <string name="login_email_placeholder">you@email.com</string>
     <string name="login_password_label">စကားဝှက်</string>
-    <string name="login_password_placeholder">အနည်းဆုံး ၆ လုံး</string>
+    <string name="login_password_placeholder">သင့်စကားဝှက်</string>
     <string name="login_password_show">ပြ</string>
     <string name="login_password_hide">ဖျောက်</string>
     <string name="login_remember">မှတ်ထားပါ</string>
@@ -305,7 +305,6 @@
     <string name="login_error_email_required">အီးမေးလ် ထည့်ပါ</string>
     <string name="login_error_email_invalid">အီးမေးလ် ပုံစံ မမှန်ပါ</string>
     <string name="login_error_password_required">စကားဝှက် ထည့်ပါ</string>
-    <string name="login_error_password_short">စကားဝှက် အနည်းဆုံး ၆ လုံး ရှိရမည်</string>
     <string name="login_continue_browsing">အကောင့်မဝင်ဘဲ ဆက်လက်ကြည့်ရှုရန်</string>
     <string name="auth_reason_title">ဝင်ရန် လိုအပ်ပါသည်</string>
     <string name="auth_reason_cart">စျေးခြင်းသည် သင့်အကောင့်နှင့် ဆက်စပ်နေသည်။ ရွေးထားသော ပစ္စည်းများ သိမ်းထားရန် အကောင့်ဝင်ပါ။</string>
@@ -314,6 +313,15 @@
     <string name="auth_reason_messages">ဆိုင်များနှင့် စကားပြောရန် အကောင့် လိုအပ်သည်။ မက်ဆေ့ချ်များ ကြည့်ရန် အကောင့်ဝင်ပါ။</string>
     <string name="auth_reason_checkout">ငွေပေးချေရန် အကောင့် လိုအပ်သည်။ ဆက်လက်ဆောင်ရွက်ရန် အကောင့်ဝင်ပါ။</string>
     <string name="auth_reason_account">ဤအပိုင်းသည် သင့်အကောင့်၏ အစိတ်အပိုင်းဖြစ်သည်။ ဆက်လက်ဆောင်ရွက်ရန် အကောင့်ဝင်ပါ။</string>
+    <string name="auth_reason_expired">သင့် ဆက်ရှင်ကုန်ဆုံးသွားပါပြီ။ ထပ်မံ အကောင့်ဝင်ပါ။</string>
+    <string name="session_checking">ဆက်ရှင် စစ်ဆေးနေသည်…</string>
+    <string name="session_unverified">ဆက်ရှင် အတည်ပြု၍ မရပါ (အင်တာနက် မရှိ)</string>
+    <string name="login_error_invalid_credentials">အီးမေးလ် သို့မဟုတ် စကားဝှက် မှားနေသည်</string>
+    <string name="login_error_network">ဆာဗာ မချိတ်ဆက်နိုင်ပါ။ အင်တာနက် စစ်ပြီး ထပ်မံ ကြိုးစားပါ။</string>
+    <string name="login_error_rate_limited">ကြိုးစားမှု များလွန်းသည်။ ခဏစောင့်ပြီး ထပ်မံ ကြိုးစားပါ။</string>
+    <string name="login_error_account_disabled">ဤအကောင့်ကို ပိတ်ထားသည်</string>
+    <string name="login_error_validation">အချက်အလက် အချို့ လက်မခံနိုင်ပါ။ ပြန်စစ်ပြီး ကြိုးစားပါ။</string>
+    <string name="login_error_generic">အကောင့်ဝင်၍ မရပါ။ ထပ်မံ ကြိုးစားပါ။</string>
     <string name="placeholder_product">ကုန်ပစ္စည်း အသေးစိတ်</string>
     <string name="placeholder_category">အမျိုးအစား</string>
     <string name="placeholder_search">ရှာဖွေရန်</string>

@@ -14,6 +14,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+
+        // The deployed Velnox API. Not a secret: it is a public HTTPS origin that
+        // every client already talks to. Kept here so no screen hard-codes a URL.
+        buildConfigField("String", "API_BASE_URL", "\"https://velnox-api.onrender.com\"")
     }
 
     buildTypes {
@@ -37,6 +41,11 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = false
     }
 
     packaging {
@@ -52,6 +61,10 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Networking. The only new runtime dependency in Part 3: the app had no HTTP
+    // client at all, and JSON is read with the platform org.json parser.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -59,4 +72,7 @@ dependencies {
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.material3:material3")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 }

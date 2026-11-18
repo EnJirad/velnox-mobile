@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup rules.
+
+  The session token lives in a Keystore-protected file
+  (filesDir/session/session.bin — see core/session/SessionVault). Its ciphertext
+  must never leave the device: the AES key lives in the Android Keystore, which
+  is not backed up, so a copied file could not be decrypted after a restore and
+  would only be dead weight. Excluding it also means a restored backup can never
+  present a stale credential.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="session/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="session/" />
+    </device-transfer>
+</data-extraction-rules>

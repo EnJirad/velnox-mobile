@@ -287,7 +287,7 @@
     <string name="login_email_label">อีเมล</string>
     <string name="login_email_placeholder">you@email.com</string>
     <string name="login_password_label">รหัสผ่าน</string>
-    <string name="login_password_placeholder">อย่างน้อย 6 ตัวอักษร</string>
+    <string name="login_password_placeholder">รหัสผ่านของคุณ</string>
     <string name="login_password_show">แสดง</string>
     <string name="login_password_hide">ซ่อน</string>
     <string name="login_remember">จดจำฉัน</string>
@@ -305,7 +305,6 @@
     <string name="login_error_email_required">กรุณากรอกอีเมล</string>
     <string name="login_error_email_invalid">รูปแบบอีเมลไม่ถูกต้อง</string>
     <string name="login_error_password_required">กรุณากรอกรหัสผ่าน</string>
-    <string name="login_error_password_short">รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร</string>
     <string name="login_continue_browsing">กลับไปเลือกซื้อสินค้าโดยไม่เข้าสู่ระบบ</string>
     <string name="auth_reason_title">ต้องเข้าสู่ระบบ</string>
     <string name="auth_reason_cart">ตะกร้าสินค้าเป็นของคุณเฉพาะเมื่อมีบัญชี กรุณาเข้าสู่ระบบเพื่อเก็บสินค้าที่เลือกไว้</string>
@@ -314,6 +313,15 @@
     <string name="auth_reason_messages">การสนทนากับร้านค้าต้องมีบัญชี กรุณาเข้าสู่ระบบเพื่อดูข้อความ</string>
     <string name="auth_reason_checkout">การชำระเงินต้องมีบัญชี กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ</string>
     <string name="auth_reason_account">ส่วนนี้เป็นข้อมูลบัญชีของคุณ กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ</string>
+    <string name="auth_reason_expired">เซสชันของคุณสิ้นสุดแล้ว กรุณาเข้าสู่ระบบอีกครั้ง</string>
+    <string name="session_checking">กำลังตรวจสอบเซสชัน…</string>
+    <string name="session_unverified">ยืนยันเซสชันไม่ได้ (ออฟไลน์)</string>
+    <string name="login_error_invalid_credentials">อีเมลหรือรหัสผ่านไม่ถูกต้อง</string>
+    <string name="login_error_network">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง</string>
+    <string name="login_error_rate_limited">ลองบ่อยเกินไป กรุณารอสักครู่แล้วลองอีกครั้ง</string>
+    <string name="login_error_account_disabled">บัญชีนี้ถูกระงับการใช้งาน</string>
+    <string name="login_error_validation">ข้อมูลที่กรอกไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง</string>
+    <string name="login_error_generic">เข้าสู่ระบบไม่สำเร็จ กรุณาลองอีกครั้ง</string>
     <string name="placeholder_product">รายละเอียดสินค้า</string>
     <string name="placeholder_category">หมวดหมู่สินค้า</string>
     <string name="placeholder_search">ค้นหาสินค้า</string>

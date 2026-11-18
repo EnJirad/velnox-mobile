@@ -48,6 +48,21 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+        env:
+          ANDROID_SDK_ROOT: /home/runner/android-sdk
+          ANDROID_HOME: /home/runner/android-sdk
+          GRADLE_HOME: /home/runner/gradle-8.11.1
+
+      - name: Publish unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: velnox-unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest
+          retention-days: 30
+
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace --refresh-dependencies
         env:

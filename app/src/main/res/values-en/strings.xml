@@ -287,7 +287,7 @@
     <string name="login_email_label">Email</string>
     <string name="login_email_placeholder">you@email.com</string>
     <string name="login_password_label">Password</string>
-    <string name="login_password_placeholder">At least 6 characters</string>
+    <string name="login_password_placeholder">Your password</string>
     <string name="login_password_show">Show</string>
     <string name="login_password_hide">Hide</string>
     <string name="login_remember">Remember me</string>
@@ -305,7 +305,6 @@
     <string name="login_error_email_required">Enter your email</string>
     <string name="login_error_email_invalid">Email format is not valid</string>
     <string name="login_error_password_required">Enter your password</string>
-    <string name="login_error_password_short">Password must be at least 6 characters</string>
     <string name="login_continue_browsing">Continue browsing without signing in</string>
     <string name="auth_reason_title">Sign-in required</string>
     <string name="auth_reason_cart">Your cart belongs to your account. Sign in to keep the items you picked.</string>
@@ -314,6 +313,15 @@
     <string name="auth_reason_messages">Chatting with shops needs an account. Sign in to see your messages.</string>
     <string name="auth_reason_checkout">Checkout needs an account. Sign in to place your order.</string>
     <string name="auth_reason_account">This is part of your account. Sign in to continue.</string>
+    <string name="auth_reason_expired">Your session expired. Please sign in again.</string>
+    <string name="session_checking">Checking session…</string>
+    <string name="session_unverified">Session couldn’t be verified (offline)</string>
+    <string name="login_error_invalid_credentials">Email or password is incorrect</string>
+    <string name="login_error_network">Couldn’t reach the server. Check your connection and try again.</string>
+    <string name="login_error_rate_limited">Too many attempts. Please wait a moment and try again.</string>
+    <string name="login_error_account_disabled">This account is disabled</string>
+    <string name="login_error_validation">Some details are not accepted. Please check them and try again.</string>
+    <string name="login_error_generic">Sign-in didn’t complete. Please try again.</string>
     <string name="placeholder_product">Product details</string>
     <string name="placeholder_category">Category</string>
     <string name="placeholder_search">Search</string>

@@ -2,6 +2,7 @@ package com.velnox.app.navigation
 
 import androidx.annotation.StringRes
 import com.velnox.app.R
+import com.velnox.app.core.session.SessionState
 
 /**
  * Why the Login screen was opened.
@@ -19,6 +20,9 @@ enum class LoginReason(
     Messages("messages", R.string.auth_reason_messages),
     Checkout("checkout", R.string.auth_reason_checkout),
     Account("account", R.string.auth_reason_account),
+
+    /** A session existed and stopped being valid; the token has been cleared. */
+    Expired("expired", R.string.auth_reason_expired),
     ;
 
     companion object {
@@ -44,6 +48,16 @@ enum class LoginReason(
  * authority on what a guest can actually read or change.
  */
 object AccessPolicy {
+
+    /**
+     * `true` when the session currently allows account surfaces.
+     *
+     * Only [SessionState.Authenticated] passes: `Loading` is unknown,
+     * `ExpiredSession` is gone and `Guest` never had one. A boolean stored on the
+     * client can therefore never satisfy this on its own — the state is only
+     * produced by a `200` from `/api/auth/me` or a successful sign-in.
+     */
+    fun isAllowed(state: SessionState): Boolean = state is SessionState.Authenticated
 
     /** Public: Home. Everything else on the bottom bar is account-specific. */
     fun reasonForTab(tab: AppTab): LoginReason? = when (tab) {
@@ -75,4 +89,14 @@ object AccessPolicy {
 
         else -> LoginReason.Account
     }
+
+    /**
+     * The reason to show for a blocked destination.
+     *
+     * An expired session says so, because "you were signed in and need to again"
+     * is a different situation from "you never signed in" — and only the former
+     * means the user's previous session was cleared.
+     */
+    fun reasonFor(base: LoginReason, state: SessionState): LoginReason =
+        if (state is SessionState.ExpiredSession) LoginReason.Expired else base
 }
