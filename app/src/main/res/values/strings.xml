@@ -354,6 +354,10 @@
     <string name="reset_code_placeholder">วางรหัสจากอีเมล</string>
     <string name="login_error_email_not_configured">ระบบยังไม่สามารถส่งอีเมลได้ กรุณาติดต่อฝ่ายสนับสนุน</string>
     <string name="login_error_invalid_reset_token">ลิงก์ตั้งรหัสผ่านไม่ถูกต้องหรือหมดอายุแล้ว</string>
+    <string name="login_error_google_unavailable">ยังไม่ได้ตั้งค่า Google Sign-In สำหรับแอปนี้</string>
+    <string name="login_error_google_failed">เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองอีกครั้ง</string>
+    <string name="login_error_google_no_account">ไม่พบบัญชี Google ในเครื่องนี้ กรุณาเพิ่มบัญชีใน Settings</string>
+    <string name="login_error_google_link_required">อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านก่อน แล้วจึงเชื่อม Google</string>
     <string name="login_continue_browsing">กลับไปเลือกซื้อสินค้าโดยไม่เข้าสู่ระบบ</string>
     <string name="auth_reason_title">ต้องเข้าสู่ระบบ</string>
     <string name="auth_reason_cart">ตะกร้าสินค้าเป็นของคุณเฉพาะเมื่อมีบัญชี กรุณาเข้าสู่ระบบเพื่อเก็บสินค้าที่เลือกไว้</string>

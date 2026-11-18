@@ -60,6 +60,22 @@ enum class AuthError {
     /** 400 `INVALID_RESET_TOKEN`: the reset code is wrong, used or expired. */
     InvalidResetToken,
 
+    /**
+     * 401 `INVALID_GOOGLE_TOKEN` / `EMAIL_NOT_VERIFIED`: the identity token the
+     * provider returned could not be trusted. Never treated as a sign-in.
+     */
+    InvalidProviderToken,
+
+    /**
+     * 409 `LINK_REQUIRED`: an account already exists for that email but is not
+     * linked to this Google identity. The user must sign in with their password
+     * once to prove ownership, then link.
+     */
+    LinkRequired,
+
+    /** 503 `GOOGLE_NOT_CONFIGURED` / `GOOGLE_UNAVAILABLE`. */
+    ProviderUnavailable,
+
     /** The request never reached the server, or the reply never arrived. */
     Network,
 

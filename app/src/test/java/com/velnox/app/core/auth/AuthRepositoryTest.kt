@@ -38,6 +38,10 @@ class AuthRepositoryTest {
         var lastResetToken: String? = null
         var forgotResult: ApiResult<Unit> = ApiResult.Ok(Unit)
         var resetResult: ApiResult<Unit> = ApiResult.Ok(Unit)
+        var googleResult: ApiResult<AuthSession> = ApiResult.Error(AuthError.Network)
+        var clientIdResult: ApiResult<String?> = ApiResult.Ok(null)
+        var googleCalls = 0
+        var lastGoogleToken: String? = null
 
         override suspend fun login(email: String, password: String): ApiResult<AuthSession> {
             loginCalls++
@@ -303,5 +307,52 @@ class AuthRepositoryTest {
 
         assertEquals(ApiResult.Error(AuthError.InvalidResetToken), result)
         assertEquals("old-token", store.token)
+    }
+
+    // ------------------------------------------------------------ google sign-in
+
+    @Test
+    fun `google sign-in sends only the id token and stores the session`() = runBlocking {
+        val api = FakeApi().apply { googleResult = ApiResult.Ok(AuthSession("google-token", user)) }
+        val store = FakeStore()
+
+        val result = repository(api, store).signInWithGoogle("  id-token-value  ")
+
+        assertEquals(SignInResult.Success(user), result)
+        assertEquals("id-token-value", api.lastGoogleToken)
+        assertEquals("google-token", store.token)
+    }
+
+    @Test
+    fun `an existing account is never merged: LinkRequired stores nothing`() = runBlocking {
+        val api = FakeApi().apply { googleResult = ApiResult.Error(AuthError.LinkRequired) }
+        val store = FakeStore()
+
+        val result = repository(api, store).signInWithGoogle("id-token")
+
+        assertEquals(SignInResult.Failure(AuthError.LinkRequired), result)
+        assertNull(store.token)
+    }
+
+    @Test
+    fun `a rejected google token stores nothing`() = runBlocking {
+        val api = FakeApi().apply { googleResult = ApiResult.Error(AuthError.InvalidProviderToken) }
+        val store = FakeStore()
+
+        val result = repository(api, store).signInWithGoogle("forged-token")
+
+        assertEquals(SignInResult.Failure(AuthError.InvalidProviderToken), result)
+        assertNull(store.token)
+    }
+
+    @Test
+    fun `an unavailable provider leaves the app signed out`() = runBlocking {
+        val api = FakeApi().apply { googleResult = ApiResult.Error(AuthError.ProviderUnavailable) }
+        val store = FakeStore()
+
+        val result = repository(api, store).signInWithGoogle("id-token")
+
+        assertEquals(SignInResult.Failure(AuthError.ProviderUnavailable), result)
+        assertNull(store.token)
     }
 }

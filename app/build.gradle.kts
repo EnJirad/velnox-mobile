@@ -18,6 +18,18 @@ android {
         // The deployed Velnox API. Not a secret: it is a public HTTPS origin that
         // every client already talks to. Kept here so no screen hard-codes a URL.
         buildConfigField("String", "API_BASE_URL", "\"https://velnox-api.onrender.com\"")
+
+        // Google Sign-In needs the *Web* OAuth client id as its `serverClientId`,
+        // because the ID token's `aud` must match what the backend verifies.
+        // It is a public identifier, not a secret, but it is deployment
+        // configuration, so it is not hard-coded: supply it with
+        // -PvelnoxGoogleClientId=… or let the app read it from
+        // GET /api/auth/mobile/config at runtime. Empty means "not configured",
+        // and the app says so instead of opening a flow that cannot finish.
+        val googleClientId = (project.findProperty("velnoxGoogleClientId") as String?)
+            ?.trim()
+            .orEmpty()
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleClientId\"")
     }
 
     buildTypes {
@@ -64,6 +76,13 @@ dependencies {
     // Networking. The only new runtime dependency in Part 3: the app had no HTTP
     // client at all, and JSON is read with the platform org.json parser.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Google Sign-In. Credential Manager is the currently supported flow;
+    // GoogleSignInClient was deprecated. These three artifacts are Google's own
+    // recommended combination for "Sign in with Google" with an ID token.
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")

@@ -105,6 +105,54 @@ class AuthRemoteDataSource(
         }
     }
 
+    /**
+     * `POST /api/auth/mobile/google`.
+     *
+     * Only the ID token is sent. The server verifies it with Google and derives
+     * the account from the claims; nothing the client claims about itself is used.
+     */
+    override suspend fun googleSignIn(idToken: String): ApiResult<AuthSession> = post(
+        path = "/api/auth/mobile/google",
+        body = JSONObject().put("idToken", idToken),
+    ).toSessionResult()
+
+    /**
+     * `GET /api/auth/mobile/config`.
+     *
+     * The Google client id is a public identifier, so publishing it lets the app
+     * stay correct when the deployment changes without shipping a new build. The
+     * response may omit it entirely, which is reported as `null`, not as a failure.
+     */
+    override suspend fun googleClientId(): ApiResult<String?> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(baseUrl + "/api/auth/mobile/config")
+            .header("Accept", "application/json")
+            .get()
+            .build()
+
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    ApiResult.Error(if (response.code >= 500) AuthError.Server else AuthError.Unknown)
+                } else {
+                    val body = response.body?.string().orEmpty()
+                    val id = try {
+                        JSONObject(body)
+                            .optJSONObject("data")
+                            ?.optString("googleClientId")
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() }
+                    } catch (_: JSONException) {
+                        null
+                    }
+                    ApiResult.Ok(id)
+                }
+            }
+        } catch (_: IOException) {
+            ApiResult.Error(AuthError.Network)
+        }
+    }
+
     // ------------------------------------------------------------------ parsing
 
     /**
@@ -230,6 +278,11 @@ class AuthRemoteDataSource(
             code == "ACCOUNT_CONFLICT" -> AuthError.AccountConflict
             code == "EMAIL_NOT_CONFIGURED" -> AuthError.EmailNotConfigured
             code == "INVALID_RESET_TOKEN" -> AuthError.InvalidResetToken
+            code == "INVALID_GOOGLE_TOKEN" || code == "EMAIL_NOT_VERIFIED" ->
+                AuthError.InvalidProviderToken
+            code == "LINK_REQUIRED" -> AuthError.LinkRequired
+            code == "GOOGLE_NOT_CONFIGURED" || code == "GOOGLE_UNAVAILABLE" ->
+                AuthError.ProviderUnavailable
             status == 400 -> AuthError.Validation
             status >= 500 -> AuthError.Server
             else -> AuthError.Unknown

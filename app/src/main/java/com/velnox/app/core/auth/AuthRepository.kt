@@ -76,6 +76,22 @@ class AuthRepository(
     }
 
     /**
+     * Exchange a Google ID token for a session.
+     *
+     * The token is handed straight to the API, which verifies it with Google. The
+     * app never reads the claims itself and never decides that a Google account
+     * belongs to anyone: if the server says `LINK_REQUIRED`, an account already
+     * exists for that address and the user has to prove ownership with their
+     * password before Google is attached to it.
+     */
+    suspend fun signInWithGoogle(idToken: String): SignInResult {
+        return when (val result = api.googleSignIn(idToken.trim())) {
+            is ApiResult.Error -> SignInResult.Failure(result.error)
+            is ApiResult.Ok -> persist(result.value)
+        }
+    }
+
+    /**
      * Ask the server to send a reset link.
      *
      * The outcome is intentionally not "does this account exist": the API answers

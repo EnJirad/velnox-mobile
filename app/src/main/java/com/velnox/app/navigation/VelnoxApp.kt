@@ -26,12 +26,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
 import com.velnox.app.core.auth.ApiResult
+import com.velnox.app.core.auth.CredentialManagerGoogleSignIn
+import com.velnox.app.core.auth.GoogleSignInOutcome
 import com.velnox.app.core.auth.AuthError
 import com.velnox.app.core.auth.SignInResult
 import com.velnox.app.core.i18n.VelnoxLocaleProvider
@@ -62,6 +66,7 @@ import com.velnox.app.ui.components.VelnoxSpacing
 import com.velnox.app.ui.components.velnoxClickable
 import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.VelnoxBrand
+import com.velnox.app.VelnoxApplication
 import com.velnox.app.ui.theme.VelnoxTheme
 import kotlinx.coroutines.launch
 
@@ -138,12 +143,26 @@ private fun VelnoxNavHost() {
     var authSucceeded by rememberSaveable { mutableStateOf(false) }
     var forgotSent by rememberSaveable { mutableStateOf(false) }
 
+    // Google Sign-In availability and progress. Availability is a deployment
+    // fact (is there a client id at all?), so it is resolved once per gate.
+    var googleAvailable by remember { mutableStateOf(false) }
+    var googleBusy by remember { mutableStateOf(false) }
+
     // Sign-in progress and the last failure, owned here so LoginScreen stays a
     // pure renderer of what the repository reported. `isSubmitting` is plain
     // remember: a rotation cancels the request coroutine, so restoring a stale
     // "true" would leave the button spinning forever.
     var isSubmitting by remember { mutableStateOf(false) }
     var signInErrorRes by rememberSaveable { mutableStateOf<Int?>(null) }
+
+    val application = LocalContext.current.applicationContext as VelnoxApplication
+    val activityContext = LocalContext.current
+    val googleProvider = remember(activityContext) {
+        CredentialManagerGoogleSignIn(
+            context = activityContext,
+            clientId = { application.googleClientId.clientId() },
+        )
+    }
 
     val tab = AppTab.fromKey(tabKey)
     val loginReason = LoginReason.fromKey(loginReasonKey)
@@ -228,6 +247,75 @@ private fun VelnoxNavHost() {
 
             pending.startsWith(OVERLAY_DESTINATION) ->
                 overlayKey = pending.removePrefix(OVERLAY_DESTINATION)
+        }
+    }
+
+    // Resolve whether Google can be offered whenever the gate opens. Cheap: the
+    // client id comes from the build or from one cached config request.
+    LaunchedEffect(loginReason) {
+        googleAvailable = if (loginReason == null) false else googleProvider.isAvailable()
+    }
+
+    /**
+     * Google Sign-In.
+     *
+     * The provider returns an ID token; the backend verifies it. Nothing about the
+     * Google account is trusted until then, so a cancellation, an offline device
+     * or a misconfigured build each leave the session exactly as it was.
+     */
+    fun startGoogleSignIn() {
+        if (isSubmitting || googleBusy) return
+        signInErrorRes = null
+        googleBusy = true
+        scope.launch {
+            val outcome = googleProvider.signIn()
+            when (outcome) {
+                is GoogleSignInOutcome.Token -> {
+                    val result = session.signInWithGoogle(outcome.idToken)
+                    googleBusy = false
+                    when (result) {
+                        is SignInResult.Success -> {
+                            authStepKey = null
+                            loginReasonKey = null
+                            applyPendingDestination()
+                        }
+
+                        is SignInResult.Failure -> {
+                            // LINK_REQUIRED is not a dead end: an account exists, so
+                            // send the user to password sign-in to prove ownership.
+                            if (result.error == AuthError.LinkRequired) {
+                                authStepKey = AuthStep.Login.key
+                            }
+                            signInErrorRes = authMessage(result.error)
+                        }
+                    }
+                }
+
+                GoogleSignInOutcome.Cancelled -> {
+                    googleBusy = false
+                }
+
+                GoogleSignInOutcome.NoAccount -> {
+                    googleBusy = false
+                    signInErrorRes = R.string.login_error_google_no_account
+                }
+
+                GoogleSignInOutcome.NotConfigured -> {
+                    googleBusy = false
+                    googleAvailable = false
+                    signInErrorRes = R.string.login_error_google_unavailable
+                }
+
+                GoogleSignInOutcome.Network -> {
+                    googleBusy = false
+                    signInErrorRes = R.string.login_error_network
+                }
+
+                is GoogleSignInOutcome.Failed -> {
+                    googleBusy = false
+                    signInErrorRes = R.string.login_error_google_failed
+                }
+            }
         }
     }
 
@@ -364,6 +452,9 @@ private fun VelnoxNavHost() {
                         errorRes = signInErrorRes,
                         onRegister = { goToStep(AuthStep.Register) },
                         onForgotPassword = { goToStep(AuthStep.Forgot) },
+                        onGoogleSignIn = ::startGoogleSignIn,
+                        googleAvailable = googleAvailable,
+                        googleBusy = googleBusy,
                         reason = reason,
                         onDismiss = ::dismissLogin,
                     )
@@ -536,6 +627,9 @@ private fun authMessage(error: AuthError): Int = when (error) {
     AuthError.EmailExists -> R.string.register_error_email_exists
     AuthError.EmailNotConfigured -> R.string.login_error_email_not_configured
     AuthError.InvalidResetToken -> R.string.login_error_invalid_reset_token
+    AuthError.InvalidProviderToken -> R.string.login_error_google_failed
+    AuthError.ProviderUnavailable -> R.string.login_error_google_unavailable
+    AuthError.LinkRequired -> R.string.login_error_google_link_required
     else -> R.string.login_error_generic
 }
 

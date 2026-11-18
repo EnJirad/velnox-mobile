@@ -28,4 +28,20 @@ interface AuthApi {
 
     /** `POST /api/auth/reset-password` — consumes a reset token. */
     suspend fun resetPassword(token: String, password: String): ApiResult<Unit>
+
+    /**
+     * `POST /api/auth/mobile/google` — exchanges a Google ID token for a session.
+     *
+     * The token is the only thing sent. No email, name or user id from the client
+     * is trusted; the server derives the identity from the token it verifies.
+     */
+    suspend fun googleSignIn(idToken: String): ApiResult<AuthSession>
+
+    /**
+     * `GET /api/auth/mobile/config` — the deployment's public Google client id.
+     *
+     * `null` when the deployment does not publish one, which means Google
+     * Sign-In cannot be offered.
+     */
+    suspend fun googleClientId(): ApiResult<String?>
 }

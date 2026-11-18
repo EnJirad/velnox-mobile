@@ -93,6 +93,25 @@ class SessionController(
         }
     }
 
+    /**
+     * Google sign-in.
+     *
+     * Identical rules to email: the state only becomes
+     * [SessionState.Authenticated] after the API has verified the identity token
+     * and issued a session. A `LINK_REQUIRED` answer leaves the app as it was.
+     */
+    suspend fun signInWithGoogle(idToken: String): SignInResult {
+        notice = null
+        return when (val result = repository.signInWithGoogle(idToken)) {
+            is SignInResult.Success -> {
+                state = SessionState.Authenticated(result.user)
+                result
+            }
+
+            is SignInResult.Failure -> result
+        }
+    }
+
     suspend fun signOut() {
         repository.signOut()
         notice = null

@@ -33,6 +33,8 @@ class SessionControllerTest {
         var logoutCalls = 0
         var forgotResult: ApiResult<Unit> = ApiResult.Ok(Unit)
         var resetResult: ApiResult<Unit> = ApiResult.Ok(Unit)
+        var googleResult: ApiResult<AuthSession> = ApiResult.Error(AuthError.Network)
+        var googleCalls = 0
 
         override suspend fun login(email: String, password: String) = loginResult
         override suspend fun register(name: String, email: String, password: String) = loginResult
@@ -293,5 +295,53 @@ class SessionControllerTest {
         assertEquals(ApiResult.Ok(Unit), result)
         assertEquals(SessionState.Guest, controller.state)
         assertNull(store.token)
+    }
+
+    @Test
+    fun `google sign-in moves Guest to Authenticated`() = runBlocking {
+        val api = FakeApi().apply {
+            googleResult = ApiResult.Ok(AuthSession("google-token", user))
+        }
+        val store = FakeStore()
+        val controller = controller(api, store)
+        controller.restoreOnce()
+
+        val result = controller.signInWithGoogle("id-token")
+
+        assertEquals(SignInResult.Success(user), result)
+        assertEquals(SessionState.Authenticated(user), controller.state)
+        assertEquals("google-token", store.token)
+    }
+
+    @Test
+    fun `google LINK_REQUIRED keeps the Guest state`() = runBlocking {
+        val api = FakeApi().apply { googleResult = ApiResult.Error(AuthError.LinkRequired) }
+        val store = FakeStore()
+        val controller = controller(api, store)
+        controller.restoreOnce()
+
+        val result = controller.signInWithGoogle("id-token")
+
+        assertEquals(SignInResult.Failure(AuthError.LinkRequired), result)
+        assertEquals(SessionState.Guest, controller.state)
+        assertNull(store.token)
+    }
+
+    @Test
+    fun `a google session survives a restart like a password session`() = runBlocking {
+        val api = FakeApi().apply {
+            googleResult = ApiResult.Ok(AuthSession(tokenExpiringAt(1_900_000_000_000L), user))
+            meResult = ApiResult.Ok(user)
+        }
+        val store = FakeStore()
+
+        val first = controller(api, store)
+        first.restoreOnce()
+        first.signInWithGoogle("id-token")
+
+        val second = controller(api, store)
+        second.restoreOnce()
+
+        assertEquals(SessionState.Authenticated(user), second.state)
     }
 }

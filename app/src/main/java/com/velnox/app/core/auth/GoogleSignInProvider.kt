@@ -1,0 +1,55 @@
+package com.velnox.app.core.auth
+
+/**
+ * The outcome of asking Google for an identity token.
+ *
+ * Every failure the Credential Manager flow can produce is mapped to one of
+ * these, because the UI has to say something different for each: "you cancelled"
+ * is not "this build is misconfigured", and neither is "no internet".
+ */
+sealed interface GoogleSignInOutcome {
+
+    /** Google returned an ID token. It is **not** yet proof of anything until the
+     *  backend verifies it. */
+    data class Token(val idToken: String) : GoogleSignInOutcome
+
+    /** The user dismissed the sheet. Not an error; show nothing. */
+    data object Cancelled : GoogleSignInOutcome
+
+    /** No Google account is available on the device to choose from. */
+    data object NoAccount : GoogleSignInOutcome
+
+    /**
+     * This build cannot use Google Sign-In at all: no OAuth client configured, or
+     * the package/SHA-1 pair is not registered in the Google Cloud project.
+     *
+     * [detail] carries the technical reason for the log, never for the user.
+     */
+    data class NotConfigured(val detail: String) : GoogleSignInOutcome
+
+    /** The device is offline, or Google Play services could not be reached. */
+    data object Network : GoogleSignInOutcome
+
+    /** Anything else, including a malformed credential response. */
+    data class Failed(val detail: String) : GoogleSignInOutcome
+}
+
+/**
+ * Asks the platform for a Google ID token.
+ *
+ * An interface so the flow can be exercised without Play services in tests;
+ * [CredentialManagerGoogleSignIn] is the single production implementation.
+ */
+interface GoogleSignInProvider {
+
+    /**
+     * Whether the flow can even be attempted.
+     *
+     * `false` when no client id is known, which is a deployment fact the UI shows
+     * honestly instead of letting the user tap into a guaranteed failure.
+     */
+    suspend fun isAvailable(): Boolean
+
+    /** Open the Google account sheet and return the outcome. Never throws. */
+    suspend fun signIn(): GoogleSignInOutcome
+}

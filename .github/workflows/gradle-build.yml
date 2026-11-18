@@ -45,6 +45,18 @@ jobs:
           echo "GRADLE_HOME=/home/runner/gradle-8.11.1" >> $GITHUB_ENV
           echo "/home/runner/gradle-8.11.1/bin" >> $GITHUB_PATH
 
+      # Google Sign-In binds an OAuth client to (package name, signing SHA-1).
+      # Without this cache every runner generates a fresh debug keystore, so the
+      # SHA-1 changes on every build and no single value could ever be registered
+      # in the Google Cloud project. The cache key is immutable, so the first run
+      # creates the key and every later run reuses it — one stable fingerprint.
+      # A debug key with the well-known password is not a secret.
+      - name: Restore the debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: velnox-debug-keystore-v1
+
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
@@ -112,6 +124,25 @@ jobs:
         run: |
           unzip -t "$APK_PATH" > /dev/null
           echo "APK integrity: OK"
+
+      # Prints the fingerprints to register in Google Cloud Console. Put the
+      # SHA-1 into the Android OAuth client for package com.velnox.app.
+      - name: Print APK signing fingerprints
+        run: |
+          APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner | sort | tail -1)
+          echo "apksigner: $APKSIGNER"
+          "$APKSIGNER" verify --print-certs "$APK_PATH" | tee certs.txt
+          SHA1=$(grep -i "SHA-1 digest" certs.txt | head -1 | sed 's/.*: //')
+          SHA256=$(grep -i "SHA-256 digest" certs.txt | head -1 | sed 's/.*: //')
+          echo "### APK signing certificate" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Package: `com.velnox.app`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SHA-1: `$SHA1`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SHA-256: `$SHA256`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Register the SHA-1 on an Android OAuth client for this package." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          ANDROID_SDK_ROOT: /home/runner/android-sdk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

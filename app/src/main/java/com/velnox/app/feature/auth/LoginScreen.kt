@@ -73,9 +73,10 @@ import com.velnox.app.ui.theme.VelnoxTheme
  * sign-in succeeded — the API does, and the navigation gate reacts to the
  * resulting session state.
  *
- * Google and LINE are present as entry points but cannot complete in this part:
- * tapping one shows an honest "arrives later" notice rather than starting a flow
- * that cannot finish.
+ * Google Sign-In is real: the button asks the caller, which opens the Credential
+ * Manager sheet and hands the ID token to the backend. It is disabled when the
+ * deployment has no Google client configured. LINE is still an entry point only
+ * and says so when tapped.
  */
 @Composable
 fun LoginScreen(
@@ -84,6 +85,9 @@ fun LoginScreen(
     errorRes: Int?,
     onRegister: () -> Unit,
     onForgotPassword: () -> Unit,
+    onGoogleSignIn: () -> Unit,
+    googleAvailable: Boolean,
+    googleBusy: Boolean,
     reason: LoginReason? = null,
     onDismiss: (() -> Unit)? = null,
     emailPrefill: String = "",
@@ -294,9 +298,12 @@ fun LoginScreen(
             SocialButton(
                 label = stringResource(R.string.login_continue_google),
                 glyph = "G",
-                enabled = !isSubmitting,
+                // Inert while a request is in flight, and disabled outright when
+                // the deployment has no Google client configured — tapping a
+                // button that cannot work is worse than showing it greyed out.
+                enabled = !isSubmitting && !googleBusy && googleAvailable,
                 modifier = Modifier.weight(1f),
-                onClick = { showComingSoon = true },
+                onClick = onGoogleSignIn,
             )
             SocialButton(
                 label = stringResource(R.string.login_continue_line),
@@ -523,6 +530,9 @@ private fun LoginScreenPreview() {
             errorRes = null,
             onRegister = {},
             onForgotPassword = {},
+            onGoogleSignIn = {},
+            googleAvailable = true,
+            googleBusy = false,
         )
     }
 }
@@ -537,6 +547,9 @@ private fun LoginScreenDarkPreview() {
             errorRes = R.string.login_error_invalid_credentials,
             onRegister = {},
             onForgotPassword = {},
+            onGoogleSignIn = {},
+            googleAvailable = false,
+            googleBusy = false,
             reason = LoginReason.Cart,
         )
     }
