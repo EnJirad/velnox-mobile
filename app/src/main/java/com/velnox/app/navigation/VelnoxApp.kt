@@ -18,6 +18,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -300,7 +301,7 @@ private fun VelnoxNavHost() {
                     signInErrorRes = R.string.login_error_google_no_account
                 }
 
-                GoogleSignInOutcome.NotConfigured -> {
+                is GoogleSignInOutcome.NotConfigured -> {
                     googleBusy = false
                     googleAvailable = false
                     signInErrorRes = R.string.login_error_google_unavailable
