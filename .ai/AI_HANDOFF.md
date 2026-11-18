@@ -7,14 +7,14 @@
 
 ---
 
-## Current State (2026-11-18, commit `2dfb21b`, run 44298776084)
+## Current State (2026-11-18, commit `3bc2f3c`, run 44335263114)
 
 | Area | Status | Notes |
 |------|--------|-------|
 | Startup destination | **VERIFIED (source)** | Opens on Home for everyone; Login is a gate, not a launch screen |
 | Auth states | **VERIFIED (unit tests)** | `Loading` / `Guest` / `Authenticated` / `ExpiredSession`, one holder |
 | Session restore | **VERIFIED (unit tests)** | `/api/auth/me` decides; token never trusted on its own |
-| Session persistence | **FIXED in 5.1** | `SessionVault.write()` deleted its own temp file, so every save threw and no session was ever stored |
+| Session persistence | **VERIFIED (unit tests + CI)** | Part 5.1 fixed the write that deleted its own temp file; Part 5.1.1 made the replacement crash-safe (atomic move, backup/rollback, recovery on read) |
 | Secure storage | **VERIFIED (compile)** | AES-256-GCM, Keystore key, `filesDir/session/session.bin`, excluded from backup |
 | Expiry handling | **VERIFIED (unit tests)** | `exp` skips a guaranteed-401 call; API stays authoritative |
 | Refresh tokens | **BLOCKED** | Backend has no refresh endpoint; 7-day JWT only |
@@ -33,7 +33,7 @@
 | Debug signing SHA-1 | **UNSTABLE** | Changes per build; keystore cache did not hold. Pin it with the `ANDROID_DEBUG_KEYSTORE_BASE64` secret |
 | Login / Register UI | **VERIFIED (compile)** | Shared components; consent-gated register; strength meter |
 | Guest gate | **VERIFIED (unit tests)** | `AccessPolicy`; unknown routes fail closed |
-| Unit tests | **VERIFIED (CI)** | 80 tests, 8 classes, green in run 44298776084 |
+| Unit tests | **VERIFIED (CI)** | 90 tests, 8 classes, green in run 44335263114 (counted from the run's JUnit XML artifact) |
 | APK | **VERIFIED (CI)** | built, verified, uploaded; signing fingerprints printed |
 | Localisation | **VERIFIED (packaged)** | 361 keys × th/en/my, identical sets, no duplicates |
 | On-device runtime | **NOT TESTED** | No install route; Keystore and UI unverified on hardware |
@@ -111,6 +111,25 @@ WebView, no invented token.
 
 ---
 
+## Part 5.1.1 changes (2026-11-18, `3bc2f3c`)
+
+One module, one test file. No UI, no navigation, no backend, no schema.
+
+- `core/session/SessionFileStore.kt`: a replaced session file is now swapped in
+  with a single `Files.move(ATOMIC_MOVE)` (available from API 26, the app's
+  `minSdk`). Filesystems that refuse an atomic move fall back to move-aside
+  (`session.bak`) plus rollback; the backup is deleted only after the new file is
+  in place and is recovered on the next read if the process died mid-swap. A
+  corrupt or missing target falls back to the backup instead of reporting
+  "signed out".
+- `core/session/SessionFileStoreTest.kt`: 6 → 19 tests, covering first write,
+  replacement, failed temp write, failed replacement with and without a working
+  rollback, crash recovery, corrupt files and cleanup.
+- The previous `target.delete()`-then-`renameTo` sequence is gone; it left a
+  window with no session file on disk at all.
+
+---
+
 ## Known issues
 
 - **Password recovery is not live.** Backend PR
@@ -130,6 +149,15 @@ WebView, no invented token.
 - **PR #16 is red in CI for pre-existing reasons**, not from its own change: none
   of the six failing offline test files reference the modified module, and
   `preauth-nonce` passes locally on `main`. Fixing them is outside Part 5.1 scope.
+- **A session write is atomic, but not directory-synced.** The payload is
+  fsynced before the rename and the filesystem journal orders the rename, but the
+  parent directory is not explicitly fsynced; a power loss could in theory lose
+  the directory entry on a filesystem that does not order it. Adding that needs
+  `android.system.Os` and cannot be unit-tested on the JVM.
+- **`AuthRepository.persist()` clears secure storage when a save throws**
+  (pre-existing policy for a failed sign-in). If a replacement failed
+  catastrophically during a sign-in, that clear also removes the recovered
+  backup. Unchanged in Part 5.1.1 because it alters sign-in semantics.
 - **LINE is still an entry point only.**
 - **Profile/Settings still demo data**; the real account is in
   `SessionState.Authenticated.user` but unused.
@@ -162,4 +190,4 @@ The app embeds only the public API origin (`BuildConfig.API_BASE_URL`).
 ## Signature
 
 > This handoff supersedes the previous snapshots.
-> **Last updated:** 2026-11-18 by the Part 5.1 Google/Neon completion session.
+> **Last updated:** 2026-11-18 by the Part 5.1.1 session-file replacement session.
