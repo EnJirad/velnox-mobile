@@ -1,224 +1,246 @@
 # LATEST.md — Velnox Mobile Latest Change Report
 
-> **Current snapshot (overwritten each task).** Previous report (Part 5.1)
-> archived in `.ai/history/20261118_152833_LATEST_before_part5_1_1.md`.
+> **Current snapshot (overwritten each task).** Previous report (Part 5.1.1)
+> archived in `.ai/history/20261118_163429_LATEST_before_part5_2_part6.md`.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Task: Part 5.1.1 — Secure SessionFileStore Replacement
+## Task: Part 5.2 + Part 6 — Google Sign-In completion, real catalogue from Neon
 
 **Date:** 2026-11-18
-**Start commit:** `359f9f6` · **End commit (code + tests):** `3bc2f3c`
-**Verified CI run:** [44335263114](https://github.com/EnJirad/velnox-mobile/actions/runs/44335263114) — **success**
-**Status:** **DONE.** The previous valid session can no longer be lost by a failed
-replacement. Tests were added for every path named in the task; the CI unit-test
-step passed with 90 tests in 8 classes and 0 failures.
+**Start commit:** `ee158af` · **End commit:** `ee115bc`
+**Verified CI run:** [44347496595](https://github.com/EnJirad/velnox-mobile/actions/runs/44347496595) — **success**
+**Status:** **Catalogue: DONE.** **Google Sign-In: BLOCKED on owner configuration**
+(one repository secret + two Google Cloud items that cannot be inspected or
+created from here).
+
+Two deliverables, separate commits:
+
+| Deliverable | Commits | CI |
+|---|---|---|
+| 5.2 signing-key verification | `fbbc625` | [44344651433](https://github.com/EnJirad/velnox-mobile/actions/runs/44344651433) — success |
+| 6 real catalogue | `6959a42`, `096827c`, `5046a43`, `ee115bc` | [44347496595](https://github.com/EnJirad/velnox-mobile/actions/runs/44347496595) — success |
+
+`096827c`, `5046a43` and `ee115bc` are one-line follow-ups for failures the first
+catalogue push surfaced (see §7); they are part of deliverable 6.
 
 ---
 
-## 1. Repository and inspection
+# Deliverable 1 — Part 5.2, Google Sign-In
+
+## 1. What is already implemented (verified in source, not in reports)
+
+`core/auth/CredentialManagerGoogleSignIn` uses Credential Manager
+(`GetGoogleIdOption`) and returns the raw ID token. `GoogleClientIdSource`
+resolves the **Web** client id: `BuildConfig.GOOGLE_WEB_CLIENT_ID` first, then
+`GET /api/auth/mobile/config`. `AuthRemoteDataSource` posts only the token to
+`/api/auth/mobile/google` and maps `409 LINK_REQUIRED`,
+`INVALID_GOOGLE_TOKEN`, `EMAIL_NOT_VERIFIED`, `GOOGLE_NOT_CONFIGURED`. A session
+exists only after a `200` — the same rule as email sign-in.
+
+No code change was needed in the app. What was missing was the ability to *prove*
+the configuration, so this task changed the CI workflow instead.
+
+## 2. Signing key — what the workflow does now
+
+`.github/workflows/gradle-build.yml`:
+
+- decodes `ANDROID_DEBUG_KEYSTORE_BASE64` into `~/.android/debug.keystore` with
+  `umask 077` + `chmod 600` (a keystore is a credential);
+- prints the pinned keystore's SHA-1 / SHA-256 **before** the build, so the
+  fingerprint registered with Google can be compared with the one CI used;
+- when the secret is absent, writes an **ACTION REQUIRED** block to the job
+  summary with the exact `keytool` / `base64` commands and the Google Cloud step;
+- never prints, generates into the repo, or commits a key.
+
+## 3. Status of every configuration item
+
+| Item | Status | Evidence |
+|---|---|---|
+| Package `com.velnox.app` | **VERIFIED** | `app/build.gradle.kts` |
+| Credential Manager flow | **VERIFIED (source)** | `CredentialManagerGoogleSignIn` |
+| Web client id from build | **NOT SET** | `GOOGLE_WEB_CLIENT_ID` empty in CI |
+| Web client id from API | **BLOCKED** | live `/api/auth/mobile/config` = `{"google":true,"line":false}`; PR #16 adds `googleClientId` |
+| `ANDROID_DEBUG_KEYSTORE_BASE64` | **MISSING** | step 6 of run 44344651433 wrote the ACTION REQUIRED block; SHA-1 differs each run |
+| Debug SHA-1 stability | **FAILED (unstable)** | `d8a33542…` → `ce53e36d…` → `ee55aa8b…` across three runs |
+| Android OAuth client | **UNKNOWN — owner** | Google Cloud cannot be inspected from here |
+| Consent screen / test users | **UNKNOWN — owner** | same |
+| Backend `MOBILE_GOOGLE_CLIENT_ID` | **UNKNOWN — owner** | Render env cannot be inspected from here |
+| Real Google end-to-end | **BLOCKED** | needs the three owner items |
+
+## 4. Owner actions, exactly
+
+1. **Pin the signing key.** Create one debug keystore, base64 it, store it as the
+   `ANDROID_DEBUG_KEYSTORE_BASE64` repository secret (exact commands are in the
+   CI job summary). Until this is done the SHA-1 changes on every build and no
+   Android OAuth client can ever match.
+2. **Android OAuth client.** In the same Google Cloud project as the Web client,
+   create an *Android* client for package `com.velnox.app` with the SHA-1 the next
+   CI run prints, plus the SHA-1 of any keystore used for local builds.
+3. **Publish the Web client id.** Either deploy PR #16 (the config endpoint then
+   serves it, no APK rebuild) or build with `-PvelnoxGoogleClientId=<web id>`.
+4. **Consent screen.** Publish the app, or add the accounts that will test it.
+5. Confirm Render's `MOBILE_GOOGLE_CLIENT_ID` equals that Web client id.
+
+## 5. Backend PR #16 — review before merge
+
+**State:** open, not merged, `mergeable_state: unstable` (its CI is not green).
+Base `4b6b09d`. **Not merged or deployed here.**
+
+**Security review of the parts that matter:**
+
+- Token verification is Google's `tokeninfo` endpoint (signature, `iss`, `exp`
+  checked by Google) with a 5 s timeout, then local claim checks in
+  `lib/google-identity.ts`: `aud === clientId`, issuer in
+  `{https://accounts.google.com, accounts.google.com}`, `exp` in the future,
+  `azp` equal to the client when present, `email_verified === "true"`, non-empty
+  `sub`, email shape.
+- `sub` is the identity key; the email is never used to pick an account.
+- An existing account with the same verified email now gets `409 LINK_REQUIRED`
+  instead of being silently attached. Linking needs an authenticated session
+  **and** an equal email (`EMAIL_MISMATCH` otherwise) **and** an unclaimed
+  identity (`IDENTITY_CONFLICT` otherwise).
+- `UNIQUE(provider, provider_id)` remains the concurrency guard (`23505` →
+  conflict).
+- No schema change, no migration, no secret exposed; only the public client id
+  is published by `/api/auth/mobile/config`.
+
+**Recommendation:** safe to merge once its own CI is green, and consistent with
+the app as written. Two caveats worth recording: verification depends on a
+network call to Google on every sign-in (5 s timeout, `GOOGLE_UNAVAILABLE` on
+failure), and it cannot be verified end-to-end until the three owner items in §4
+exist.
+
+---
+
+# Deliverable 2 — Part 6, real catalogue from Neon
+
+## 6. What the app reads (all already deployed)
+
+| Purpose | Endpoint | Server rule |
+|---|---|---|
+| Listing / search / filter | `GET /api/products/catalog?q&category&limit&offset` | `p.status='published' AND sh.status='active'` |
+| Product page | `GET /api/products/:id` | same predicate, else `404 NOT_FOUND` |
+| Category tree | `GET /api/categories/tree` | `is_active` only, with published counts |
+
+Discovered in `backend/routes/products.ts` (8 read routes exist; these three are
+the public ones). Tables the backend touches for them, read from its own SQL —
+**no direct connection to Neon was made or is possible from the app**:
+`products`, `product_images`, `product_variants`, `categories`, `shops`,
+`sellers`, `inventory`, `order_items`.
+
+Fields displayed, all taken from the response: `id`, `name`, `price`,
+`currency`, `primaryImage.url` (→ `displayUrl`), `images[]` (ordered,
+`isPrimary` first), `description`, `shopName`, `currentStock` /
+`totalAvailableStock`, `soldCount`, `unit`.
+
+## 7. Live verification against the deployed API (2026-11-18)
 
 | Check | Result |
 |---|---|
-| `git fetch origin` | `HEAD` == `origin/main` == `359f9f6` at start |
-| Uncommitted work at start | **None** (clean tree; nothing to preserve) |
-| Docs read | `.ai/AI_HANDOFF.md`, `.ai/AI_RULES.md`, `.ai/VELNOX_DESIGN_THEME.md`, `.ai/reports/LATEST.md` |
-| Source inspected | `SessionFileStore.kt`, `SessionVault.kt`, `SessionManager.kt`, `AuthRepository.persist`, `SessionFileStoreTest.kt`, backup rules, CI workflow |
-| Assumed from earlier reports | Nothing. The description of `SessionFileStore` in the Part 5.1 report matched the code; the data-loss window it left open did **not** |
-| Local Gradle build | Not run (`.ai/AI_RULES.md` §1: the on-device wrapper cannot load `libnative-platform` for aarch64). Unit tests were compiled and executed directly instead — see §5 |
+| Published products in the deployed database | **2** |
+| Both returned with `status=published` | yes |
+| Detail for each id | `200`, price/stock match the list (`0 THB`/1117, `182 THB`/867) |
+| Product images | 9 and 7 per product; R2 URL returns `HTTP 200`, 645 KB |
+| Categories | 96 active, 15 top-level; **2** hold published products (`chargers-cables`, `mens-clothing`) |
+| Search `q=charger` | 1 product |
+| Search `q=zzzznotreal` | 0 products (empty state) |
+| Filter `category=chargers-cables` | 1 product |
+| Filter `category=books` (no products) | 0 products |
+| Unknown product id | `404 NOT_FOUND` |
 
----
+So the real catalogue is small but genuine. Nothing was inserted into production,
+and the app shows an empty state rather than filler when a query has no results.
 
-## 2. The defect that was still open
+## 8. What changed in the app
 
-Part 5.1 made persistence work again, but the swap itself was unsafe:
+**Added — `core/catalog/`**
 
-```kotlin
-target.delete()                       // ← no session on disk from here…
-if (!temporary.renameTo(target)) {     // ← …to here
-    temporary.delete()
-    throw IllegalStateException("Could not persist the session")
-}
+- `CatalogModels.kt` — `CatalogProduct`, `ProductDetail`, `CatalogImage`,
+  `CatalogCategory`, `CatalogPage`, `CatalogQuery`, `CatalogResult`, `CatalogError`.
+- `CatalogApi.kt` — the three reads.
+- `CatalogRemoteDataSource.kt` — OkHttp + `org.json` on the existing stack and
+  base URL. Tolerant where the API is inconsistent (price is a JSON number on
+  `/catalog` and `/detail`, a string on the legacy list route), strict where it
+  matters (no `success:true` → error; malformed body → `Server`, never empty
+  data).
+- `CatalogRepository.kt` — in-memory page/product/category cache, `force` to
+  bypass, failures never cached, a product that starts 404ing is evicted.
+- `PriceFormat.kt` — the amount and currency from the database, `฿` for THB.
+
+**Added — `feature/catalog/ProductDetailScreen.kt`** — gallery (first image main,
+thumbnails in seller order), name, price, stock badge, shop, sold count,
+description; loading, retry, and "product unavailable" states.
+
+**Changed**
+
+- `feature/home/HomeScreen.kt` — real feed with explicit `Loading`/`Content`/
+  `Empty`/`Error` states, 300 ms debounced **server-side** search, category chips
+  from the real tree (only categories with published products), load-more paging,
+  real images (`AsyncImage`), price, shop and out-of-stock badge.
+- `feature/home/CategoryScreen.kt` — real category hub with published-product
+  counts, and a listing per category with empty/error states.
+- `navigation/VelnoxApp.kt` — `product:<id>` now opens the detail screen;
+  `"All"` opens the category hub.
+- `VelnoxApplication.kt` — one `CatalogRepository` for the process.
+- `app/build.gradle.kts` — `io.coil-kt:coil-compose:2.7.0` (image loading) and
+  `org.json:json` for **tests only**.
+- `strings.xml` ×3 — 14 new keys (error/empty/retry/stock/price labels), 16 demo
+  product/category keys removed; 361 keys per language, identical sets.
+
+**Removed** — `feature/home/HomeCatalog.kt` (8 invented products with invented
+prices, stock, ratings and vector art) and every string that fed it.
+
+**Deliberately kept** — the vector `ProductArt`/`ProductArtTile` used by the
+Cart and Orders **demo** screens. Those screens are unrelated to the catalogue and
+still show demo data; rewiring them needs backend cart/order work that is out of
+this task's scope. Recorded here so it is not mistaken for finished work.
+
+## 9. Tests
+
+New: `CatalogRemoteDataSourceTest` (9), `CatalogRepositoryTest` (7),
+`PriceFormatTest` (5) — 21 tests. The parsing tests run against **captured
+responses** from the deployed API (`src/test/resources/*.json`, trimmed to one
+product and two images, field names and types untouched).
+
+CI run [44347496595](https://github.com/EnJirad/velnox-mobile/actions/runs/44347496595):
+
+```
+AuthRepositoryTest            22   SessionControllerTest 19
+GoogleClientIdSourceTest       7   SessionFileStoreTest  19
+JwtTest                        5   SessionManagerTest     6
+CatalogRemoteDataSourceTest    9   CredentialRulesTest    7
+CatalogRepositoryTest          7   AccessPolicyTest       5
+PriceFormatTest                5
+TOTAL 111 tests, 11 suites, 0 failures, 0 errors
 ```
 
-Two failure modes, both silent:
+All steps green: unit tests, `assembleDebug`, APK verify, APK integrity, signing
+fingerprints, upload.
 
-1. **Process death** between the delete and the rename (LMK under memory
-   pressure, power loss, user force-stop) — the only copy of the session is gone.
-2. **Failed rename** (ENOSPC, EIO, a locked or read-only filesystem): the old file
-   is already deleted, so the throw reports failure *after* destroying the data.
+## 10. Failures hit and fixed on the way (all in CI, all fixed)
 
-Either way the user is signed out on the next launch with no session and no
-explanation, and the app cannot re-derive it — the token exists only on disk.
+| Run | Failure | Fix |
+|---|---|---|
+| 44345615362 | AAPT: unescaped `'` in two English strings | `096827c` |
+| 44346132312 | Kotlin: missing `rememberCoroutineScope` import; smart cast on a delegated property | `5046a43` |
+| 44346763442 | 7 tests failed — the mockable `android.jar` ships stub `org.json` | `ee115bc` (test-only dependency) |
 
----
+## 11. Not done, stated plainly
 
-## 3. The replacement strategy now in place
+- **No device or instrumentation testing.** The APK builds and its unit tests
+  pass; nobody has installed it. The Keystore, the image loading and the new
+  screens are unverified on hardware.
+- **Google Sign-In is not verified end-to-end** and cannot be until §4 is done.
+- **Cart and Orders still use demo data** (pre-existing, out of scope).
+- **No admin/seller product endpoints** are consumed; the app is read-only.
+- The catalogue has 2 published products, so the grid, paging and "load more"
+  are exercised structurally rather than with a large catalogue.
 
-`SessionFileStore` keeps three names in `filesDir/session/`: `session.bin`
-(target), `session.tmp`, `session.bak` (only while a swap is in flight).
+## 12. Next steps
 
-1. **Recover first.** `recoverIfNeeded()` runs on every read *and* every write.
-   If the target is missing but a backup exists, the backup is moved back. If the
-   target is valid and a backup is left over, the backup is deleted.
-2. **Write the payload to `session.tmp`** with `FileOutputStream`, `flush()` and
-   `FileDescriptor.sync()`. The target is untouched, so every failure here
-   (unopenable temp, short write, failed fsync) leaves the old session readable.
-3. **Commit with one atomic move:**
-   `Files.move(tmp, target, REPLACE_EXISTING, ATOMIC_MOVE)`. `rename(2)` either
-   replaces the target completely or changes nothing — there is no interval in
-   which the session file does not exist.
-4. **Fallback when the filesystem refuses an atomic move**
-   (`AtomicMoveNotSupportedException` / `UnsupportedOperationException`):
-   move `session.bin` → `session.bak`, move `session.tmp` → `session.bin`, and
-   delete the backup only after the new file is in place. If the second move
-   fails, the backup is moved back and the write throws. If even the rollback
-   fails, the backup is **kept on disk** and step 1 restores it on the next read.
-
-A read that finds an unusable target (missing, zero-length, shorter than the
-version byte) now falls through to the backup instead of reporting "signed out",
-and restores it.
-
-### Why `java.nio.file` is allowed here
-
-`app/build.gradle.kts` sets `minSdk = 26`, and `java.nio.file` (`Files`,
-`StandardCopyOption`, `AtomicMoveNotSupportedException`) exists from API 26. No
-desugaring or API-level branch is needed, and no compile-time guard is required.
-`NioFileReplacer` is still behind the small `FileReplacer` interface so the
-fallback paths can be driven by a test double.
-
-### What was deliberately not changed
-
-- Encryption, key handling, `SessionVault`'s payload format, session validation
-  and the app's file permissions. `SessionFileStore` is still `internal`; nothing
-  new is exposed.
-- Backup rules already exclude the whole `session/` directory
-  (`res/xml/backup_rules.xml`, `res/xml/data_extraction_rules.xml`), so the new
-  `session.bak` cannot reach cloud backup or device transfer either.
-
----
-
-## 4. Tests added
-
-`app/src/test/java/com/velnox/app/core/session/SessionFileStoreTest.kt` — the
-class grew from 6 to **19** tests, using a real directory and the production
-class. New coverage required by the task:
-
-| Requirement | Test |
-|---|---|
-| Initial session creation | `the first write creates the session file and nothing else` |
-| Successful replacement | `replacing an existing session keeps only the new payload` |
-| Failed temporary-file write | `a failed temp-file write keeps the previous session` (a non-empty directory where `session.tmp` belongs) |
-| Failed replacement, previous preserved | `a failed replacement keeps the previous session` (scripted replacer fails `tmp → bin`; rollback restores) |
-| Failed replacement, rollback also fails | `a replacement that cannot roll back still leaves the session recoverable` (backup survives; a fresh store reads it) |
-| Recovery from an interrupted replacement | `an interrupted replacement is recovered from the backup` (no target, complete backup, partial temp — the exact on-disk state of a crash) |
-| Corrupted session | `a zero-length file reads as null…`, `a corrupt session file falls back to the backup` |
-| Temp and backup cleanup | `a completed write leaves no temp file behind`, `replacing… keeps only the new payload`, `clear removes the session, temp and backup files…` |
-| Existing read / clear behaviour | `a second store instance reads what the first wrote`, `clear works when nothing was ever stored`, `an unreadable directory reports no session instead of throwing` |
-| Atomic path is actually taken | `an atomic replace is used when the filesystem supports it` (asserts one atomic attempt, zero renames, no backup left) |
-| Stale temp cannot win | `a stale temp file never replaces a valid session` |
-
-Retained from Part 5.1, unchanged: the round-trip test, the "no temp file left
-behind" regression guard, and the "directory cannot be created" failure test.
-
-`writeBytes` now throws `IOException` where it used to throw
-`IllegalStateException`. `AuthRepository.persist()` already catches
-`Exception`, and `SessionManager.save()` still propagates as documented, so no
-call site changed.
-
----
-
-## 5. Test results
-
-**CI (authoritative):** run [44335263114](https://github.com/EnJirad/velnox-mobile/actions/runs/44335263114) — **success**.
-
-Every step passed, including:
-
-- `Run unit tests` (`./gradlew :app:testDebugUnitTest`) — **success**
-- `Build debug APK` (`./gradlew :app:assembleDebug`) — **success**
-- `Verify APK`, `Verify APK integrity`, `Print APK signing fingerprints`,
-  `Upload APK` — **success**
-
-Counted from the run's own JUnit XML artifact, not from the log:
-
-| Suite | Tests |
-|---|---|
-| `AuthRepositoryTest` | 22 |
-| `GoogleClientIdSourceTest` | 7 |
-| `JwtTest` | 5 |
-| `SessionControllerTest` | 19 |
-| `SessionFileStoreTest` | **19** |
-| `SessionManagerTest` | 6 |
-| `CredentialRulesTest` | 7 |
-| `AccessPolicyTest` | 5 |
-| **Total** | **90 tests, 8 suites, 0 failures, 0 errors, 0 skipped** |
-
-**Local (supplementary):** Gradle cannot run on this device (`.ai/AI_RULES.md`
-§1), so the two files were compiled with `kotlinc 2.4.21` against `junit 4.13.2`,
-`hamcrest-core 1.3` and `kotlinx-coroutines-core-jvm 1.8.1`, and executed with
-`org.junit.runner.JUnitCore`: **OK (19 tests)**. This is a JVM run of the same
-sources that CI compiles with Gradle; it is not a Gradle run and not a device
-run.
-
-**Not performed:** instrumentation tests, an on-device install, a real
-process-kill during a write, and a read-only/ENOSPC filesystem test on hardware.
-The corresponding behaviour is covered by unit tests with a scripted
-`FileReplacer`, which is not the same thing as a hardware test.
-
----
-
-## 6. Limitations, stated plainly
-
-1. **No directory `fsync`.** The payload is fsynced before the swap, and `rename`
-   is ordered before the directory-entry update by the filesystem journal on
-   ext4/f2fs, but the parent directory is not explicitly synced. A power loss
-   could in theory lose the directory entry on a filesystem that does not order
-   it. Doing this properly needs `android.system.Os.open`/`Os.fsync` on the
-   directory, which is not available in a JVM unit test; it was left out rather
-   than added untested.
-2. **The atomic path is expected to be the only path on real devices.** Android
-   internal storage supports `ATOMIC_MOVE`, so `session.bak` normally never
-   exists. The backup path exists for filesystems that refuse it and is exercised
-   only by unit tests.
-3. **A failed write is still a failed write.** If both the swap and the rollback
-   fail, the current process reports failure and the caller behaves as before; the
-   session is recovered on the *next* read, not in the current process.
-4. **`AuthRepository.persist()` clears storage after a failed save** (pre-existing,
-   deliberate: "staying signed in for this process only would be a lie"). If a
-   replacement fails catastrophically during a sign-in, that clear also removes
-   the recovered backup. This is unchanged in this task because changing it alters
-   sign-in semantics, which is outside the scope given. Recorded here so the next
-   agent can decide.
-5. **`recoverIfNeeded()` reads the ~1 KB target file** on every write to decide
-   whether a leftover backup is disposable. Negligible, but it is a read on the
-   write path.
-
----
-
-## 7. Files changed
-
-**Android — modified**
-
-- `app/src/main/java/com/velnox/app/core/session/SessionFileStore.kt`
-  (atomic replace, backup/rollback, recovery on read, `FileReplacer` seam)
-- `app/src/test/java/com/velnox/app/core/session/SessionFileStoreTest.kt`
-  (6 → 19 tests)
-
-**Docs** — this file, `.ai/AI_HANDOFF.md`, plus archives in `.ai/history/`.
-
-**Not touched:** Google OAuth, backend, Neon schema, production session data,
-navigation, UI, string resources, Gradle files, CI workflow.
-
-**No schema change. No migration. No dependency added.**
-
----
-
-## 8. Next steps
-
-1. Review this change (Part 5.1.1), then unpark Part 6.
-2. Google Sign-In is still blocked on owner configuration only: Android OAuth
-   client for `com.velnox.app`, a stable debug SHA-1, and the Web client id. See
-   `.ai/GOOGLE_SETUP.md`.
-3. If a stricter durability guarantee is wanted later, add directory `fsync`
-   behind an interface that has a no-op JVM test implementation.
+1. Owner: the four Google items in §4. Nothing else blocks Google.
+2. Review and (if CI allows) merge backend PR #16 — not merged here.
+3. Part 6 leftovers: cart and orders on the real API, and a device pass over the
+   new screens.

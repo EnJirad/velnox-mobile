@@ -35,9 +35,9 @@ Two OAuth clients are involved and they are **not interchangeable**:
 | Item | Value | Status |
 |---|---|---|
 | Package name | `com.velnox.app` | **Verified** (`app/build.gradle.kts`) |
-| Signing SHA-1 (CI debug) | **unstable** — differs per build | **Verified unstable**: `a94659e6…` then `2fb37429…` on consecutive runs |
+| Signing SHA-1 (CI debug) | **unstable** — `d8a33542…`, `ce53e36d…`, `ee55aa8b…` on three consecutive runs | **Verified unstable.** `ANDROID_DEBUG_KEYSTORE_BASE64` is not set: the CI step writes an ACTION REQUIRED summary instead of decoding a key |
 | Signing SHA-256 (CI debug) | changes with it | same |
-| Web client id | — | **Unknown.** The backend has one (`config` → `google:true`) but its value is not exposed anywhere I can read. |
+| Web client id | — | **Unknown.** The backend has one (`config` → `google:true`) but its value is not exposed; PR #16 adds `googleClientId` to that endpoint |
 | Android OAuth client | — | **Unknown.** Google Cloud Console cannot be inspected from here. |
 | Backend `MOBILE_GOOGLE_CLIENT_ID` | present? | **Verified present** (`GET /api/auth/mobile/config` → `google: true`). The value is not returned by the deployed build yet. |
 | Backend verification code | `verifyGoogleToken()` | **Verified** — signature (via Google tokeninfo), `iss`, `aud`, `exp`, `azp`, `email_verified`, `sub`. |
@@ -55,14 +55,28 @@ Two OAuth clients are involved and they are **not interchangeable**:
 | Backend verifies real tokens | **Yes, negatively** — a forged token returns `401 INVALID_GOOGLE_TOKEN`. |
 | A real Google token completes the flow | **No.** No Android OAuth client exists and no Web client id reaches the app. |
 
+## 2.2 What changed in Part 5.2
+
+No app code changed — the flow was already complete. The CI workflow now proves
+which key it used:
+
+- the secret is decoded into the runner home with `umask 077` + `chmod 600`;
+- the pinned keystore's SHA-1 / SHA-256 are printed **before** the build;
+- when the secret is absent, the job summary carries an **ACTION REQUIRED** block
+  with the exact commands below.
+
+Evidence: [run 44344651433](https://github.com/EnJirad/velnox-mobile/actions/runs/44344651433)
+— step 6 wrote the ACTION REQUIRED block, and the APK SHA-1 differed from the two
+previous runs (`ee55aa8b…` vs `d8a33542…`, `ce53e36d…`).
+
 ## 3. Required owner actions
 
 ### 3.1 Pin the signing key first
 
 An Android OAuth client is bound to a SHA-1, so the SHA-1 has to stop changing
-first. Today it does not: the workflow has no signing configuration, every runner
-generates its own debug keystore, and two consecutive runs produced different
-fingerprints. Caching the keystore was tried and did not hold.
+first. It still changes on every run because `ANDROID_DEBUG_KEYSTORE_BASE64` is
+not set. The workflow supports the secret and will use it; nothing else is
+needed on the CI side.
 
 Create one keystore and store it as the repository secret
 `ANDROID_DEBUG_KEYSTORE_BASE64`:

@@ -7,7 +7,7 @@
 
 ---
 
-## Current State (2026-11-18, commit `3bc2f3c`, run 44335263114)
+## Current State (2026-11-18, commit `ee115bc`, run 44347496595)
 
 | Area | Status | Notes |
 |------|--------|-------|
@@ -25,15 +25,17 @@
 | Registration | **VERIFIED (live)** | Real account created (201); duplicate → 409, weak password → 400 |
 | Logout + revocation | **VERIFIED (live)** | Bearer logout 200, then `/api/auth/me` → 401 "Session revoked" |
 | Forgot / reset password | **BLOCKED (not deployed)** | Backend PR #15 open; live API answers 404. Client half unit-tested |
-| Google Sign-In | **IMPLEMENTED, BLOCKED** | Credential Manager flow compiles and is unit-tested; cannot run until the Android OAuth client exists and the Web client id is supplied. See `.ai/GOOGLE_SETUP.md` |
+| Google Sign-In | **BLOCKED (owner config)** | Credential Manager flow, client-id resolution and server-side claim checks are in place; the flow cannot run until the signing key is pinned, an Android OAuth client exists, and the Web client id is published. See `.ai/GOOGLE_SETUP.md` |
+| Debug signing SHA-1 | **UNSTABLE — owner action** | `d8a33542…` → `ce53e36d…` → `ee55aa8b…` on three runs; set `ANDROID_DEBUG_KEYSTORE_BASE64` |
+| Product catalogue | **VERIFIED (live API + CI)** | Home, categories, search and product detail read `/api/products/catalog`, `/api/products/:id`, `/api/categories/tree`; 2 real published products, R2 images |
+| Mock product data | **REMOVED** | `HomeCatalog.kt` deleted; no demo products in the catalogue path. Cart and Orders still demo (unrelated) |
 | Google account linking | **PR #16, not deployed** | `LINK_REQUIRED` + `POST /api/auth/mobile/link`. Deployed backend still auto-links |
 | Google claim validation | **VERIFIED (17 backend tests)** | `lib/google-identity.ts`, pure and testable; not deployed |
 | Profile shows real account | **VERIFIED (compile)** | `ProfileScreen(user = …)` from `SessionState`; demo identity removed |
 | LINE | **ENTRY POINT ONLY** | Button says "coming soon"; `line:false` |
-| Debug signing SHA-1 | **UNSTABLE** | Changes per build; keystore cache did not hold. Pin it with the `ANDROID_DEBUG_KEYSTORE_BASE64` secret |
 | Login / Register UI | **VERIFIED (compile)** | Shared components; consent-gated register; strength meter |
 | Guest gate | **VERIFIED (unit tests)** | `AccessPolicy`; unknown routes fail closed |
-| Unit tests | **VERIFIED (CI)** | 90 tests, 8 classes, green in run 44335263114 (counted from the run's JUnit XML artifact) |
+| Unit tests | **VERIFIED (CI)** | 111 tests, 11 classes, green in run 44347496595 (counted from the run's JUnit XML artifact) |
 | APK | **VERIFIED (CI)** | built, verified, uploaded; signing fingerprints printed |
 | Localisation | **VERIFIED (packaged)** | 361 keys × th/en/my, identical sets, no duplicates |
 | On-device runtime | **NOT TESTED** | No install route; Keystore and UI unverified on hardware |
@@ -130,6 +132,33 @@ One module, one test file. No UI, no navigation, no backend, no schema.
 
 ---
 
+## Part 5.2 + Part 6 changes (2026-11-18, `ee115bc`)
+
+Two deliverables, separate commits: `fbbc625` (signing-key verification) and
+`6959a42` + three fixes (catalogue).
+
+**Google Sign-In (5.2)** — no app code changed; the flow was already complete.
+The CI workflow now proves which signing key it used: decode with `umask 077` +
+`chmod 600`, print the pinned key's SHA-1/SHA-256 before the build, and write an
+ACTION REQUIRED summary with the exact commands when
+`ANDROID_DEBUG_KEYSTORE_BASE64` is absent. `.ai/GOOGLE_SETUP.md` lists the five
+owner actions that remain.
+
+**Catalogue (6)**
+
+- New `core/catalog/`: `CatalogApi`, `CatalogRemoteDataSource` (OkHttp +
+  `org.json`), `CatalogRepository` (cache, never caches failures), `PriceFormat`.
+- New `feature/catalog/ProductDetailScreen.kt` on `GET /api/products/:id`.
+- `HomeScreen`, `CategoryScreen`, `VelnoxApp` read the real API; `HomeCatalog.kt`
+  (8 invented products) deleted.
+- Coil added for the sellers' real R2 images.
+- 21 new unit tests over captured API responses; 111 tests in total.
+- Deployment requirement: **none**. The three endpoints are already live.
+
+Task tracking: `.ai/tasks/active/part5_2-part6.md`.
+
+---
+
 ## Known issues
 
 - **Password recovery is not live.** Backend PR
@@ -142,10 +171,20 @@ One module, one test file. No UI, no navigation, no backend, no schema.
   mechanism; sessions end at 7-day expiry.
 - **No refresh token** (no backend endpoint). Sessions last 7 days, then
   `ExpiredSession` → sign in again.
-- **Google Sign-In cannot run yet.** Credential Manager flow is implemented, but
-  the debug signing SHA-1 still changes per build, no Android OAuth client is
-  registered for `com.velnox.app`, and the Web client id is unknown. The app shows
-  "not configured" until all three exist. See `.ai/GOOGLE_SETUP.md`.
+- **Google Sign-In cannot run yet — configuration only.** The client flow, the
+  Web-client-id resolution and the server-side claim checks exist and are tested.
+  Three owner items are missing: a pinned debug keystore
+  (`ANDROID_DEBUG_KEYSTORE_BASE64`), an Android OAuth client for
+  `com.velnox.app` + that SHA-1, and the Web client id (deploy PR #16 or build
+  with `-PvelnoxGoogleClientId`). See `.ai/GOOGLE_SETUP.md`.
+- **The catalogue has 2 published products.** That is the real content of the
+  deployed database, not a bug: the grid, paging and empty states are exercised
+  but not stressed. Do not seed production to make it look fuller.
+- **Cart and Orders are still demo data** and still use the vector
+  `ProductArt` tile. They need backend cart/order work; the catalogue no longer
+  touches them.
+- **No device run.** The APK builds, 111 unit tests pass, and the API is
+  verified live — but nobody has installed this build on hardware.
 - **PR #16 is red in CI for pre-existing reasons**, not from its own change: none
   of the six failing offline test files reference the modified module, and
   `preauth-nonce` passes locally on `main`. Fixing them is outside Part 5.1 scope.
@@ -190,4 +229,4 @@ The app embeds only the public API origin (`BuildConfig.API_BASE_URL`).
 ## Signature
 
 > This handoff supersedes the previous snapshots.
-> **Last updated:** 2026-11-18 by the Part 5.1.1 session-file replacement session.
+> **Last updated:** 2026-11-18 by the Part 5.2 + Part 6 catalogue session.
