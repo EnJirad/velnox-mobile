@@ -23,8 +23,8 @@ flow **cannot be executed** from this environment. Exact blockers in §2 and §7
 | Item | Finding | How |
 |---|---|---|
 | Package name | `com.velnox.app` | `app/build.gradle.kts` |
-| Signing certificate SHA-1 | **`a94659e6d884960206997a4d960a905563568ffb`** | Printed by CI (`apksigner verify --print-certs`) |
-| Signing certificate SHA-256 | `d22a28cd7fd049d8fe34301e670f6344816e3d95ca0ed544fb3623655447f1e3` | same |
+| Signing certificate SHA-1 | **not stable** — changed between runs (`a94659e6…` → `2fb37429…`) | Printed by CI (`apksigner verify --print-certs`) |
+| Signing certificate SHA-256 | changes with it | same |
 | Web/server OAuth client id | **UNKNOWN** | The backend has one (`config` → `google:true`) but never returns the value in the deployed build |
 | Android OAuth client | **UNKNOWN** | Google Cloud Console is not reachable from this environment; no API access to it |
 | Backend verification requirement | `aud` must equal `MOBILE_GOOGLE_CLIENT_ID ?? GOOGLE_CLIENT_ID` | `backend/routes/mobile-auth.ts` |
@@ -33,15 +33,26 @@ flow **cannot be executed** from this environment. Exact blockers in §2 and §7
 I did not invent any credential. The two unknown values are the reason the flow
 cannot run yet; §7 lists exactly what the owner must do.
 
-### 1.1 A blocker that was fixed rather than reported
+### 1.1 The signing-certificate blocker — attempted fix, still open
 
-The workflow had no signing configuration, so every fresh GitHub runner generated
-its own debug keystore. That makes the SHA-1 **different on every build**, so no
-single fingerprint could ever be registered in Google Cloud Console.
+The workflow has no signing configuration, so every fresh GitHub runner generates
+its own debug keystore and the SHA-1 differs on every build. No single fingerprint
+can then be registered in Google Cloud Console.
 
-Fixed: the workflow now caches `~/.android/debug.keystore` under the immutable key
-`velnox-debug-keystore-v1`, and prints the fingerprint of the built APK. From now
-on the debug SHA-1 is stable — the value above.
+**First attempt (failed):** caching `~/.android/debug.keystore` under an immutable
+key. Two consecutive runs produced different fingerprints
+(`a94659e6d884960206997a4d960a905563568ffb`, then
+`2fb37429e07934763497efc7d23d7eda2c82b4af`), so the restore does not take effect
+for that path. I am reporting this rather than leaving the claim in place.
+
+**What now ships:** the workflow prints the APK fingerprint on every build, and
+pins the key when `ANDROID_DEBUG_KEYSTORE_BASE64` is set as a repository secret
+(the exact `keytool`/`base64` commands are in the workflow). Without that secret
+it emits a warning that the fingerprint is not pinned.
+
+**Owner action:** add `ANDROID_DEBUG_KEYSTORE_BASE64`, then register the
+fingerprint that build prints. That is the only way to get a value that stays
+valid.
 
 ---
 
@@ -200,25 +211,30 @@ yet. The button being present is not evidence that the flow works.
 
 1. **Debug SHA-1 changed on every build** — no signing config and no keystore
    cache. Fixed by caching the debug keystore; fingerprint is now stable.
-2. **Missing `LaunchedEffect` import** — the availability probe did not compile.
-3. **`NotConfigured` is a data class** — `when` branches needed `is`.
-4. **Test fakes not updated** for the widened `AuthApi`.
-5. **Illegal `:` in a test name** — rejected by the JVM method-name rule.
+2. **Debug SHA-1 still unstable** — the keystore cache was tried and did not
+   hold; see §1.1. Pinning via a secret is the remaining fix.
+3. **Missing `LaunchedEffect` import** — the availability probe did not compile.
+4. **`NotConfigured` is a data class** — `when` branches needed `is`.
+5. **Test fakes not updated** for the widened `AuthApi`.
+6. **Illegal `:` in a test name** — rejected by the JVM method-name rule.
 
 ---
 
 ## 7. Exact blockers (owner action)
 
-1. **Create the Android OAuth client** — Google Cloud Console → Credentials →
-   Android client, package `com.velnox.app`, SHA-1
-   `a94659e6d884960206997a4d960a905563568ffb`.
-2. **Supply the Web client id** — either merge PR #16 (the app then reads it from
+1. **Pin the debug signing key** — add the `ANDROID_DEBUG_KEYSTORE_BASE64`
+   repository secret (commands in the workflow). Without it the SHA-1 changes on
+   every build and any registered OAuth client breaks on the next one.
+2. **Create the Android OAuth client** — Google Cloud Console → Credentials →
+   Android client, package `com.velnox.app`, and the SHA-1 that a pinned build
+   prints.
+3. **Supply the Web client id** — either merge PR #16 (the app then reads it from
    `config`) or build with `-PvelnoxGoogleClientId=<web-client-id>`.
-3. **Confirm `MOBILE_GOOGLE_CLIENT_ID` on Render equals that same Web client id**,
+4. **Confirm `MOBILE_GOOGLE_CLIENT_ID` on Render equals that same Web client id**,
    or every token is rejected with `INVALID_GOOGLE_TOKEN`.
-4. **Configure the OAuth consent screen** — in Testing mode only listed test users
+5. **Configure the OAuth consent screen** — in Testing mode only listed test users
    can sign in.
-5. **Merge PR #16** to make `LINK_REQUIRED` and `/api/auth/mobile/link` live.
+6. **Merge PR #16** to make `LINK_REQUIRED` and `/api/auth/mobile/link` live.
    Until then the deployed backend still auto-links.
 
 Detailed steps: `.ai/GOOGLE_SETUP.md`.

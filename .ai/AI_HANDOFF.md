@@ -27,7 +27,7 @@
 | Google Sign-In | **IMPLEMENTED, BLOCKED** | Credential Manager flow compiles and is unit-tested; cannot run until the Android OAuth client exists and the Web client id is supplied. See `.ai/GOOGLE_SETUP.md` |
 | Google account linking | **PR #16, not deployed** | `LINK_REQUIRED` + `POST /api/auth/mobile/link`. Deployed backend still auto-links |
 | LINE | **ENTRY POINT ONLY** | Button says "coming soon"; `line:false` |
-| Debug signing SHA-1 | **VERIFIED, STABLE** | `a94659e6d884960206997a4d960a905563568ffb` — keystore now cached in CI |
+| Debug signing SHA-1 | **UNSTABLE** | Changes per build; keystore cache did not hold. Pin it with the `ANDROID_DEBUG_KEYSTORE_BASE64` secret |
 | Login / Register UI | **VERIFIED (compile)** | Shared components; consent-gated register; strength meter |
 | Guest gate | **VERIFIED (unit tests)** | `AccessPolicy`; unknown routes fail closed |
 | Unit tests | **VERIFIED (CI)** | 71 tests, 7 classes, green in run 44278012706 |
@@ -121,9 +121,9 @@ WebView, no invented token.
 - **No refresh token** (no backend endpoint). Sessions last 7 days, then
   `ExpiredSession` → sign in again.
 - **Google Sign-In cannot run yet.** Credential Manager flow is implemented, but
-  no Android OAuth client is registered for `com.velnox.app` +
-  `a94659e6d884960206997a4d960a905563568ffb`, and the Web client id is unknown.
-  The app shows "not configured" until both exist.
+  the debug signing SHA-1 still changes per build, no Android OAuth client is
+  registered for `com.velnox.app`, and the Web client id is unknown. The app shows
+  "not configured" until all three exist. See `.ai/GOOGLE_SETUP.md`.
 - **LINE is still an entry point only.**
 - **Profile/Settings still demo data**; the real account is in
   `SessionState.Authenticated.user` but unused.

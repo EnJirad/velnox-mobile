@@ -35,8 +35,8 @@ Two OAuth clients are involved and they are **not interchangeable**:
 | Item | Value | Status |
 |---|---|---|
 | Package name | `com.velnox.app` | **Verified** (`app/build.gradle.kts`) |
-| Signing SHA-1 (CI debug) | `a94659e6d884960206997a4d960a905563568ffb` | **Verified** — printed by CI run 44278012706 |
-| Signing SHA-256 (CI debug) | `d22a28cd7fd049d8fe34301e670f6344816e3d95ca0ed544fb3623655447f1e3` | **Verified** |
+| Signing SHA-1 (CI debug) | **unstable** — differs per build | **Verified unstable**: `a94659e6…` then `2fb37429…` on consecutive runs |
+| Signing SHA-256 (CI debug) | changes with it | same |
 | Web client id | — | **Unknown.** The backend has one (`config` → `google:true`) but its value is not exposed anywhere I can read. |
 | Android OAuth client | — | **Unknown.** Google Cloud Console cannot be inspected from here. |
 | Backend `MOBILE_GOOGLE_CLIENT_ID` | present? | **Verified present** (`GET /api/auth/mobile/config` → `google: true`). The value is not returned by the deployed build yet. |
@@ -48,26 +48,42 @@ Two OAuth clients are involved and they are **not interchangeable**:
 
 ## 3. Required owner actions
 
-### 3.1 Create the Android OAuth client
+### 3.1 Pin the signing key first
+
+An Android OAuth client is bound to a SHA-1, so the SHA-1 has to stop changing
+first. Today it does not: the workflow has no signing configuration, every runner
+generates its own debug keystore, and two consecutive runs produced different
+fingerprints. Caching the keystore was tried and did not hold.
+
+Create one keystore and store it as the repository secret
+`ANDROID_DEBUG_KEYSTORE_BASE64`:
+
+```bash
+keytool -genkeypair -v -keystore debug.keystore -storepass android \
+  -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+  -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+base64 -w0 debug.keystore
+```
+
+The workflow writes it to `~/.android/debug.keystore` before Gradle runs. From the
+next build on, the fingerprint printed in the run summary is the one to register.
+
+A debug key with the well-known password is not a secret in any meaningful sense;
+it only needs to be stable.
+
+### 3.2 Create the Android OAuth client
 
 Google Cloud Console → **APIs & Services → Credentials → Create credentials →
 OAuth client ID → Android**.
 
 - Package name: `com.velnox.app`
-- SHA-1: `a94659e6d884960206997a4d960a905563568ffb`
-
-That fingerprint is the **debug** key, now cached by the workflow
-(`.github/workflows/gradle-build.yml`, key `velnox-debug-keystore-v1`), so it no
-longer changes between builds. Before that cache existed every runner generated a
-fresh debug keystore, which is why no fingerprint could have been registered.
+- SHA-1: the value printed by a build **after** §3.1 (e.g. run summary
+  "APK signing SHA-1", also emitted as a notice annotation).
 
 For a release build, add a **second** Android client with the release key's
 SHA-1. Both may coexist in the same project.
 
-If the keystore cache is ever cleared, the fingerprint changes and the OAuth
-client must be updated.
-
-### 3.2 Confirm or create the Web OAuth client
+### 3.3 Confirm or create the Web OAuth client
 
 The app needs the **Web** client id. Two ways to supply it:
 
@@ -80,14 +96,14 @@ The app needs the **Web** client id. Two ways to supply it:
 Until one of these is done the app reports Google Sign-In as **not configured**
 and disables the button. It does not open a sheet that would fail.
 
-### 3.3 Confirm the server's audience matches
+### 3.4 Confirm the server's audience matches
 
 `MOBILE_GOOGLE_CLIENT_ID` (or `GOOGLE_CLIENT_ID`) on Render must be the **same
 Web client id** the app uses. If they differ, every token is rejected with
 `INVALID_GOOGLE_TOKEN` — the failure looks like a client bug but is a
 configuration mismatch.
 
-### 3.4 OAuth consent screen
+### 3.5 OAuth consent screen
 
 The project must have a configured consent screen. In **Testing** mode only
 accounts listed under *Test users* can sign in; for anyone else the flow fails
