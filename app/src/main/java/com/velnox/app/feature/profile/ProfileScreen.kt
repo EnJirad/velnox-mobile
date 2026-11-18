@@ -105,7 +105,7 @@ fun ProfileScreen(
             contentPadding = PaddingValues(horizontal = PageGutter, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ProfileHeaderCard(onOpenEditProfile) }
+            item { ProfileHeaderCard(user = user, onOpenEditProfile = onOpenEditProfile) }
 
             item {
                 StatsRow(
