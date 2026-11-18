@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
+import com.velnox.app.core.auth.AuthUser
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
 import com.velnox.app.ui.components.InitialsAvatar
@@ -62,6 +64,7 @@ import com.velnox.app.ui.theme.VelnoxTheme
  */
 @Composable
 fun ProfileScreen(
+    user: AuthUser,
     onOpenSettings: () -> Unit,
     onOpenEditProfile: () -> Unit,
     onOpenPersonalInfo: () -> Unit,
@@ -187,7 +190,9 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileHeaderCard(onOpenEditProfile: () -> Unit) {
+private fun ProfileHeaderCard(user: AuthUser, onOpenEditProfile: () -> Unit) {
+    // Initials from the real account, never a hardcoded pair.
+    val initials = remember(user.name, user.email) { initialsOf(user.name, user.email) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -197,12 +202,12 @@ private fun ProfileHeaderCard(onOpenEditProfile: () -> Unit) {
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            InitialsAvatar(initials = "SJ", size = 56, brand = true)
+            InitialsAvatar(initials = initials, size = 56, brand = true)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = stringResource(R.string.profile_demo_name),
+                        text = user.name.ifBlank { user.email.substringBefore('@') },
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
@@ -210,7 +215,7 @@ private fun ProfileHeaderCard(onOpenEditProfile: () -> Unit) {
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     Spacer(Modifier.width(6.dp))
-                    BrandBadge(text = stringResource(R.string.profile_demo_badge))
+                    BrandBadge(text = stringResource(R.string.profile_verified_badge))
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -219,7 +224,7 @@ private fun ProfileHeaderCard(onOpenEditProfile: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = stringResource(R.string.profile_demo_email),
+                    text = stringResource(R.string.profile_role_label, user.role),
                     style = Text2xs,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -345,11 +350,37 @@ private fun AddressLine(label: String, detail: String, isDefault: Boolean) {
     }
 }
 
+
+/**
+ * Two initials for the avatar.
+ *
+ * Falls back to the email's first letters when the account has no display name,
+ * so the avatar is never blank and never invented.
+ */
+private fun initialsOf(name: String, email: String): String {
+    val source = name.trim().ifBlank { email.substringBefore('@') }
+    val parts = source.split(' ', '.', '_', '-').filter { it.isNotBlank() }
+    return when {
+        parts.size >= 2 -> (parts[0].take(1) + parts[1].take(1)).uppercase()
+        source.isNotEmpty() -> source.take(2).uppercase()
+        else -> "?"
+    }
+}
+
+/** Only for @Preview: a fixed account so the layout can be inspected. */
+private val PreviewUser = AuthUser(
+    id = "preview",
+    email = "ann@example.com",
+    name = "Ann Suriya",
+    role = "customer",
+)
+
 @Preview(showBackground = true, widthDp = 390, heightDp = 900)
 @Composable
 private fun ProfilePreview() {
     VelnoxTheme(darkTheme = false) {
         ProfileScreen(
+            user = PreviewUser,
             onOpenSettings = {},
             onOpenEditProfile = {},
             onOpenPersonalInfo = {},
@@ -366,6 +397,7 @@ private fun ProfilePreview() {
 private fun ProfileCompactPreview() {
     VelnoxTheme(darkTheme = false) {
         ProfileScreen(
+            user = PreviewUser,
             onOpenSettings = {},
             onOpenEditProfile = {},
             onOpenPersonalInfo = {},
@@ -382,6 +414,7 @@ private fun ProfileCompactPreview() {
 private fun ProfileDarkPreview() {
     VelnoxTheme(darkTheme = true) {
         ProfileScreen(
+            user = PreviewUser,
             onOpenSettings = {},
             onOpenEditProfile = {},
             onOpenPersonalInfo = {},

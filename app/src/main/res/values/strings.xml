@@ -161,6 +161,8 @@
     <string name="profile_demo_handle">@velnox_demo</string>
     <string name="profile_demo_email">demo@velnox.app</string>
     <string name="profile_demo_badge">บัญชีสาธิต</string>
+    <string name="profile_role_label">บทบาท: %1$s</string>
+    <string name="profile_verified_badge">ยืนยันแล้ว</string>
     <string name="profile_stats_orders">คำสั่งซื้อ</string>
     <string name="profile_stats_wishlist">รายการโปรด</string>
     <string name="profile_stats_messages">ข้อความ</string>

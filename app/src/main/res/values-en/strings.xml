@@ -161,6 +161,8 @@
     <string name="profile_demo_handle">@velnox_demo</string>
     <string name="profile_demo_email">demo@velnox.app</string>
     <string name="profile_demo_badge">Demo account</string>
+    <string name="profile_role_label">Role: %1$s</string>
+    <string name="profile_verified_badge">Verified</string>
     <string name="profile_stats_orders">Orders</string>
     <string name="profile_stats_wishlist">Wishlist</string>
     <string name="profile_stats_messages">Messages</string>

@@ -492,6 +492,7 @@ private fun VelnoxNavHost() {
                             TabContent(
                                 tab = tab,
                                 cart = cart,
+                                sessionState = sessionState,
                                 onOpenOverlay = ::requestOverlay,
                                 onOpenTab = ::requestTab,
                             )
@@ -638,6 +639,7 @@ private fun authMessage(error: AuthError): Int = when (error) {
 private fun TabContent(
     tab: AppTab,
     cart: CartState,
+    sessionState: SessionState,
     onOpenOverlay: (String) -> Unit,
     onOpenTab: (AppTab) -> Unit,
 ) {
@@ -664,14 +666,23 @@ private fun TabContent(
             onBrowseProducts = { onOpenTab(AppTab.Home) },
         )
 
-        AppTab.Profile -> ProfileScreen(
-            onOpenSettings = { onOpenOverlay("settings") },
-            onOpenEditProfile = { onOpenOverlay(SettingsPage.EditProfile.key) },
-            onOpenPersonalInfo = { onOpenOverlay(SettingsPage.PersonalInfo.key) },
-            onOpenAddresses = { onOpenOverlay(SettingsPage.Addresses.key) },
-            onOpenOrders = { onOpenTab(AppTab.Orders) },
-            onOpenWishlist = { onOpenOverlay("wishlist") },
-            onOpenMessages = { onOpenTab(AppTab.Messages) },
-        )
+        AppTab.Profile -> {
+            // The Profile tab is protected by AccessPolicy, so a missing user
+            // means the session ended between the tap and this frame. Render
+            // nothing rather than an account that is not real.
+            val user = sessionState.user
+            if (user != null) {
+                ProfileScreen(
+                    user = user,
+                    onOpenSettings = { onOpenOverlay("settings") },
+                    onOpenEditProfile = { onOpenOverlay(SettingsPage.EditProfile.key) },
+                    onOpenPersonalInfo = { onOpenOverlay(SettingsPage.PersonalInfo.key) },
+                    onOpenAddresses = { onOpenOverlay(SettingsPage.Addresses.key) },
+                    onOpenOrders = { onOpenTab(AppTab.Orders) },
+                    onOpenWishlist = { onOpenOverlay("wishlist") },
+                    onOpenMessages = { onOpenTab(AppTab.Messages) },
+                )
+            }
+        }
     }
 }

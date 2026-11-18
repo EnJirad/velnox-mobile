@@ -161,6 +161,8 @@
     <string name="profile_demo_handle">@velnox_demo</string>
     <string name="profile_demo_email">demo@velnox.app</string>
     <string name="profile_demo_badge">ဒီမိုအကောင့်</string>
+    <string name="profile_role_label">အခန်းကဏ္ဍ: %1$s</string>
+    <string name="profile_verified_badge">အတည်ပြုပြီး</string>
     <string name="profile_stats_orders">အမှာစာ</string>
     <string name="profile_stats_wishlist">နှစ်သက်စာရင်း</string>
     <string name="profile_stats_messages">စာ</string>

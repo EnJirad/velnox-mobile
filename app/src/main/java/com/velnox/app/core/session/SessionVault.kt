@@ -31,24 +31,27 @@ import javax.crypto.spec.GCMParameterSpec
  */
 class SessionVault(private val context: Context) : SessionStore {
 
-    private val file: File
-        get() = File(File(context.filesDir, DIRECTORY), FILE_NAME)
+    // All file handling lives in SessionFileStore so its temp-file/rename
+    // protocol can be unit-tested; this class only does Keystore crypto.
+    private val files = SessionFileStore(File(context.filesDir, DIRECTORY))
 
     override suspend fun read(): StoredSession? {
-        val stored = file
-        if (!stored.exists()) return null
+        val bytes = files.readBytes() ?: return null
+        if (bytes.size <= VERSION_BYTES + IV_BYTES) return null
 
         return try {
-            val bytes = stored.readBytes()
-            if (bytes.size <= VERSION_BYTES + IV_BYTES) return null
-
             val version = bytes[0]
             if (version != FORMAT_VERSION_BYTE) return null
+
             val iv = bytes.copyOfRange(VERSION_BYTES, VERSION_BYTES + IV_BYTES)
             val ciphertext = bytes.copyOfRange(VERSION_BYTES + IV_BYTES, bytes.size)
 
             val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, existingKey() ?: return null, GCMParameterSpec(TAG_BITS, iv))
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                existingKey() ?: return null,
+                GCMParameterSpec(TAG_BITS, iv),
+            )
             val plaintext = cipher.doFinal(ciphertext)
 
             val token = String(plaintext, Charsets.UTF_8)
@@ -57,7 +60,7 @@ class SessionVault(private val context: Context) : SessionStore {
             // A key that was invalidated (lock screen change, restore to a new
             // device) or a corrupted file both mean the same thing: no session.
             // Drop the useless bytes so the next launch does not retry them.
-            clearQuietly()
+            files.clear()
             null
         }
     }
@@ -67,33 +70,22 @@ class SessionVault(private val context: Context) : SessionStore {
         cipher.init(Cipher.ENCRYPT_MODE, createKey())
         val ciphertext = cipher.doFinal(session.token.toByteArray(Charsets.UTF_8))
 
-        val directory = File(context.filesDir, DIRECTORY).apply { mkdirs() }
-        val target = File(directory, FILE_NAME)
-        val temporary = File(directory, TEMP_NAME)
+        val payload = ByteArray(VERSION_BYTES + IV_BYTES + ciphertext.size)
+        payload[0] = FORMAT_VERSION_BYTE
+        cipher.iv.copyInto(payload, VERSION_BYTES)
+        ciphertext.copyInto(payload, VERSION_BYTES + IV_BYTES)
 
-        temporary.outputStream().use { out ->
-            out.write(byteArrayOf(FORMAT_VERSION_BYTE))
-            out.write(cipher.iv)
-            out.write(ciphertext)
-            out.flush()
-        }
-
-        clearQuietly()
-        if (!temporary.renameTo(target)) {
-            temporary.delete()
-            throw IllegalStateException("Could not persist the session")
-        }
+        // Throws when the file cannot be made durable, so a caller never reports
+        // a session that was not actually saved.
+        files.writeBytes(payload)
     }
 
-    override suspend fun clear() = clearQuietly()
-
-    private fun clearQuietly() {
+    override suspend fun clear() {
         try {
-            file.delete()
-            File(File(context.filesDir, DIRECTORY), TEMP_NAME).delete()
+            files.clear()
         } catch (_: Exception) {
-            // Nothing to do: a failed delete cannot make the token readable, and
-            // the next read either succeeds or is discarded by read().
+            // A failed delete cannot make the token readable; read() discards
+            // anything it cannot decrypt.
         }
     }
 
@@ -139,7 +131,5 @@ class SessionVault(private val context: Context) : SessionStore {
         /** Same value as [FORMAT_VERSION], typed for the on-disk byte compare. */
         val FORMAT_VERSION_BYTE: Byte = FORMAT_VERSION.toByte()
         const val DIRECTORY = "session"
-        const val FILE_NAME = "session.bin"
-        const val TEMP_NAME = "session.tmp"
     }
 }
