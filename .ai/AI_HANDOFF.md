@@ -1,19 +1,20 @@
 # AI_HANDOFF.md — Velnox Mobile Current Snapshot
 
-> **Current snapshot (not a log).** Supersedes the Part 4 snapshot, archived
-> verbatim in `.ai/history/20261118_174000_AI_HANDOFF_before_part5.md`.
+> **Current snapshot (not a log).** Supersedes the Part 5 snapshot, archived
+> verbatim in `.ai/history/20261118_190000_AI_HANDOFF_before_part5_1.md`.
 > Statuses: **VERIFIED / UNVERIFIED / FAILED / BLOCKED / SKIPPED / NOT TESTED**.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Current State (2026-11-18, commit `751eb2b`, run 44278012706)
+## Current State (2026-11-18, commit `2dfb21b`, run 44298776084)
 
 | Area | Status | Notes |
 |------|--------|-------|
 | Startup destination | **VERIFIED (source)** | Opens on Home for everyone; Login is a gate, not a launch screen |
 | Auth states | **VERIFIED (unit tests)** | `Loading` / `Guest` / `Authenticated` / `ExpiredSession`, one holder |
 | Session restore | **VERIFIED (unit tests)** | `/api/auth/me` decides; token never trusted on its own |
+| Session persistence | **FIXED in 5.1** | `SessionVault.write()` deleted its own temp file, so every save threw and no session was ever stored |
 | Secure storage | **VERIFIED (compile)** | AES-256-GCM, Keystore key, `filesDir/session/session.bin`, excluded from backup |
 | Expiry handling | **VERIFIED (unit tests)** | `exp` skips a guaranteed-401 call; API stays authoritative |
 | Refresh tokens | **BLOCKED** | Backend has no refresh endpoint; 7-day JWT only |
@@ -26,11 +27,13 @@
 | Forgot / reset password | **BLOCKED (not deployed)** | Backend PR #15 open; live API answers 404. Client half unit-tested |
 | Google Sign-In | **IMPLEMENTED, BLOCKED** | Credential Manager flow compiles and is unit-tested; cannot run until the Android OAuth client exists and the Web client id is supplied. See `.ai/GOOGLE_SETUP.md` |
 | Google account linking | **PR #16, not deployed** | `LINK_REQUIRED` + `POST /api/auth/mobile/link`. Deployed backend still auto-links |
+| Google claim validation | **VERIFIED (17 backend tests)** | `lib/google-identity.ts`, pure and testable; not deployed |
+| Profile shows real account | **VERIFIED (compile)** | `ProfileScreen(user = …)` from `SessionState`; demo identity removed |
 | LINE | **ENTRY POINT ONLY** | Button says "coming soon"; `line:false` |
 | Debug signing SHA-1 | **UNSTABLE** | Changes per build; keystore cache did not hold. Pin it with the `ANDROID_DEBUG_KEYSTORE_BASE64` secret |
 | Login / Register UI | **VERIFIED (compile)** | Shared components; consent-gated register; strength meter |
 | Guest gate | **VERIFIED (unit tests)** | `AccessPolicy`; unknown routes fail closed |
-| Unit tests | **VERIFIED (CI)** | 71 tests, 7 classes, green in run 44278012706 |
+| Unit tests | **VERIFIED (CI)** | 80 tests, 8 classes, green in run 44298776084 |
 | APK | **VERIFIED (CI)** | built, verified, uploaded; signing fingerprints printed |
 | Localisation | **VERIFIED (packaged)** | 361 keys × th/en/my, identical sets, no duplicates |
 | On-device runtime | **NOT TESTED** | No install route; Keystore and UI unverified on hardware |
@@ -124,6 +127,9 @@ WebView, no invented token.
   the debug signing SHA-1 still changes per build, no Android OAuth client is
   registered for `com.velnox.app`, and the Web client id is unknown. The app shows
   "not configured" until all three exist. See `.ai/GOOGLE_SETUP.md`.
+- **PR #16 is red in CI for pre-existing reasons**, not from its own change: none
+  of the six failing offline test files reference the modified module, and
+  `preauth-nonce` passes locally on `main`. Fixing them is outside Part 5.1 scope.
 - **LINE is still an entry point only.**
 - **Profile/Settings still demo data**; the real account is in
   `SessionState.Authenticated.user` but unused.
@@ -156,4 +162,4 @@ The app embeds only the public API origin (`BuildConfig.API_BASE_URL`).
 ## Signature
 
 > This handoff supersedes the previous snapshots.
-> **Last updated:** 2026-11-18 by the Part 5 Google Sign-In session.
+> **Last updated:** 2026-11-18 by the Part 5.1 Google/Neon completion session.

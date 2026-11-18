@@ -1,252 +1,277 @@
 # LATEST.md — Velnox Mobile Latest Change Report
 
-> **Current snapshot (overwritten each task).** Previous report (Part 4)
-> archived verbatim in `.ai/history/20261118_174000_LATEST_before_part5.md`.
+> **Current snapshot (overwritten each task).** Previous report (Part 5)
+> archived in `.ai/history/20261118_190000_LATEST_before_part5_1.md`.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Task: Part 5 — Google Sign-In Integration
+## Task: Part 5.1 — Complete Google Sign-In & Real Neon Integration
 
 **Date:** 2026-11-18
-**Commits:** `81e0b97` (feature), `a3c7b36` (compile fixes), `29b700a` (test
-fakes), `751eb2b` (fingerprint annotation), plus docs
-**Verified CI run:** [44278012706](https://github.com/EnJirad/velnox-mobile/actions/runs/44278012706) — **success**
-**Backend PR:** [velnox-marketplace#16](https://github.com/EnJirad/velnox-marketplace/pull/16) — open, **not merged**
-**Status:** **PARTIAL** — implementation complete and compiling; the real OAuth
-flow **cannot be executed** from this environment. Exact blockers in §2 and §7.
+**Start commit:** `c016be9` · **End commit:** `2dfb21b`
+**Verified CI run:** [44298776084](https://github.com/EnJirad/velnox-mobile/actions/runs/44298776084) — **success**
+**Status:** **BLOCKED on owner configuration.** A real Google identity cannot
+complete the flow, because no Android OAuth client exists and the Web client id
+is not published. Everything that does not depend on those was fixed, tested and
+verified — including a critical session-persistence bug that made **all** sign-in
+non-persistent.
 
 ---
 
-## 1. Provider configuration — what could and could not be inspected
+## 1. Repository and inspection
 
-| Item | Finding | How |
+| Check | Result |
+|---|---|
+| `git fetch origin main` | local == remote (`c016be9`) |
+| Uncommitted work at start | None |
+| Inspection | `.ai/AI_HANDOFF.md`, `AI_RULES.md`, `VELNOX_DESIGN_THEME.md`, `ARCHITECTURE_AUTH.md`, `reports/LATEST.md`, `GOOGLE_SETUP.md` |
+| Local Android build | Not run (`.ai/AI_RULES.md` §1) |
+| Duplicate auth system created | **No** — extended the Part 3/5 architecture |
+
+---
+
+## 2. THE CRITICAL FINDING: session persistence never worked
+
+> The task asked me to verify the "SessionVault persistence defect reported in the
+> Part 4 remediation". No such defect is recorded anywhere in this repository —
+> but **a real, total defect does exist.**
+
+`SessionVault.write()` did this:
+
+```kotlin
+temporary.outputStream().use { ... }   // write session.tmp
+clearQuietly()                          // deletes session.bin AND session.tmp
+if (!temporary.renameTo(target)) throw  // always fails: the temp file is gone
+```
+
+`clearQuietly()` deletes `session.tmp`. So **every single save threw**,
+`AuthRepository.persist()` converted that into `SignInResult.Failure(Unknown)`,
+and no session was ever written to disk — for password or Google sign-in, on any
+device, since Part 3.
+
+It survived because every session test used a fake in-memory `SessionStore`,
+which has no temp file to delete.
+
+**Fix:** file handling extracted into [SessionFileStore.kt](app/src/main/java/com/velnox/app/core/session/SessionFileStore.kt)
+— delete the stale temp file *before* writing, flush to disk, delete the old
+target, rename. It never deletes the temp file after writing it. `SessionVault`
+now does only Keystore crypto.
+
+**Regression test:** [SessionFileStoreTest.kt](app/src/test/java/com/velnox/app/core/session/SessionFileStoreTest.kt),
+9 cases against the production class in a real directory — including "no temp
+file survives a write", which is the exact assertion that was missing.
+
+---
+
+## 3. Backend work (PR #16, extended)
+
+`backend/lib/google-identity.ts` (new) — the claim rules extracted from
+`verifyGoogleToken` into a pure function of `(claims, expectedAudience, nowMs)`,
+so they can be tested without a network round trip. No behaviour change: same
+checks, same codes.
+
+`backend/tests/google-identity.test.ts` (new) — **17 tests, all passing locally**:
+valid token; subject as the identity key; both issuer spellings; `azp` match and
+mismatch; email normalisation; name fallback; wrong audience; missing audience;
+foreign issuer; expired, exactly-expired and non-numeric expiry; unverified
+email (`EMAIL_NOT_VERIFIED`); missing subject; malformed emails; unconfigured
+server (`503`).
+
+`tsc --noEmit` on the backend: **clean**.
+
+---
+
+## 4. Android work
+
+| Change | File |
+|---|---|
+| Session persistence fix + testable file store | `core/session/SessionFileStore.kt`, `SessionVault.kt` |
+| Profile shows the **real** account, not demo data | `feature/profile/ProfileScreen.kt`, `navigation/VelnoxApp.kt` |
+| Regression tests | `app/src/test/.../SessionFileStoreTest.kt` |
+
+**Profile was showing a hardcoded identity** ("Somchai Jaidee", `demo@velnox.app`)
+to signed-in users. It now takes `AuthUser` from `SessionState`: real name, email,
+role, initials derived from the account, and a "Verified" badge instead of a
+"demo account" badge. If the session ends mid-frame the tab renders nothing
+rather than a fake account.
+
+Two new strings in th/en/my (363 keys each, identical sets, no duplicates).
+
+---
+
+## 5. Neon database
+
+**Nothing was created, altered or dropped.** Existing tables reused:
+
+| Table | Role |
+|---|---|
+| `users` | account; `email` UNIQUE |
+| `auth_identities` | external identity; `UNIQUE(provider, provider_id)` |
+| `customer_profiles` | per-account profile row |
+| `revoked_tokens` | session revocation by `jti` |
+
+Verified read-only on the `production` branch: `auth_identities_provider_provider_id_key`
+exists, `users_email_key` exists, 1 Google identity, 0 duplicate provider ids.
+
+**Migration needed for the Google flow: none.** The schema already supports it.
+
+---
+
+## 6. Real Neon integration test (through the deployed backend)
+
+Registration and login were exercised against the **live** API and the **real**
+Neon database — no mocks, no local database.
+
+| Step | Result |
+|---|---|
+| `POST /api/auth/mobile/register` (`qa.p51.1795003211@example.com`) | **201**, user id `ea7da8d5-7bed-4326-a625-2464645bda41` |
+| Neon row for that email | id matches exactly, `role=customer`, `status=active` |
+| `password_hash` | `$scrypt$…` (never plaintext) |
+| `customer_profiles` row | 1 |
+| `auth_identities` rows | 0 (password account, as expected) |
+
+**Google specifically:** not testable. Producing a real Google ID token requires
+an Android OAuth client and a device with Play services; neither exists. I will
+not simulate one.
+
+---
+
+## 7. PR #16 status
+
+| Item | Status |
+|---|---|
+| Merged | **No** |
+| Deployed | **No** — `config` still returns no `googleClientId`; `/api/auth/mobile/link` still 404 |
+| CI check | **Red, but not from my change** |
+
+Evidence the red check is pre-existing: this PR touches only
+`backend/routes/mobile-auth.ts`, `backend/lib/google-identity.ts`,
+`backend/tests/google-identity.test.ts` and `docs/API.md`. All six failing test
+files (`preauth-nonce`, `chat-support-phase2d`, `center-admin-audit`,
+`product-lifecycle`, `verification-badge-visual`, `oauth-callback-session`)
+reference **none** of `mobile-auth`, `resolveIdentity`, `LINK_REQUIRED` or
+`googleClientId`, and `preauth-nonce` passes locally on `main` (15 pass) — so
+those failures are environment-dependent and predate this branch.
+
+Fixing them is outside Part 5.1's boundary (unrelated marketplace features).
+
+---
+
+## 8. Classification of every deliverable
+
+### Completed and verified
+
+| Item | Evidence |
+|---|---|
+| Session persistence defect found and fixed | code + 9 new tests, CI green |
+| Session restore/logout unchanged and intact | existing 71 tests still pass (80 total) |
+| Profile shows the real authenticated account | source + compile |
+| Google claim validation extracted and tested | 17 backend tests pass locally |
+| Backend typecheck | `tsc --noEmit` clean |
+| Real Neon account creation through the deployed API | 201 + row inspected in Neon |
+| Real Neon duplicate/conflict handling for password accounts | 409 `EMAIL_EXISTS` (Part 4) |
+| Schema supports Google identities without migration | `UNIQUE(provider, provider_id)` verified |
+| Android CI | run 44298776084 success, APK 11,534,270 B |
+
+### Implemented but not deployed
+
+| Item | Blocker |
+|---|---|
+| `LINK_REQUIRED` + `POST /api/auth/mobile/link` | PR #16 unmerged |
+| `googleClientId` in `/api/auth/mobile/config` | PR #16 unmerged |
+| Claim-validation module in production | PR #16 unmerged |
+
+### Tested against the real backend and real Neon only for the password path
+
+| Item | Note |
+|---|---|
+| Registration → Neon row → session | verified live |
+| Login → `/api/auth/me` → real profile | verified live (Part 4) |
+| Logout → `401 Session revoked` | verified live (Part 4) |
+
+### Blocked by external configuration
+
+| Item | Exact blocker |
+|---|---|
+| **Real Google sign-in, end to end** | No Android OAuth client for `com.velnox.app`; no Web client id available to the app |
+| Google token verified against real Neon | needs a real Google ID token |
+| `googleClientId` resolution by the app | PR #16 unmerged |
+| Stable APK signing fingerprint | `ANDROID_DEBUG_KEYSTORE_BASE64` secret not set |
+
+### Not implemented
+
+| Item | Scope |
+|---|---|
+| LINE authentication | Part 6, explicitly out of scope |
+| Automated E2E instrumentation tests | no device route in this environment |
+
+---
+
+## 9. Test results
+
+| Suite | Count | Result |
 |---|---|---|
-| Package name | `com.velnox.app` | `app/build.gradle.kts` |
-| Signing certificate SHA-1 | **not stable** — changed between runs (`a94659e6…` → `2fb37429…`) | Printed by CI (`apksigner verify --print-certs`) |
-| Signing certificate SHA-256 | changes with it | same |
-| Web/server OAuth client id | **UNKNOWN** | The backend has one (`config` → `google:true`) but never returns the value in the deployed build |
-| Android OAuth client | **UNKNOWN** | Google Cloud Console is not reachable from this environment; no API access to it |
-| Backend verification requirement | `aud` must equal `MOBILE_GOOGLE_CLIENT_ID ?? GOOGLE_CLIENT_ID` | `backend/routes/mobile-auth.ts` |
-| Authorized redirect URIs | **not required for native** | Credential Manager returns the ID token directly; redirects belong to the web flow |
-
-I did not invent any credential. The two unknown values are the reason the flow
-cannot run yet; §7 lists exactly what the owner must do.
-
-### 1.1 The signing-certificate blocker — attempted fix, still open
-
-The workflow has no signing configuration, so every fresh GitHub runner generates
-its own debug keystore and the SHA-1 differs on every build. No single fingerprint
-can then be registered in Google Cloud Console.
-
-**First attempt (failed):** caching `~/.android/debug.keystore` under an immutable
-key. Two consecutive runs produced different fingerprints
-(`a94659e6d884960206997a4d960a905563568ffb`, then
-`2fb37429e07934763497efc7d23d7eda2c82b4af`), so the restore does not take effect
-for that path. I am reporting this rather than leaving the claim in place.
-
-**What now ships:** the workflow prints the APK fingerprint on every build, and
-pins the key when `ANDROID_DEBUG_KEYSTORE_BASE64` is set as a repository secret
-(the exact `keytool`/`base64` commands are in the workflow). Without that secret
-it emits a warning that the fingerprint is not pinned.
-
-**Owner action:** add `ANDROID_DEBUG_KEYSTORE_BASE64`, then register the
-fingerprint that build prints. That is the only way to get a value that stays
-valid.
+| Android unit tests | **80** | pass in CI (9 new for the file store) |
+| Backend Google claim tests | **17** | pass locally (`bun test`) |
+| Backend typecheck | — | clean |
+| Live API + Neon | 1 registration | 201, row verified |
+| Google end-to-end | — | **NOT TESTED** |
 
 ---
 
-## 2. What was implemented
+## 10. Exact owner actions, in order
 
-### 2.1 Android — the supported flow
+1. **Add the `ANDROID_DEBUG_KEYSTORE_BASE64` secret.** Without it the APK SHA-1
+   changes every build, so no OAuth client can stay valid. Commands are in
+   `.github/workflows/gradle-build.yml` and `.ai/GOOGLE_SETUP.md`.
+2. **Create the Android OAuth client**: package `com.velnox.app`, SHA-1 printed by
+   a build after step 1.
+3. **Merge PR #16** (then #15, or rebase whichever lands second) so
+   `/api/auth/mobile/link`, `LINK_REQUIRED` and `googleClientId` go live. Render
+   auto-deploys `main`.
+4. **Confirm `MOBILE_GOOGLE_CLIENT_ID`** on Render equals the Web client id the
+   app receives.
+5. **Configure the OAuth consent screen** (Testing mode only admits listed users).
 
-`core/auth/CredentialManagerGoogleSignIn.kt` uses **Credential Manager** with
-`GetGoogleIdOption`. `GoogleSignInClient` is deprecated and is not used.
-
-| Case | Handling |
-|---|---|
-| Success | Returns the raw ID token; decides nothing else |
-| User cancellation | `GetCredentialCancellationException` → silent |
-| No account on device | `NoCredentialException` → its own message |
-| Misconfigured build / package+SHA-1 not registered | `GetCredentialProviderConfigurationException` → "not configured", button disables |
-| Interrupted | own message |
-| Unsupported device | treated as not configured |
-| Malformed token | `GoogleIdTokenParsingException` → generic failure |
-| Network | offline message |
-
-`setFilterByAuthorizedAccounts(false)` so a first-time user sees their accounts;
-`setAutoSelectEnabled(false)` so nobody is signed in without choosing.
-
-### 2.2 Client id resolution
-
-`core/auth/GoogleClientIdSource.kt` resolves the **Web** client id:
-
-1. `-PvelnoxGoogleClientId=…` baked into `BuildConfig` (wins), else
-2. `GET /api/auth/mobile/config` → `googleClientId` (PR #16).
-
-It must be the Web client: the ID token's `aud` carries it, and the backend
-compares `aud` against its own value. No value → the UI says unavailable.
-
-### 2.3 Backend integration
-
-`AuthApi.googleSignIn(idToken)` → `POST /api/auth/mobile/google`. **Only the token
-is sent**; no email, name or user id from the client. The existing
-`verifyGoogleToken()` already checks signature (via Google tokeninfo), issuer,
-audience, expiry, `azp`, `email_verified` and subject — unchanged and still
-server-side.
-
-### 2.4 Account linking — no silent merge
-
-The deployed backend auto-linked a verified Google email to an existing account.
-That is a silent merge: a verified address proves control of the mailbox, not that
-the signer is the person who created the password account, and attaching hands
-over its orders, addresses and history.
-
-PR #16 changes `resolveIdentity` to return `link_required` (`409 LINK_REQUIRED`)
-and adds `POST /api/auth/mobile/link` (`requireAuth`):
-
-- holding a session for the account **is** the proof of ownership,
-- the Google email must equal the account email (`409 EMAIL_MISMATCH`),
-- an identity already bound elsewhere is refused (`409 IDENTITY_CONFLICT`),
-- a repeat call is idempotent,
-- `UNIQUE(provider, provider_id)` remains the guard against duplicate mappings.
-
-LINE is unchanged: unverified email stays a plain conflict.
-
-### 2.5 Session integration
-
-`AuthRepository.signInWithGoogle` and `SessionController.signInWithGoogle` reuse
-the Part 3 architecture exactly: `Authenticated` only after the API returns a
-session, `SessionVault` storage, `/api/auth/me` restoration, and the same
-`signOut()`. The nav gate is untouched; `LINK_REQUIRED` switches the gate to the
-password step instead of dead-ending.
+After 1–5, the flow needs one device run to be called end-to-end verified.
 
 ---
 
-## 3. Files changed
+## 11. Files changed (this part)
 
-**Added**
+**Android — added**
+`app/src/main/java/com/velnox/app/core/session/SessionFileStore.kt`
+`app/src/test/java/com/velnox/app/core/session/SessionFileStoreTest.kt`
 
-- `core/auth/GoogleSignInProvider.kt`, `CredentialManagerGoogleSignIn.kt`,
-  `GoogleClientIdSource.kt`
-- `app/src/test/.../GoogleClientIdSourceTest.kt`
-- `.ai/GOOGLE_SETUP.md`
+**Android — modified**
+`core/session/SessionVault.kt`, `feature/profile/ProfileScreen.kt`,
+`navigation/VelnoxApp.kt`, `res/values{,-en,-my}/strings.xml`
 
-**Modified**
+**Backend (PR #16) — added**
+`backend/lib/google-identity.ts`, `backend/tests/google-identity.test.ts`
 
-- `app/build.gradle.kts` — three Credential Manager/Google artifacts,
-  `GOOGLE_WEB_CLIENT_ID` BuildConfig field
-- `core/auth/{AuthApi,AuthModels,AuthRemoteDataSource,AuthRepository}.kt`
-- `core/session/SessionController.kt`, `VelnoxApplication.kt`
-- `feature/auth/LoginScreen.kt`, `navigation/VelnoxApp.kt`
-- `res/values{,-en,-my}/strings.xml` — 361 keys each
-- `app/src/test/.../{AuthRepositoryTest,SessionControllerTest}.kt`
-- `.github/workflows/gradle-build.yml` — keystore cache + fingerprint step
+**Backend (PR #16) — modified**
+`backend/routes/mobile-auth.ts`
 
-**Backend (PR #16)**
+**Docs** — this file, `AI_HANDOFF.md`, `ARCHITECTURE_AUTH.md`, `GOOGLE_SETUP.md`
 
-- `backend/routes/mobile-auth.ts`, `docs/API.md`
+**No schema change. No migration. No destructive operation.**
 
 ---
 
-## 4. Test results
+## 12. Honest statement of the finish line
 
-### 4.1 Unit tests — 71, all passing (CI)
+The task defines completion as: *"a real Google identity can authenticate through
+the existing Velnox backend, resolve to the correct real Neon user account, and
+establish a securely persisted Velnox session."*
 
-14 new: `GoogleClientIdSourceTest` (7 — build value wins, remote fallback,
-caching, unconfigured, blank, missing field, invalidate), `AuthRepositoryTest`
-(4 — token only, LinkRequired stores nothing, rejected token stores nothing,
-provider unavailable), `SessionControllerTest` (3 — Guest→Authenticated,
-LinkRequired stays Guest, Google session survives restart).
+**That has not been achieved, and cannot be from here.** Two of the four links in
+that chain are blocked on configuration only the owner can supply: the Android
+OAuth client (so Google will issue a token at all) and the Web client id (so the
+backend's audience check can pass).
 
-### 4.2 CI
-
-| Item | Result |
-|---|---|
-| Run | 44278012706 on `751eb2b` |
-| Restore the debug signing key | **success** |
-| Run unit tests | **success** |
-| Build / verify / integrity / upload | **success** |
-| Print APK signing fingerprints | **success** |
-
-Three runs failed first, all real defects of mine and all fixed:
-`44274992238` (missing `LaunchedEffect` import, `NotConfigured` needing `is`),
-`44276106016` (test fakes missing the new interface members, illegal `:` in a
-test name). `44277127872` and `44278012706` are green.
-
-### 4.3 Live backend probes
-
-| Probe | Result | Meaning |
-|---|---|---|
-| `GET /api/auth/mobile/config` | `{"google":true,"line":false}` | The server has a Google client id configured |
-| Same, `googleClientId` field | **absent** | PR #16 not deployed — the app therefore reports "not configured" |
-| `POST /api/auth/mobile/google` with a forged token | **401** `INVALID_GOOGLE_TOKEN` | The endpoint is live and refuses untrusted input |
-| `POST /api/auth/mobile/link` | **404** | PR #16 not deployed |
-
-### 4.4 The real OAuth flow — NOT TESTED
-
-**I could not run it, and I will not claim otherwise.** Running it needs all three
-of: a device or emulator with Google Play services and a signed-in Google account;
-the app installed; and an Android OAuth client registered for this package and
-SHA-1. This environment has no device route, and the OAuth client does not exist
-yet. The button being present is not evidence that the flow works.
-
----
-
-## 5. Security properties
-
-| Property | Where |
-|---|---|
-| Client never supplies identity | Only `{idToken}` is posted; identity comes from verified claims |
-| Signature, issuer, audience, expiry, subject checked | `verifyGoogleToken()` server-side |
-| Client-side flag is not proof | `Authenticated` only after a `200` from the API |
-| No silent merge | `LINK_REQUIRED` + authenticated link endpoint (PR #16) |
-| Duplicate Google mappings prevented | `UNIQUE(provider, provider_id)` + explicit guards |
-| No secret in the APK | Only the public client id; `GOOGLE_CLIENT_SECRET` stays server-side |
-| Token stored encrypted | Part 3 `SessionVault` (Keystore AES-GCM) |
-
----
-
-## 6. Defects found and fixed during this part
-
-1. **Debug SHA-1 changed on every build** — no signing config and no keystore
-   cache. Fixed by caching the debug keystore; fingerprint is now stable.
-2. **Debug SHA-1 still unstable** — the keystore cache was tried and did not
-   hold; see §1.1. Pinning via a secret is the remaining fix.
-3. **Missing `LaunchedEffect` import** — the availability probe did not compile.
-4. **`NotConfigured` is a data class** — `when` branches needed `is`.
-5. **Test fakes not updated** for the widened `AuthApi`.
-6. **Illegal `:` in a test name** — rejected by the JVM method-name rule.
-
----
-
-## 7. Exact blockers (owner action)
-
-1. **Pin the debug signing key** — add the `ANDROID_DEBUG_KEYSTORE_BASE64`
-   repository secret (commands in the workflow). Without it the SHA-1 changes on
-   every build and any registered OAuth client breaks on the next one.
-2. **Create the Android OAuth client** — Google Cloud Console → Credentials →
-   Android client, package `com.velnox.app`, and the SHA-1 that a pinned build
-   prints.
-3. **Supply the Web client id** — either merge PR #16 (the app then reads it from
-   `config`) or build with `-PvelnoxGoogleClientId=<web-client-id>`.
-4. **Confirm `MOBILE_GOOGLE_CLIENT_ID` on Render equals that same Web client id**,
-   or every token is rejected with `INVALID_GOOGLE_TOKEN`.
-5. **Configure the OAuth consent screen** — in Testing mode only listed test users
-   can sign in.
-6. **Merge PR #16** to make `LINK_REQUIRED` and `/api/auth/mobile/link` live.
-   Until then the deployed backend still auto-links.
-
-Detailed steps: `.ai/GOOGLE_SETUP.md`.
-
----
-
-## 8. Remaining issues
-
-1. Google Sign-In is **not usable end to end** until blockers 1–3 are resolved.
-2. The app currently shows "not configured" because `config` does not yet return
-   `googleClientId` — correct behaviour, not a bug.
-3. No device verification of the Credential Manager sheet, or of the new
-   messages, on hardware.
-4. LINE is still an entry point only (its own part).
-5. Existing JWTs still survive a password reset (Part 4 note, unchanged).
+What *is* now true: the persisted-session link — which was broken for every user
+of the app — works and is tested. The Neon link works and is verified against the
+real database for the password path. The verification link is extracted, hardened
+and covered by 17 tests.

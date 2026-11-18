@@ -2,7 +2,7 @@
 
 > Scope: how the Android app proves who the user is. Companion to
 > `.ai/AI_HANDOFF.md` and `.ai/reports/LATEST.md`.
-> Last updated: 2026-11-18 (Part 5).
+> Last updated: 2026-11-18 (Part 5.1).
 
 ---
 
@@ -38,6 +38,7 @@ AuthRemoteDataSource     SessionManager            ← token owner (core/session
 | Repository | `core/auth/AuthRepository.kt` | Only `200` from the API makes a session; unreachable API is never success. |
 | Session manager | `core/session/SessionManager.kt` | One in-memory token; `exp` read for pre-emptive expiry only. |
 | Secure storage | `core/session/SessionVault.kt` | AES-256-GCM with a Keystore key; ciphertext on disk only. |
+| File protocol | `core/session/SessionFileStore.kt` | temp-file-then-rename, unit-testable. Replace this ordering and persistence silently breaks. |
 | State holder | `core/session/SessionController.kt` | The four states; the only writer of them. |
 | Nav policy | `navigation/AccessPolicy.kt` | Which destinations need a session. |
 
@@ -188,6 +189,11 @@ The backend verifies signature, issuer, audience, expiry, `azp`, `email_verified
 and subject before any session exists.
 
 `Authenticated` still requires a `200` from the API — the same rule as email.
+
+Claim validation lives in `backend/lib/google-identity.ts` as a pure function of
+`(claims, expectedAudience, nowMs)`: audience, issuer, expiry, `azp`,
+`email_verified`, and `sub` as the identity key. 17 tests cover it. It is **not
+deployed** until PR #16 merges.
 
 An existing account with the same email is **not** merged. The API answers
 `409 LINK_REQUIRED`; the user signs in with their password, then calls

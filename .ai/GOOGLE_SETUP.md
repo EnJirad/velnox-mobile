@@ -46,6 +46,15 @@ Two OAuth clients are involved and they are **not interchangeable**:
 
 ---
 
+## 2.1 What was verified in Part 5.1
+
+| Claim | Verified? |
+|---|---|
+| Session token storage works | **Yes** — `SessionVault.write()` was broken (it deleted its own temp file, so every save threw); fixed and covered by `SessionFileStoreTest`. |
+| Backend claim validation rules | **Yes** — 17 tests in `backend/tests/google-identity.test.ts`. |
+| Backend verifies real tokens | **Yes, negatively** — a forged token returns `401 INVALID_GOOGLE_TOKEN`. |
+| A real Google token completes the flow | **No.** No Android OAuth client exists and no Web client id reaches the app. |
+
 ## 3. Required owner actions
 
 ### 3.1 Pin the signing key first
