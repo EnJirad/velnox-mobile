@@ -2,7 +2,7 @@
 
 > Scope: how the Android app proves who the user is. Companion to
 > `.ai/AI_HANDOFF.md` and `.ai/reports/LATEST.md`.
-> Last updated: 2026-11-18 (Part 3).
+> Last updated: 2026-11-18 (Part 4).
 
 ---
 
@@ -131,7 +131,9 @@ If the backend later returns `data.token`, only `captureSession()` changes.
 | POST | `/api/auth/mobile/register` | none (5/min) | create customer → session cookie (UI in Part 4) |
 | POST | `/api/auth/mobile/google` | none (10/min) | Google ID token → session (Part 6) |
 | POST | `/api/auth/mobile/line` | none (10/min) | LINE ID token → session (Part 6) |
-| GET | `/api/auth/mobile/config` | none | `{google, line}` availability probe |
+| GET | `/api/auth/mobile/config` | none | `{google, line, email}` availability probe |
+| POST | `/api/auth/forgot-password` | none (3/15min) | uniform reset request — **PR #15, not deployed** |
+| POST | `/api/auth/reset-password` | none (5/15min) | consume a reset token — **PR #15, not deployed** |
 | GET | `/api/auth/me` | Bearer or cookie | validate session, return account |
 | POST | `/api/auth/logout` | Bearer or cookie | revoke `jti`, clear cookie |
 
@@ -149,6 +151,8 @@ redirect flow).
 | 401 on `/me` | `Unauthorized` | → `ExpiredSession` |
 | 409 `EMAIL_EXISTS` | `EmailExists` | Part 4 registration |
 | 409 `ACCOUNT_CONFLICT` | `AccountConflict` | Part 6 linking |
+| 503 `EMAIL_NOT_CONFIGURED` | `EmailNotConfigured` | "reset email is not available yet" |
+| 400 `INVALID_RESET_TOKEN` | `InvalidResetToken` | "that link is invalid or expired" |
 | 403 `ACCOUNT_DISABLED` | `AccountDisabled` | "This account is disabled" |
 | 400 `VALIDATION_ERROR` | `Validation` | "Check your details" |
 | 429 | `RateLimited` | "Too many attempts" |
@@ -157,12 +161,28 @@ redirect flow).
 
 ---
 
-## 7. Not implemented yet
+## 7. The authentication gate
+
+The gate is one destination with four steps (`AuthStep`), so the reason card and
+the pending destination survive moving between them:
+
+```
+requestTab / requestOverlay (protected, not Authenticated)
+        └─▶ Login ──┬─▶ Register ──┐
+                    ├─▶ Forgot ──▶ Reset
+                    └──────────────┴─▶ success ⇒ Authenticated ⇒ pending destination applied
+```
+
+Back inside the gate returns to sign-in before it leaves the gate, so a user who
+opened Sign up by mistake does not lose the destination they were reaching for.
+
+## 8. Not implemented yet
 
 - **Google and LINE provider flows** (Part 6). Server side is ready; the app has
-  no SDK and no ID-token source.
-- **Registration UI** (Part 4). `AuthApi.register` and
-  `AuthRepository.register` exist and are tested; no screen calls them.
+  no SDK and no ID-token source. The buttons exist and say so.
+- **Password recovery delivery** — endpoints are in PR #15 (not deployed) and no
+  mail transport is configured.
+- **Refresh tokens** — the backend has none.
 - **Refresh tokens** — the backend has none. Sessions are 7-day JWTs; the app
   reports `ExpiredSession` and asks the user to sign in again.
 - **Logout-everywhere / device list** — no endpoint; `revoked_tokens` is per `jti`.

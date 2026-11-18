@@ -1,13 +1,13 @@
 # AI_HANDOFF.md — Velnox Mobile Current Snapshot
 
-> **Current snapshot (not a log).** Supersedes the Part 2 snapshot, archived
-> verbatim in `.ai/history/20261118_155500_AI_HANDOFF_before_part3.md`.
+> **Current snapshot (not a log).** Supersedes the Part 3 snapshot, archived
+> verbatim in `.ai/history/20261118_164500_AI_HANDOFF_before_part4.md`.
 > Statuses: **VERIFIED / UNVERIFIED / FAILED / BLOCKED / SKIPPED / NOT TESTED**.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Current State (2026-11-18, commit `8bea21f`, run 44261281798)
+## Current State (2026-11-18, commit `55ee97c`, run 44269003139)
 
 | Area | Status | Notes |
 |------|--------|-------|
@@ -20,12 +20,16 @@
 | Sign-out | **VERIFIED (unit tests)** | Clears storage first, then revokes best-effort |
 | Invalid session | **VERIFIED (unit tests)** | 401 → token cleared → `ExpiredSession` |
 | Offline restore | **VERIFIED (unit tests)** | `Guest` + notice; token kept; never authenticated |
-| Email sign-in | **VERIFIED (API contract + tests)** | Live `401 INVALID_CREDENTIALS` maps correctly; **success path has no live account to test** |
-| Google / LINE | **NOT IMPLEMENTED** | Part 6; server side ready (`google:true, line:false`) |
-| Registration UI | **NOT IMPLEMENTED** | Part 4; repository call exists and is tested |
+| Email sign-in | **VERIFIED (live)** | Real login against `velnox-api.onrender.com` returned 200 + session cookie; Bearer `/api/auth/me` returned the account |
+| Registration | **VERIFIED (live)** | Real account created (201); duplicate → 409, weak password → 400 |
+| Logout + revocation | **VERIFIED (live)** | Bearer logout 200, then `/api/auth/me` → 401 "Session revoked" |
+| Forgot / reset password | **BLOCKED (not deployed)** | Backend PR #15 open; live API answers 404. Client half unit-tested |
+| Google / LINE | **ENTRY POINTS ONLY** | Buttons explain "coming soon"; Part 6. `line:false` |
+| Login / Register UI | **VERIFIED (compile)** | Shared components; consent-gated register; strength meter |
 | Guest gate | **VERIFIED (unit tests)** | `AccessPolicy`; unknown routes fail closed |
-| Unit tests | **VERIFIED (CI)** | 41 tests, 5 classes, green in run 44261281798 |
-| APK | **VERIFIED (CI)** | 10,564,666 bytes, integrity OK |
+| Unit tests | **VERIFIED (CI)** | 57 tests, 6 classes, green in run 44269003139 |
+| APK | **VERIFIED (CI)** | 10,637,196 bytes, integrity OK |
+| Localisation | **VERIFIED (packaged)** | 357 keys × th/en/my, identical sets, no duplicates |
 | On-device runtime | **NOT TESTED** | No install route; Keystore and UI unverified on hardware |
 
 Architecture detail: **`.ai/ARCHITECTURE_AUTH.md`**. Evidence: `.ai/reports/LATEST.md`.
@@ -88,9 +92,10 @@ WebView, no invented token.
   `SessionStore`, `SessionController`, `SessionProvider` rewritten for the four
   states.
 - `navigation/AccessPolicy.kt`: `isAllowed`, `reasonFor`, `LoginReason.Expired`.
-- `navigation/VelnoxApp.kt`: real credential submit, error mapping, status pill.
-- `feature/auth/LoginScreen.kt`: `onSubmit`/`isSubmitting`/`errorRes`, error banner,
-  demo delay removed.
+- `feature/auth/`: `AuthComponents.kt`, `CredentialRules.kt`, `RegisterScreen.kt`,
+  `ForgotPasswordScreen.kt` (new); `LoginScreen.kt` rebuilt on the shared pieces.
+- `navigation/VelnoxApp.kt`: real credential submit, registration, recovery, and a
+  four-step gate (`AuthStep`) that keeps the reason and the pending destination.
 - `AndroidManifest.xml`: `INTERNET`, backup rules. `app/build.gradle.kts`: OkHttp,
   test deps, `API_BASE_URL`, `buildConfig = true`.
 - `.github/workflows/gradle-build.yml`: unit-test step, failure annotations, test
@@ -102,12 +107,17 @@ WebView, no invented token.
 
 ## Known issues
 
+- **Password recovery is not live.** Backend PR
+  [velnox-marketplace#15](https://github.com/EnJirad/velnox-marketplace/pull/15)
+  adds `/api/auth/forgot-password` and `/api/auth/reset-password` but is not
+  merged, and `password_reset_tokens` is not created. Until then those calls 404
+  and the app reports a generic failure. A mail transport (`RESEND_API_KEY`,
+  `MAIL_FROM`) is also required, or the endpoint answers 503.
+- **A password reset does not invalidate existing JWTs** — no session-version
+  mechanism; sessions end at 7-day expiry.
 - **No refresh token** (no backend endpoint). Sessions last 7 days, then
   `ExpiredSession` → sign in again.
-- **Google / LINE not in the app** (Part 6). No SDK, no ID-token source. LINE is
-  unconfigured on the server (`line:false`).
-- **Registration UI missing** (Part 4); `AuthRepository.register` exists, tested,
-  unreachable.
+- **Google / LINE are entry points only** (Part 6). No SDK, no ID-token source.
 - **Profile/Settings still demo data**; the real account is in
   `SessionState.Authenticated.user` but unused.
 - **`onUnauthorized()` has no caller** until an authenticated feature call exists.
@@ -138,4 +148,4 @@ The app embeds only the public API origin (`BuildConfig.API_BASE_URL`).
 ## Signature
 
 > This handoff supersedes the previous snapshots.
-> **Last updated:** 2026-11-18 by the Part 3 authentication-foundation session.
+> **Last updated:** 2026-11-18 by the Part 4 registration and login session.
