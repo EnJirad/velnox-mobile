@@ -369,7 +369,7 @@
     <string name="placeholder_checkout">Checkout</string>
     <string name="placeholder_generic">This screen</string>
     <string name="placeholder_body">This screen opens in the next phase, once a backend is connected.</string>
-    <string name="catalog_error_title">Couldn't load products</string>
+    <string name="catalog_error_title">Couldn\'t load products</string>
     <string name="catalog_error_body">Check your connection and try again</string>
     <string name="catalog_empty_title">No products yet</string>
     <string name="catalog_empty_body">Products appear here as sellers publish them</string>
@@ -381,6 +381,6 @@
     <string name="product_stock_left">%1$d left</string>
     <string name="product_sold">%1$d sold</string>
     <string name="product_description_title">Product details</string>
-    <string name="product_unavailable_title">This product isn't available</string>
+    <string name="product_unavailable_title">This product isn\'t available</string>
     <string name="product_unavailable_body">It may have been removed or is no longer published</string>
 </resources>
