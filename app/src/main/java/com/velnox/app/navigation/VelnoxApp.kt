@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.velnox.app.AuthState
 import com.velnox.app.core.i18n.VelnoxLocaleProvider
 import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.preferences.ThemeMode
@@ -39,14 +40,12 @@ import com.velnox.app.ui.theme.VelnoxTheme
  * Application root.
  *
  * Preference → locale → theme is a strict chain: a language change recomposes
- * the tree with a localized context, and an appearance change swaps the colour
- * scheme. Neither recreates the activity.
+ * the tree with a locale-swapped context; a theme change re-reads the
+ * resolution (Light / Dark / System) from DataStore through the same flow.
  */
 @Composable
 fun VelnoxApp() {
-    VelnoxPreferencesProvider {
-        val preferences = LocalPreferences.current.current
-
+    VelnoxPreferencesProvider { preferences ->
         VelnoxLocaleProvider(language = preferences.language) {
             val darkTheme = when (preferences.themeMode) {
                 ThemeMode.LIGHT -> false
@@ -63,22 +62,30 @@ fun VelnoxApp() {
 /**
  * Session and navigation state.
  *
- * Phase 2 has no authentication: `signedIn` is a demo gate that starts false and
- * is never persisted, so a cold start always lands on Login. Phase 3 replaces
- * this flag with resolved auth state; the destinations and Back handling below
- * do not change.
+ * The app starts in Guest mode: Home and browsing are visible without
+ * authentication. Protected tabs (Orders, Cart, Profile, Messages) and
+ * account-only actions redirect to Login.
  */
 @Composable
 private fun VelnoxNavHost() {
-    var signedIn by rememberSaveable { mutableStateOf(false) }
+    var authState by rememberSaveable { mutableStateOf(AuthState.Guest.name) }
     var tabKey by rememberSaveable { mutableStateOf(AppTab.Home.key) }
     var overlayKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingTabKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var showLoginGate by remember { mutableStateOf(false) }
 
+    val currentAuth = AuthState.entries.firstOrNull { it.name == authState } ?: AuthState.Guest
     val tab = AppTab.fromKey(tabKey)
     val cart = remember { CartState() }
     val tabStateHolder = rememberSaveableStateHolder()
 
     fun openTab(next: AppTab) {
+        // Protected tabs require authentication.
+        if (currentAuth == AuthState.Guest && next != AppTab.Home) {
+            pendingTabKey = next.key
+            showLoginGate = true
+            return
+        }
         tabKey = next.key
         overlayKey = null
     }
@@ -87,8 +94,29 @@ private fun VelnoxNavHost() {
         overlayKey = null
     }
 
-    // Child page → Settings hub / category hub → tabs → Home tab. On Home, the system exits.
-    BackHandler(enabled = signedIn && (overlayKey != null || tab != AppTab.Home)) {
+    fun onLoginSuccess() {
+        authState = AuthState.Authenticated.name
+        showLoginGate = false
+        val pending = pendingTabKey
+        pendingTabKey = null
+        if (pending != null) {
+            tabKey = pending
+        } else {
+            tabKey = AppTab.Home.key
+        }
+        overlayKey = null
+    }
+
+    fun onSignOut() {
+        overlayKey = null
+        tabKey = AppTab.Home.key
+        pendingTabKey = null
+        showLoginGate = false
+        authState = AuthState.Guest.name
+    }
+
+    // Child page → Settings hub / category hub → tabs → Home tab.
+    BackHandler(enabled = currentAuth == AuthState.Authenticated && (overlayKey != null || tab != AppTab.Home)) {
         val current = overlayKey
         when {
             current != null && current.startsWith("settings/") -> overlayKey = "settings"
@@ -104,17 +132,13 @@ private fun VelnoxNavHost() {
             .background(MaterialTheme.colorScheme.background),
     ) {
         Crossfade(
-            targetState = signedIn,
+            targetState = showLoginGate,
             animationSpec = tween(durationMillis = 260),
             label = "sessionTransition",
-        ) { isSignedIn ->
-            if (!isSignedIn) {
+        ) { loginVisible ->
+            if (loginVisible) {
                 LoginScreen(
-                    onSignedIn = {
-                        signedIn = true
-                        tabKey = AppTab.Home.key
-                        overlayKey = null
-                    },
+                    onSignedIn = { onLoginSuccess() },
                 )
             } else {
                 when (val overlay = overlayKey) {
@@ -123,6 +147,7 @@ private fun VelnoxNavHost() {
                             TabContent(
                                 tab = tab,
                                 cart = cart,
+                                authState = currentAuth,
                                 onOpenOverlay = { overlayKey = it },
                                 onOpenTab = ::openTab,
                             )
@@ -132,11 +157,7 @@ private fun VelnoxNavHost() {
                     "settings" -> SettingsScreen(
                         onBack = ::closeOverlay,
                         onOpen = { page -> overlayKey = page.key },
-                        onSignOut = {
-                            overlayKey = null
-                            tabKey = AppTab.Home.key
-                            signedIn = false
-                        },
+                        onSignOut = { onSignOut() },
                     )
 
                     "category" -> CategoryScreen(
@@ -157,8 +178,6 @@ private fun VelnoxNavHost() {
                         } else {
                             val page = SettingsPage.fromKey(overlay)
                             if (page != null) {
-                                // A child page always returns to the Settings hub; the
-                                // hub's own Back is the one that closes the overlay.
                                 SettingsDetailScreen(
                                     page = page,
                                     onBack = { overlayKey = "settings" },
@@ -191,6 +210,7 @@ private fun VelnoxNavHost() {
 private fun TabContent(
     tab: AppTab,
     cart: CartState,
+    authState: AuthState,
     onOpenOverlay: (String) -> Unit,
     onOpenTab: (AppTab) -> Unit,
 ) {

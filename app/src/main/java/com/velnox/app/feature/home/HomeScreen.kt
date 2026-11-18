@@ -351,7 +351,12 @@ private fun HomeSearchField(
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(VelnoxSpacing.sm))
-        Box(modifier = Modifier.weight(1f)) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(vertical = VelnoxSpacing.sm),
+            contentAlignment = Alignment.CenterStart,
+        ) {
             if (query.isEmpty()) {
                 Text(
                     text = stringResource(R.string.home_search_placeholder),
@@ -372,9 +377,7 @@ private fun HomeSearchField(
                 interactionSource = interactionSource,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = VelnoxSpacing.md),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
         if (query.isNotEmpty()) {
