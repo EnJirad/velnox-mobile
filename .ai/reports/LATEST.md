@@ -9,7 +9,7 @@
 ## Task: Part 5.1 — Complete Google Sign-In & Real Neon Integration
 
 **Date:** 2026-11-18
-**Start commit:** `c016be9` · **End commit:** `2dfb21b`
+**Start commit:** `c016be9` · **End commit:** `2dfb21b` (code), then docs
 **Verified CI run:** [44298776084](https://github.com/EnJirad/velnox-mobile/actions/runs/44298776084) — **success**
 **Status:** **BLOCKED on owner configuration.** A real Google identity cannot
 complete the flow, because no Android OAuth client exists and the Web client id
@@ -173,6 +173,7 @@ Fixing them is outside Part 5.1's boundary (unrelated marketplace features).
 | Real Neon duplicate/conflict handling for password accounts | 409 `EMAIL_EXISTS` (Part 4) |
 | Schema supports Google identities without migration | `UNIQUE(provider, provider_id)` verified |
 | Android CI | run 44298776084 success, APK 11,534,270 B |
+| Docs-only commit does not break the build | a docs commit failed "Build debug APK" once with no source change and passed on re-run: a transient runner failure, not a code fault |
 
 ### Implemented but not deployed
 
