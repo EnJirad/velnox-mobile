@@ -42,12 +42,6 @@
     <string name="home_trust_support">24/7 support</string>
     <string name="home_categories_title">Popular categories</string>
     <string name="home_category_all">All</string>
-    <string name="home_category_fashion">Fashion</string>
-    <string name="home_category_electronics">Electronics</string>
-    <string name="home_category_home">Home living</string>
-    <string name="home_category_beauty">Beauty</string>
-    <string name="home_category_sports">Sports</string>
-    <string name="home_category_food">Food</string>
     <string name="home_hero_badge">VELNOX SELECT</string>
     <string name="home_hero_title">The new season collection</string>
     <string name="home_hero_body">Quiet design, selected from verified sellers only.</string>
@@ -61,7 +55,6 @@
     <string name="home_popular_subtitle">What shoppers choose most</string>
     <string name="home_new_title">New arrivals</string>
     <string name="home_see_all">See all</string>
-    <string name="home_preview_note">Sample data for design preview only · no store connection yet</string>
     <string name="home_quick_orders">Orders</string>
     <string name="home_quick_wishlist">Wishlist</string>
     <string name="home_quick_cart">Cart</string>
@@ -73,19 +66,10 @@
     <string name="product_2_store">Aural Labs</string>
     <string name="product_3_name">Minimal leather tote</string>
     <string name="product_3_store">Nord Studio</string>
-    <string name="product_4_name">Swiss dial watch</string>
-    <string name="product_4_store">Tide &amp; Co.</string>
     <string name="product_5_name">Round ceramic mug</string>
     <string name="product_5_store">Clay Works</string>
     <string name="product_6_name">LED desk lamp</string>
     <string name="product_6_store">Lumen House</string>
-    <string name="product_7_name">Lightweight running shoes</string>
-    <string name="product_7_store">Stride</string>
-    <string name="product_8_name">Gentle care serum</string>
-    <string name="product_8_store">Botanica</string>
-    <string name="product_tag_new">New</string>
-    <string name="product_tag_popular">Popular</string>
-    <string name="product_tag_editor">Curated</string>
 
     <!-- ═════════════════════════════ messages ═════════════════════════════ -->
     <string name="messages_title">Messages</string>
@@ -385,4 +369,18 @@
     <string name="placeholder_checkout">Checkout</string>
     <string name="placeholder_generic">This screen</string>
     <string name="placeholder_body">This screen opens in the next phase, once a backend is connected.</string>
+    <string name="catalog_error_title">Couldn't load products</string>
+    <string name="catalog_error_body">Check your connection and try again</string>
+    <string name="catalog_empty_title">No products yet</string>
+    <string name="catalog_empty_body">Products appear here as sellers publish them</string>
+    <string name="catalog_load_more">Load more</string>
+    <string name="category_product_count">%1$d products</string>
+    <string name="product_out_of_stock">Out of stock</string>
+    <string name="product_in_stock">In stock</string>
+    <string name="product_per_unit">per %1$s</string>
+    <string name="product_stock_left">%1$d left</string>
+    <string name="product_sold">%1$d sold</string>
+    <string name="product_description_title">Product details</string>
+    <string name="product_unavailable_title">This product isn't available</string>
+    <string name="product_unavailable_body">It may have been removed or is no longer published</string>
 </resources>

@@ -42,12 +42,6 @@
     <string name="home_trust_support">၂၄ နာရီ အကူအညီ</string>
     <string name="home_categories_title">လူကြိုက်များသော အမျိုးအစားများ</string>
     <string name="home_category_all">အားလုံး</string>
-    <string name="home_category_fashion">ဖက်ရှင်</string>
-    <string name="home_category_electronics">အီလက်ထရောနစ်</string>
-    <string name="home_category_home">အိမ်သုံးပစ္စည်း</string>
-    <string name="home_category_beauty">အလှပြင်ဆေး</string>
-    <string name="home_category_sports">အားကစား</string>
-    <string name="home_category_food">အစားအသောက်</string>
     <string name="home_hero_badge">VELNOX SELECT</string>
     <string name="home_hero_title">ရာသီအသစ် ကုန်စည်းစု</string>
     <string name="home_hero_body">သန့်ရှင်းသော ဒီဇိုင်း၊ စစ်ဆေးပြီး ရောင်းချသူများထံမှ ရွေးချယ်ထားသည်</string>
@@ -61,7 +55,6 @@
     <string name="home_popular_subtitle">အများဆုံး ရွေးချယ်ကြသော ပစ္စည်းများ</string>
     <string name="home_new_title">အသစ်ဝင်ရောက်မှုများ</string>
     <string name="home_see_all">အားလုံးကြည့်ရန်</string>
-    <string name="home_preview_note">ဒီဇိုင်းပြသရန် နမူနာဒေတာသာ · စတိုးစနစ်နှင့် မချိတ်ဆက်ရသေးပါ</string>
     <string name="home_quick_orders">အမှာစာများ</string>
     <string name="home_quick_wishlist">နှစ်သက်စာရင်း</string>
     <string name="home_quick_cart">ကုန်တောင်း</string>
@@ -73,19 +66,10 @@
     <string name="product_2_store">Aural Labs</string>
     <string name="product_3_name">သားရေ ရိုးရှင်းလက်ကိုင်အိတ်</string>
     <string name="product_3_store">Nord Studio</string>
-    <string name="product_4_name">ဆွစ်ဒိုင်ခွက် နာရီ</string>
-    <string name="product_4_store">Tide &amp; Co.</string>
     <string name="product_5_name">စက်ဝိုင်း ကြွေခွက်</string>
     <string name="product_5_store">Clay Works</string>
     <string name="product_6_name">LED စားပွဲမီးခွက်</string>
     <string name="product_6_store">Lumen House</string>
-    <string name="product_7_name">ပေါ့ပါးသော အပြေးဖိနပ်</string>
-    <string name="product_7_store">Stride</string>
-    <string name="product_8_name">နူးညံ့သော အသားအရေထိန်းဆေး</string>
-    <string name="product_8_store">Botanica</string>
-    <string name="product_tag_new">အသစ်</string>
-    <string name="product_tag_popular">လူကြိုက်များ</string>
-    <string name="product_tag_editor">ရွေးချယ်ထား</string>
 
     <!-- ═════════════════════════════ messages ═════════════════════════════ -->
     <string name="messages_title">စာများ</string>
@@ -385,4 +369,18 @@
     <string name="placeholder_checkout">ငွေပေးချေမှု</string>
     <string name="placeholder_generic">ဤစာမျက်နှာ</string>
     <string name="placeholder_body">ဤစာမျက်နှာကို နောက်အဆင့်တွင် ဖွင့်မည်</string>
+    <string name="catalog_error_title">ကုန်ပစ္စည်းများ မရယူနိုင်ပါ</string>
+    <string name="catalog_error_body">အင်တာနက် ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ</string>
+    <string name="catalog_empty_title">ကုန်ပစ္စည်း မရှိသေးပါ</string>
+    <string name="catalog_empty_body">ရောင်းချသူများ ကုန်ပစ္စည်း ထုတ်ပြန်သည့်အခါ ဤနေရာတွင် ပြပါမည်</string>
+    <string name="catalog_load_more">ထပ်မံ ကြည့်ရန်</string>
+    <string name="category_product_count">%1$d ခု</string>
+    <string name="product_out_of_stock">ကုန်သွားပါပြီ</string>
+    <string name="product_in_stock">လက်ကျန် ရှိပါသည်</string>
+    <string name="product_per_unit">%1$s လျှင်</string>
+    <string name="product_stock_left">%1$d ခု ကျန်ရှိ</string>
+    <string name="product_sold">ရောင်းချပြီး %1$d</string>
+    <string name="product_description_title">ကုန်ပစ္စည်း အသေးစိတ်</string>
+    <string name="product_unavailable_title">ဤကုန်ပစ္စည်းကို မတွေ့ပါ</string>
+    <string name="product_unavailable_body">ဖယ်ရှားခံရခြင်း သို့မဟုတ် ထုတ်ပြန်မှု ရပ်ဆိုင်းခံရခြင်း ဖြစ်နိုင်သည်</string>
 </resources>

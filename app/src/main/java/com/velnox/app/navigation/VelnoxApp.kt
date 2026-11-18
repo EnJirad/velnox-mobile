@@ -52,6 +52,8 @@ import com.velnox.app.feature.auth.RegisterScreen
 import com.velnox.app.feature.auth.ResetPasswordScreen
 import com.velnox.app.feature.cart.CartScreen
 import com.velnox.app.feature.cart.CartState
+import com.velnox.app.feature.catalog.ProductDetailScreen
+import com.velnox.app.feature.home.ALL_CATEGORY
 import com.velnox.app.feature.home.CategoryScreen
 import com.velnox.app.feature.home.HomeScreen
 import com.velnox.app.feature.messages.ConversationScreen
@@ -508,7 +510,7 @@ private fun VelnoxNavHost() {
                     "category" -> CategoryScreen(
                         initialCategoryId = null,
                         onBack = ::closeOverlay,
-                        onOpenListing = ::requestOverlay,
+                        onOpenListing = { slug -> requestOverlay("category:$slug") },
                         onOpenProduct = ::requestOverlay,
                     )
 
@@ -517,8 +519,13 @@ private fun VelnoxNavHost() {
                             CategoryScreen(
                                 initialCategoryId = overlay.removePrefix("category:"),
                                 onBack = { overlayKey = "category" },
-                                onOpenListing = ::requestOverlay,
+                                onOpenListing = { slug -> requestOverlay("category:$slug") },
                                 onOpenProduct = ::requestOverlay,
+                            )
+                        } else if (overlay.startsWith("product:")) {
+                            ProductDetailScreen(
+                                productId = overlay.removePrefix("product:"),
+                                onBack = ::closeOverlay,
                             )
                         } else {
                             val page = SettingsPage.fromKey(overlay)
@@ -646,7 +653,14 @@ private fun TabContent(
     when (tab) {
         AppTab.Home -> HomeScreen(
             onOpenCategoryHub = { onOpenOverlay("category") },
-            onOpenListing = { onOpenOverlay("category:$it") },
+            onOpenListing = { categoryId ->
+                // "All" is the hub, not a category of its own.
+                if (categoryId == ALL_CATEGORY) {
+                    onOpenOverlay("category")
+                } else {
+                    onOpenOverlay("category:$categoryId")
+                }
+            },
             onOpenProduct = { onOpenOverlay("product:$it") },
         )
 

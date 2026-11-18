@@ -88,15 +88,42 @@ import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import coil.compose.AsyncImage
+import com.velnox.app.VelnoxApplication
+import com.velnox.app.core.catalog.CatalogCategory
+import com.velnox.app.core.catalog.CatalogPage
+import com.velnox.app.core.catalog.CatalogProduct
+import com.velnox.app.core.catalog.CatalogQuery
+import com.velnox.app.core.catalog.CatalogResult
+import com.velnox.app.core.catalog.PriceFormat
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+/** Chip id for "All". The API is asked for every category when this is selected. */
+internal const val ALL_CATEGORY = "all"
+
+/** How long typing must pause before the query is sent to the server. */
+private const val SEARCH_DEBOUNCE_MS = 300L
+
+/** How many products the horizontal featured rail shows. */
+private const val FEATURED_LIMIT = 6
 
 /**
  * Velnox Home — a fixed toolbar over one coherent lazy feed.
  *
  * Order: fixed search toolbar → seasonal banner → sticky Popular Categories →
- * featured rail → complete local product feed. Search filters the same feed
- * locally; category chips filter it in place. The toolbar never scrolls, and
- * the category header pins to the bottom edge of the toolbar until the user
- * returns toward the seasonal banner.
+ * featured rail → the live product feed. The catalogue comes from the deployed
+ * Velnox API (`/api/products/catalog`, `/api/categories/tree`); search is sent to
+ * the server after a short debounce and category chips become the `category`
+ * query parameter, so the app never downloads the whole database.
+ *
+ * Every state is explicit. A failed request shows a retry card, never a
+ * placeholder product: the app has no demo catalogue to fall back to.
  */
 @Composable
 fun HomeScreen(
@@ -104,29 +131,80 @@ fun HomeScreen(
     onOpenListing: (String) -> Unit,
     onOpenProduct: (String) -> Unit,
     modifier: Modifier = Modifier,
-    catalog: CatalogSource = HomeCatalog,
 ) {
-    val context = LocalContext.current
+    val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
+    val isThai = LocalConfiguration.current.locales[0].language == "th"
+
     var query by rememberSaveable { mutableStateOf("") }
-    var selectedCategory by rememberSaveable { mutableStateOf(HomeCatalog.ALL_CATEGORY) }
+    var debouncedQuery by remember { mutableStateOf("") }
+    var selectedCategory by rememberSaveable { mutableStateOf(ALL_CATEGORY) }
+    var categories by remember { mutableStateOf<List<CatalogCategory>>(emptyList()) }
+    var feed by remember { mutableStateOf<HomeFeed>(HomeFeed.Loading) }
+    var reloadKey by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
-    val searchResults = remember(query, context, catalog) {
-        if (query.isBlank()) emptyList() else catalog.search(query, context)
-    }
-    val isSearching = query.isNotBlank()
-    val products = remember(isSearching, selectedCategory, searchResults, catalog) {
-        if (isSearching) searchResults else catalog.productsIn(selectedCategory)
-    }
-    val selectedCategoryLabel = catalog.categories()
-        .firstOrNull { it.id == selectedCategory }
-        ?.label
-        ?.let { stringResource(it) }
-        ?: stringResource(R.string.home_all_products_title)
-    val categories = remember(catalog) { catalog.categories() }
-
+    // Typing must not fire one request per keystroke.
     LaunchedEffect(query) {
+        if (debouncedQuery == query) return@LaunchedEffect
+        delay(SEARCH_DEBOUNCE_MS)
+        debouncedQuery = query
+    }
+
+    LaunchedEffect(debouncedQuery, selectedCategory, reloadKey) {
+        feed = HomeFeed.Loading
         if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(0)
+
+        if (categories.isEmpty()) {
+            val loaded = catalog.categories()
+            if (loaded is CatalogResult.Ok) categories = loaded.value
+        }
+
+        feed = catalog.products(
+            CatalogQuery(
+                search = debouncedQuery.takeIf { it.isNotBlank() },
+                category = selectedCategory.takeIf { it != ALL_CATEGORY },
+            ),
+        ).toFeed()
+    }
+
+    val isSearching = query.isNotBlank()
+    val selectedCategoryLabel = categories
+        .firstOrNull { it.slug == selectedCategory }
+        ?.let { category -> if (isThai) category.displayName ?: category.name else category.name }
+        ?: stringResource(R.string.home_all_products_title)
+
+    fun loadMore() {
+        val current = feed as? HomeFeed.Content ?: return
+        if (!current.hasMore || current.loadingMore) return
+        feed = current.copy(loadingMore = true)
+        scope.launch {
+            val next = catalog.products(
+                CatalogQuery(
+                    search = debouncedQuery.takeIf { it.isNotBlank() },
+                    category = selectedCategory.takeIf { it != ALL_CATEGORY },
+                    offset = current.items.size,
+                ),
+            )
+            feed = when (next) {
+                is CatalogResult.Ok -> current.copy(
+                    items = current.items + next.value.items,
+                    hasMore = next.value.hasMore,
+                    loadingMore = false,
+                )
+                // Keep what is already on screen; the retry row stays available.
+                is CatalogResult.Failed -> current.copy(loadingMore = false, hasMore = false)
+            }
+        }
+    }
+
+    fun retry() {
+        scope.launch {
+            // A retry must actually ask the server again.
+            catalog.invalidate()
+            categories = emptyList()
+            reloadKey++
+        }
     }
 
     Column(
@@ -163,7 +241,7 @@ fun HomeScreen(
                 if (!isSearching) {
                     item(key = "seasonal", contentType = "seasonal") {
                         SeasonalBanner(
-                            onClick = { onOpenListing(HomeCatalog.ALL_CATEGORY) },
+                            onClick = { onOpenCategoryHub() },
                             modifier = Modifier.padding(
                                 start = PageGutter,
                                 top = VelnoxSpacing.md,
@@ -174,110 +252,189 @@ fun HomeScreen(
                     }
 
                     // Sticky: pins directly below the fixed toolbar.
-                    stickyHeader(key = "popular-categories", contentType = "categories") {
+                    stickyHeader(key = "categories", contentType = "categories") {
                         PopularCategoriesHeader(
                             categories = categories,
                             selectedCategory = selectedCategory,
                             onSelectCategory = { selectedCategory = it },
                             onOpenCategories = onOpenCategoryHub,
-                        )
-                    }
-
-                    item(key = "trust", contentType = "trust") {
-                        Box(Modifier.padding(horizontal = PageGutter, vertical = VelnoxSpacing.md)) {
-                            TrustRow()
-                        }
-                    }
-
-                    item(key = "featured", contentType = "section") {
-                        FeaturedSection(
-                            products = catalog.productsIn(selectedCategory).take(6),
-                            onOpenProduct = onOpenProduct,
-                            onSeeAll = { onOpenListing(selectedCategory) },
-                        )
-                    }
-
-                    item(key = "feed-header", contentType = "section") {
-                        SectionHeader(
-                            title = if (selectedCategory == HomeCatalog.ALL_CATEGORY) {
-                                stringResource(R.string.home_all_products_title)
-                            } else {
-                                selectedCategoryLabel
-                            },
-                            modifier = Modifier.padding(
-                                start = PageGutter,
-                                top = VelnoxSpacing.lg,
-                                end = PageGutter,
-                                bottom = VelnoxSpacing.sm,
-                            ),
+                            isThai = isThai,
                         )
                     }
                 } else {
                     item(key = "search-header", contentType = "section") {
-                        Column(
+                        Text(
+                            text = stringResource(R.string.home_search_results_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.padding(
                                 start = PageGutter,
                                 top = VelnoxSpacing.lg,
                                 end = PageGutter,
                                 bottom = VelnoxSpacing.sm,
                             ),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.home_search_results_title),
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onBackground,
-                            )
-                        }
+                        )
                     }
                 }
 
-                if (products.isEmpty()) {
-                    item(key = "empty", contentType = "empty") {
+                when (val current = feed) {
+                    HomeFeed.Loading -> item(key = "loading", contentType = "state") {
+                        LoadingRow()
+                    }
+
+                    HomeFeed.Error -> item(key = "error", contentType = "state") {
                         EmptyState(
-                            icon = if (isSearching) VelnoxIcons.Search else VelnoxIcons.Tag,
-                            title = stringResource(
-                                if (isSearching) R.string.home_search_no_results_title
-                                else R.string.home_category_empty_title
-                            ),
-                            body = stringResource(
-                                if (isSearching) R.string.home_search_no_results_body
-                                else R.string.home_category_empty_body
-                            ),
+                            icon = VelnoxIcons.EyeOff,
+                            title = stringResource(R.string.catalog_error_title),
+                            body = stringResource(R.string.catalog_error_body),
+                            actionLabel = stringResource(R.string.common_retry),
+                            onAction = { retry() },
+                        )
+                    }
+
+                    HomeFeed.Empty -> item(key = "empty", contentType = "state") {
+                        EmptyState(
+                            icon = VelnoxIcons.Search,
+                            title = if (isSearching) {
+                                stringResource(R.string.home_search_no_results_title)
+                            } else {
+                                stringResource(R.string.catalog_empty_title)
+                            },
+                            body = if (isSearching) {
+                                stringResource(R.string.home_search_no_results_body)
+                            } else {
+                                stringResource(R.string.catalog_empty_body)
+                            },
                             actionLabel = if (isSearching) {
                                 stringResource(R.string.home_search_clear)
                             } else {
-                                stringResource(R.string.home_all_products_title)
+                                null
                             },
-                            onAction = {
-                                if (isSearching) {
-                                    query = ""
-                                } else {
-                                    selectedCategory = HomeCatalog.ALL_CATEGORY
-                                }
+                            onAction = if (isSearching) {
+                                { query = "" }
+                            } else {
+                                null
                             },
                         )
                     }
-                } else {
-                    productRows(
-                        products = products,
-                        columns = columns,
-                        onOpenProduct = onOpenProduct,
-                    )
-                }
 
-                item(key = "preview-note", contentType = "note") {
-                    Text(
-                        text = stringResource(R.string.home_preview_note),
-                        style = Text2xs,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(
-                            start = PageGutter,
-                            top = VelnoxSpacing.lg,
-                            end = PageGutter,
-                        ),
-                    )
+                    is HomeFeed.Content -> {
+                        if (!isSearching && selectedCategory == ALL_CATEGORY) {
+                            item(key = "featured", contentType = "section") {
+                                FeaturedSection(
+                                    products = current.items.take(FEATURED_LIMIT),
+                                    onOpenProduct = onOpenProduct,
+                                    onSeeAll = { onOpenListing(ALL_CATEGORY) },
+                                )
+                            }
+                            item(key = "trust", contentType = "trust") {
+                                Box(
+                                    Modifier.padding(
+                                        horizontal = PageGutter,
+                                        vertical = VelnoxSpacing.md,
+                                    ),
+                                ) {
+                                    TrustRow()
+                                }
+                            }
+                            item(key = "feed-header", contentType = "section") {
+                                SectionHeader(
+                                    title = stringResource(R.string.home_all_products_title),
+                                    modifier = Modifier.padding(
+                                        start = PageGutter,
+                                        top = VelnoxSpacing.lg,
+                                        end = PageGutter,
+                                        bottom = VelnoxSpacing.sm,
+                                    ),
+                                )
+                            }
+                        } else if (!isSearching) {
+                            item(key = "category-header", contentType = "section") {
+                                SectionHeader(
+                                    title = selectedCategoryLabel,
+                                    modifier = Modifier.padding(
+                                        start = PageGutter,
+                                        top = VelnoxSpacing.lg,
+                                        end = PageGutter,
+                                        bottom = VelnoxSpacing.sm,
+                                    ),
+                                )
+                            }
+                        }
+
+                        productRows(
+                            products = current.items,
+                            columns = columns,
+                            onOpenProduct = onOpenProduct,
+                        )
+
+                        if (current.hasMore) {
+                            item(key = "load-more", contentType = "state") {
+                                LoadMoreRow(
+                                    loading = current.loadingMore,
+                                    onLoadMore = { loadMore() },
+                                )
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+/** The state of the Home feed. One of these is always true; there is no default. */
+private sealed interface HomeFeed {
+    data object Loading : HomeFeed
+    data object Empty : HomeFeed
+    data object Error : HomeFeed
+    data class Content(
+        val items: List<CatalogProduct>,
+        val hasMore: Boolean,
+        val loadingMore: Boolean = false,
+    ) : HomeFeed
+}
+
+private fun CatalogResult<CatalogPage>.toFeed(): HomeFeed = when (this) {
+    is CatalogResult.Failed -> HomeFeed.Error
+    is CatalogResult.Ok -> when {
+        value.items.isEmpty() -> HomeFeed.Empty
+        else -> HomeFeed.Content(items = value.items, hasMore = value.hasMore)
+    }
+}
+
+@Composable
+private fun LoadingRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+    }
+}
+
+@Composable
+private fun LoadMoreRow(loading: Boolean, onLoadMore: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = VelnoxSpacing.md),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+        } else {
+            Text(
+                text = stringResource(R.string.catalog_load_more),
+                style = TextXs.copy(fontWeight = FontWeight.Medium),
+                color = VelnoxBrand,
+                modifier = Modifier
+                    .clip(Squircle)
+                    .velnoxClickable(role = Role.Button, onClick = onLoadMore)
+                    .padding(horizontal = VelnoxSpacing.lg, vertical = VelnoxSpacing.sm),
+            )
         }
     }
 }
@@ -512,10 +669,11 @@ private fun NotificationBell(notifications: List<HomeNotification>) {
 
 @Composable
 private fun PopularCategoriesHeader(
-    categories: List<Category>,
+    categories: List<CatalogCategory>,
     selectedCategory: String,
     onSelectCategory: (String) -> Unit,
     onOpenCategories: () -> Unit,
+    isThai: Boolean,
 ) {
     Column(
         modifier = Modifier
@@ -555,11 +713,22 @@ private fun PopularCategoriesHeader(
             horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
             modifier = Modifier.padding(bottom = VelnoxSpacing.sm),
         ) {
-            items(categories, key = { it.id }, contentType = { "category" }) { category ->
+            item(key = ALL_CATEGORY, contentType = { "category" }) {
                 CategoryChip(
-                    category = category,
-                    selected = category.id == selectedCategory,
-                    onClick = { onSelectCategory(category.id) },
+                    icon = VelnoxIcons.Grid,
+                    label = stringResource(R.string.home_category_all),
+                    selected = selectedCategory == ALL_CATEGORY,
+                    onClick = { onSelectCategory(ALL_CATEGORY) },
+                )
+            }
+            // Only categories the backend reports as holding published products,
+            // so a chip can never open an empty listing.
+            items(categories, key = { it.slug }, contentType = { "category" }) { category ->
+                CategoryChip(
+                    icon = categoryIcon(category.slug),
+                    label = if (isThai) category.displayName ?: category.name else category.name,
+                    selected = category.slug == selectedCategory,
+                    onClick = { onSelectCategory(category.slug) },
                 )
             }
         }
@@ -569,7 +738,8 @@ private fun PopularCategoriesHeader(
 
 @Composable
 private fun CategoryChip(
-    category: Category,
+    icon: ImageVector,
+    label: String,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -599,20 +769,34 @@ private fun CategoryChip(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = category.icon,
+            imageVector = icon,
             contentDescription = null,
             tint = if (selected) VelnoxBrand else content,
             modifier = Modifier.size(15.dp),
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            text = stringResource(category.label),
+            text = label,
             style = TextXs.copy(fontWeight = FontWeight.Medium),
             color = content,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+/**
+ * The backend returns a Lucide icon name per category (`plug`, `shirt`, …).
+ * This map is presentation only: an unknown name never invents a category, it
+ * just falls back to the neutral tag glyph.
+ */
+internal fun categoryIcon(slug: String): ImageVector = when {
+    slug.contains("charger") || slug.contains("cable") || slug.contains("phone") -> VelnoxIcons.Headphones
+    slug.contains("clothing") || slug.contains("shirt") || slug.contains("fashion") -> VelnoxIcons.Shirt
+    slug.contains("electronic") || slug.contains("computer") -> VelnoxIcons.Laptop
+    slug.contains("kitchen") || slug.contains("food") || slug.contains("cook") -> VelnoxIcons.Coffee
+    slug.contains("beauty") || slug.contains("health") -> VelnoxIcons.Sparkles
+    else -> VelnoxIcons.Tag
 }
 
 // ---------------------------------------------------------------- seasonal
@@ -689,9 +873,11 @@ private fun SeasonalBanner(
 
 // ----------------------------------------------------------------- featured
 
+// --------------------------------------------------------------- featured
+
 @Composable
 private fun FeaturedSection(
-    products: List<ProductPreview>,
+    products: List<CatalogProduct>,
     onOpenProduct: (String) -> Unit,
     onSeeAll: () -> Unit,
 ) {
@@ -721,7 +907,7 @@ private fun FeaturedSection(
 // --------------------------------------------------------------- product grid
 
 private fun LazyListScope.productRows(
-    products: List<ProductPreview>,
+    products: List<CatalogProduct>,
     columns: Int,
     onOpenProduct: (String) -> Unit,
 ) {
@@ -743,20 +929,27 @@ private fun LazyListScope.productRows(
                     onClick = { onOpenProduct(product.id) },
                 )
             }
-            repeat(columns - row.size) {
-                Spacer(Modifier.weight(1f))
-            }
+            // Keeps the last row aligned with the grid above it.
+            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
         }
         Spacer(Modifier.height(VelnoxSpacing.sm))
     }
 }
 
+/**
+ * A real catalogue product: the seller's own image, name, shop and price.
+ *
+ * Nothing is substituted when a field is missing. A product without an image
+ * renders the neutral tile, a product without a price renders no price line, and
+ * only a known out-of-stock flag adds the badge.
+ */
 @Composable
 internal fun ProductCard(
-    product: ProductPreview,
+    product: CatalogProduct,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val locale = LocalConfiguration.current.locales[0]
     Column(
         modifier = modifier
             .clip(SquircleLg)
@@ -765,35 +958,41 @@ internal fun ProductCard(
             .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(VelnoxSpacing.sm),
     ) {
-        ProductArtTile(art = product.art, modifier = Modifier.aspectRatio(1f))
+        ProductThumbnail(
+            url = product.imageUrl,
+            name = product.name,
+            outOfStock = product.inStock == false,
+            modifier = Modifier.aspectRatio(1f),
+        )
         Spacer(Modifier.height(VelnoxSpacing.sm))
         Text(
-            text = stringResource(product.name),
+            text = product.name,
             style = TextXs.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             minLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = stringResource(product.store),
-            style = Text2xs,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-        )
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        product.shopName?.let { shop ->
+            Spacer(Modifier.height(2.dp))
             Text(
-                text = stringResource(product.tag),
+                text = shop,
                 style = Text2xs,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier
-                    .clip(SquircleXs)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PriceFormat.format(product.price, product.currency, locale)?.let { price ->
+                Text(
+                    text = price,
+                    style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            }
             Spacer(Modifier.weight(1f))
             Icon(
                 imageVector = VelnoxIcons.ChevronRight,
@@ -804,6 +1003,67 @@ internal fun ProductCard(
         }
     }
 }
+
+/**
+ * The product image, loaded from the URL the API returns (Cloudflare R2 today).
+ *
+ * A missing or unloadable image is a neutral tile with the package glyph: the app
+ * has no stock photography to fall back on, and pretending a product looks like
+ * something it does not would be worse than showing nothing.
+ */
+@Composable
+fun ProductThumbnail(
+    url: String?,
+    name: String,
+    outOfStock: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(Squircle)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (url != null) {
+            AsyncImage(
+                model = url,
+                contentDescription = name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(
+                imageVector = VelnoxIcons.Package,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(32.dp),
+            )
+        }
+        if (outOfStock) {
+            Text(
+                text = stringResource(R.string.product_out_of_stock),
+                style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(6.dp)
+                    .clip(SquircleXs)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Product art for the screens that are still demo data (Cart, Orders).
+ *
+ * The catalogue itself no longer uses it: Home, categories and the product page
+ * render the seller's real image. It stays here, unchanged, so the unrelated
+ * demo screens do not break while they wait for their own API work.
+ */
+enum class ProductArt { Jacket, Headphones, Tote, Watch, Mug, Lamp, Sneaker, Serum }
 
 /**
  * Flat vector product art. Colour is derived from theme roles, so a card never
@@ -1005,39 +1265,5 @@ private fun ProductGlyph(
                 drawLine(color, p(12f, 14f), p(12f, 17f), strokeWidth = stroke, cap = StrokeCap.Round)
             }
         }
-    }
-}
-
-// ------------------------------------------------------------------- previews
-
-@Preview(name = "Home phone", showBackground = true, widthDp = 390, heightDp = 900)
-@Composable
-private fun HomePhonePreview() {
-    VelnoxTheme(darkTheme = false) {
-        HomeScreen(onOpenCategoryHub = {}, onOpenListing = {}, onOpenProduct = {})
-    }
-}
-
-@Preview(name = "Home wide", showBackground = true, widthDp = 600, heightDp = 900)
-@Composable
-private fun HomeWidePreview() {
-    VelnoxTheme(darkTheme = false) {
-        HomeScreen(onOpenCategoryHub = {}, onOpenListing = {}, onOpenProduct = {})
-    }
-}
-
-@Preview(name = "Home 320dp", showBackground = true, widthDp = 320, heightDp = 760)
-@Composable
-private fun HomeCompactPreview() {
-    VelnoxTheme(darkTheme = false) {
-        HomeScreen(onOpenCategoryHub = {}, onOpenListing = {}, onOpenProduct = {})
-    }
-}
-
-@Preview(name = "Home dark", showBackground = true, widthDp = 390, heightDp = 900)
-@Composable
-private fun HomeDarkPreview() {
-    VelnoxTheme(darkTheme = true) {
-        HomeScreen(onOpenCategoryHub = {}, onOpenListing = {}, onOpenProduct = {})
     }
 }

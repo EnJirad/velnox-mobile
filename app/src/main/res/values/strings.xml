@@ -42,12 +42,6 @@
     <string name="home_trust_support">ช่วยเหลือ 24 ชม.</string>
     <string name="home_categories_title">หมวดหมู่ยอดนิยม</string>
     <string name="home_category_all">ทั้งหมด</string>
-    <string name="home_category_fashion">แฟชั่น</string>
-    <string name="home_category_electronics">อิเล็กทรอนิกส์</string>
-    <string name="home_category_home">ของใช้ในบ้าน</string>
-    <string name="home_category_beauty">ความงาม</string>
-    <string name="home_category_sports">กีฬา</string>
-    <string name="home_category_food">อาหาร</string>
     <string name="home_hero_badge">VELNOX SELECT</string>
     <string name="home_hero_title">คอลเลกชันใหม่ประจำฤดู</string>
     <string name="home_hero_body">งานดีไซน์เรียบหรู คัดสรรจากผู้ขายที่ผ่านการตรวจสอบ</string>
@@ -61,7 +55,6 @@
     <string name="home_popular_subtitle">สินค้าที่คนเลือกมากที่สุด</string>
     <string name="home_new_title">มาใหม่ล่าสุด</string>
     <string name="home_see_all">ดูทั้งหมด</string>
-    <string name="home_preview_note">ข้อมูลตัวอย่างสำหรับการออกแบบเท่านั้น · ยังไม่เชื่อมต่อระบบร้านค้า</string>
     <string name="home_quick_orders">คำสั่งซื้อ</string>
     <string name="home_quick_wishlist">รายการโปรด</string>
     <string name="home_quick_cart">ตะกร้า</string>
@@ -73,19 +66,10 @@
     <string name="product_2_store">Aural Labs</string>
     <string name="product_3_name">กระเป๋าหนังแบบมินิมอล</string>
     <string name="product_3_store">Nord Studio</string>
-    <string name="product_4_name">นาฬิกาดีไซน์สวิตช์สเกล</string>
-    <string name="product_4_store">Tide &amp; Co.</string>
     <string name="product_5_name">แก้วเซรามิกทรงกลม</string>
     <string name="product_5_store">Clay Works</string>
     <string name="product_6_name">โคมไฟตั้งโต๊ะ LED</string>
     <string name="product_6_store">Lumen House</string>
-    <string name="product_7_name">รองเท้าวิ่งพื้นน้ำหนักเบา</string>
-    <string name="product_7_store">Stride</string>
-    <string name="product_8_name">เซรั่มบำรุงผิวสูตรอ่อนโยน</string>
-    <string name="product_8_store">Botanica</string>
-    <string name="product_tag_new">ใหม่</string>
-    <string name="product_tag_popular">ยอดนิยม</string>
-    <string name="product_tag_editor">คัดสรร</string>
 
     <!-- ═════════════════════════════ messages ═════════════════════════════ -->
     <string name="messages_title">ข้อความ</string>
@@ -385,4 +369,18 @@
     <string name="placeholder_checkout">ชำระเงิน</string>
     <string name="placeholder_generic">หน้านี้</string>
     <string name="placeholder_body">หน้านี้จะเปิดให้ใช้งานในเฟสถัดไป เมื่อเชื่อมต่อระบบหลังบ้านแล้ว</string>
+    <string name="catalog_error_title">เชื่อมต่อร้านค้าไม่ได้</string>
+    <string name="catalog_error_body">ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองอีกครั้ง</string>
+    <string name="catalog_empty_title">ยังไม่มีสินค้า</string>
+    <string name="catalog_empty_body">เมื่อผู้ขายเผยแพร่สินค้า รายการจะแสดงที่นี่</string>
+    <string name="catalog_load_more">โหลดเพิ่มเติม</string>
+    <string name="category_product_count">%1$d รายการ</string>
+    <string name="product_out_of_stock">สินค้าหมด</string>
+    <string name="product_in_stock">มีสินค้า</string>
+    <string name="product_per_unit">ต่อ %1$s</string>
+    <string name="product_stock_left">เหลือ %1$d ชิ้น</string>
+    <string name="product_sold">ขายแล้ว %1$d</string>
+    <string name="product_description_title">รายละเอียดสินค้า</string>
+    <string name="product_unavailable_title">ไม่พบสินค้านี้</string>
+    <string name="product_unavailable_body">สินค้าอาจถูกนำออก หรือยังไม่เผยแพร่</string>
 </resources>

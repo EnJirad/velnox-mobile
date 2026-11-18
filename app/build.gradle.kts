@@ -77,6 +77,12 @@ dependencies {
     // client at all, and JSON is read with the platform org.json parser.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // Product images. The catalogue returns absolute URLs on the seller's own
+    // storage (Cloudflare R2), so the app needs an async image loader that can
+    // cancel off-screen requests inside a lazy grid. Coil is that loader; it is
+    // not a design system and adds no UI.
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
     // Google Sign-In. Credential Manager is the currently supported flow;
     // GoogleSignInClient was deprecated. These three artifacts are Google's own
     // recommended combination for "Sign in with Google" with an ID token.
