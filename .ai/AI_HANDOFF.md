@@ -1,32 +1,29 @@
 # AI_HANDOFF.md — Velnox Mobile Current Snapshot
 
-> **Current snapshot (not a log).** Supersedes the Phase 2/UI-audit snapshots,
-> archived verbatim in `.ai/history/`.
+> **Current snapshot (not a log).** Supersedes the Phase 3 snapshot, archived
+> verbatim in `.ai/history/20261118_135900_AI_HANDOFF_before_part2.md`.
 > Statuses: **VERIFIED / UNVERIFIED / FAILED / BLOCKED / SKIPPED / NOT TESTED**.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Current State (2026-11-17, run 44157230905)
+## Current State (2026-11-18, commit `cc8a093`, run 44254710010)
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Five-tab navigation | **VERIFIED (source unchanged)** | Home, Messages, Orders, Cart, Profile; per-tab `SaveableStateHolder` |
-| Home fixed toolbar | **VERIFIED (compile)** | Logo, editable search, notification bell; status-bar inset; never scrolls |
-| Home sticky categories | **VERIFIED (compile)** | Seasonal banner → sticky Popular Categories → featured → full feed; one `LazyColumn` |
-| Home search | **VERIFIED (compile + static logic)** | Localized local search over name/store/tag/category; clear action and empty state |
-| Category destination | **VERIFIED (compile)** | `category` hub and `category:<id>` filtered listing; Back chain to Home |
-| Product feed | **VERIFIED (compile)** | Lazy rows, stable product ids, content types, no nested vertical list |
-| Notification popover | **VERIFIED (compile)** | Anchored `DropdownMenu`, outside/back dismiss, honest empty state, no fake data |
-| Profile Sign Out | **VERIFIED (source)** | Removed from Profile; Settings sign-out confirmation and reset preserved |
-| Settings child Back | **VERIFIED (source)** | Arrow and system Back return to Settings hub; hub Back returns to Profile/tab |
-| Dark Mode | **VERIFIED (compile)** | Selected tab, Profile, Messages, Settings, dialogs and emerald pairs use semantic roles |
-| Brand mark | **VERIFIED (APK/source)** | Slate SVG for Light, white SVG for Dark, chosen from the applied scheme |
-| Localisation | **VERIFIED (packaged)** | 292 keys × th/en/my, identical key sets, no raw UI literals in Kotlin |
-| Theme modes | **VERIFIED (source)** | Light / Dark / System still resolve through `ThemeMode` + DataStore |
-| Tap effects | **VERIFIED (source)** | Shared no-indication clickable/toggleable across custom controls |
-| CI build | **VERIFIED** | `BUILD SUCCESSFUL in 2m 23s`, run 44157230905 |
-| APK artifact | **VERIFIED** | 10,773,857 bytes; SHA-256 `cc4ddbde961045d9e9ddc788669b657c7460ce692419ab76e61e4abbec7663d2`; `unzip -t` clean |
+| Startup destination | **VERIFIED (source)** | Opens on Home for everyone; Login is no longer a launch screen |
+| Session restore | **VERIFIED (source)** | `SessionController.restoreOnce()` runs once per process; `NoStoredSessionStore` truthfully reports no session, so the result is Guest |
+| Session during restore | **VERIFIED (source)** | `Restoring` renders the shell; no full-screen Login, no spinner, protected taps ignored until resolved |
+| Guest browsing | **VERIFIED (source)** | Home, categories, listings, product route, search |
+| Guest gate | **VERIFIED (source)** | Cart / Orders / Profile / Messages / checkout / wishlist / settings / order + thread detail |
+| Gate centralization | **VERIFIED (source)** | `AccessPolicy` + two funnels (`requestTab`, `requestOverlay`); no per-screen auth checks |
+| Gate reason copy | **VERIFIED (compile)** | `LoginReason` card on `secondaryContainer`; localized in th/en/my |
+| Gate escape | **VERIFIED (source)** | 44dp "continue browsing" + system Back; pending destination cleared, no loop |
+| Pending destination | **VERIFIED (source)** | `tab:<key>` / `overlay:<key>` restored by `completeSignIn()` |
+| Sign-in | **DEMO (unchanged)** | `LoginScreen`'s pre-existing simulated submit; `completeDemoSignIn()` persists nothing |
+| Home search alignment | **VERIFIED (compile)** | Placeholder, typed text and icon share one vertical centre (was ~12dp high) |
+| Localisation | **VERIFIED (packaged)** | 300 keys × th/en/my, identical key sets |
+| CI build | **VERIFIED** | run 44254710010, all steps success; artifact 10,176,620 bytes |
 | On-device runtime | **NOT TESTED** | No install route in this session; no device-level claim |
 
 ---
@@ -35,66 +32,63 @@
 
 ```
 MainActivity
-└── VelnoxApp (preferences → locale → theme)
-    ├── signedIn seam (demo, Phase 3 backend later)
-    └── VelnoxBottomBar + five tabs
-        └── Home / Messages / Orders / Cart / Profile
-            ├── Home: fixed toolbar + one LazyColumn
-            │   ├── seasonal banner
-            │   ├── sticky Popular Categories
-            │   ├── featured rail
-            │   └── complete product rows
-            └── Overlay destinations
-                settings, settings/<page>, category, category:<id>,
-                order/<id>, thread/<id>, product:<id>, placeholders
+└── VelnoxApp (preferences → locale → theme → session)
+    └── VelnoxSessionProvider          LocalSession (process-scoped controller)
+        └── VelnoxNavHost              starts on AppTab.Home
+            ├── requestTab / requestOverlay   ← the only destination funnels
+            │     └── AccessPolicy            ← the only guest decision
+            ├── Login gate                 (reason + pending destination)
+            └── TabScaffold + five tabs
+                └── Home / Messages / Orders / Cart / Profile
+                    └── Overlay destinations
+                        settings, settings/<page>, category, category:<id>,
+                        order:<id>, thread:<id>, product:<id>, placeholders
 ```
 
-- `HomeCatalog` implements `CatalogSource`; a future repository can replace the
-  four read methods without changing Home.
-- `HomeNotifications.items` is empty; no notification backend exists.
-- `CartState` remains hoisted in the nav host.
-- No Navigation Compose, database, backend auth, payment or new dependency.
+- `core/session/` — `SessionState`, `SessionStore` (+ `NoStoredSessionStore`),
+  `SessionController`, `SessionProvider`.
+- `navigation/AccessPolicy.kt` — `LoginReason` + public/protected route tables.
+- `HomeCatalog` still implements `CatalogSource`; a repository can replace the
+  four read methods without touching Home.
+- `CartState` remains hoisted in the nav host; `HomeNotifications.items` is empty.
+- No Navigation Compose, backend client, database, auth SDK or new dependency.
 
 ---
 
 ## Decisions
 
-1. **One vertical lazy system.** `LazyColumn` owns Home; `stickyHeader` provides
-   the category pin. Featured/category rails are horizontal `LazyRow`s only.
-2. **Stable local ids.** `p1`–`p8` are unique; the old `p1b`/`p6b` duplicates were
-   removed. Rows use the joined product ids as their lazy key.
-3. **Search is honest.** Localized local substring search only; the UI states the
-   preview nature and the `CatalogSource` seam is ready for an API.
-4. **Theme-aware branding without OS checks.** `BrandMark` uses
-   `colorScheme.surface.luminance()`, so manual Light/Dark choices win over the
-   system setting.
-5. **Navigation stays one-level with derived parents.** `settings/<page>` →
-   `settings`, `category:<id>` → `category`; no new navigation library.
-6. **No fake notifications.** The popover ships with an empty state and an empty
-   model, not invented order or payment events.
+1. **Guest-first, gate-on-demand.** Home is the launch destination; authentication
+   is requested only when a protected destination is opened.
+2. **One policy object.** `AccessPolicy` is the only place that knows what a guest
+   may reach, and unknown routes fail closed to "sign-in required".
+3. **Two funnels, no scattered checks.** `requestTab` and `requestOverlay` are the
+   only ways a destination changes, so a new screen cannot quietly bypass the gate.
+4. **Client gate is not the security boundary.** The API's `requireAuth` on
+   `/api/customer/cart*`, `/checkout`, `/orders*`, `/profile`, `/addresses` remains
+   the authority; the client gate is UX and defence in depth.
+5. **Honest session, no fake auth.** `NoStoredSessionStore` returns `null` rather
+   than inventing a session; the demo sign-in is named `completeDemoSignIn()` and
+   persists nothing.
+6. **Restore never blocks the UI.** The restore runs after the first frame, so
+   Home paints immediately and Login cannot flash.
+7. **Messages is account-specific.** Gated with the other account surfaces; change
+   `AccessPolicy` if guests should read threads.
+8. **Search fix is alignment-only.** `CenterStart` on the text box; no colour,
+   size or spacing change, so light and dark behave identically.
 
 ---
 
 ## What changed this phase
 
-- `feature/home/HomeScreen.kt` — fixed toolbar, sticky categories, search, lazy feed
-- `feature/home/HomeCatalog.kt` — `CatalogSource`, unique products, localized search
-- `feature/home/CategoryScreen.kt` — category hub + filtered listing
-- `feature/home/HomeNotifications.kt` — notification model with empty source
-- `ui/components/VelnoxInteractions.kt` — no-indication clickable/toggleable
-- `ui/components/VelnoxComponents.kt` — theme-aware `BrandMark`, theme-safe badges
-- `ui/components/VelnoxScaffolds.kt` — semantic selected/danger/status roles
-- `navigation/VelnoxApp.kt` — category routes, Settings child Back, Profile sign-out wiring removed
-- `navigation/VelnoxBottomBar.kt` — readable selected label, emerald indicator
-- `feature/profile/ProfileScreen.kt` — Sign Out removed, theme-safe stats/address
-- `feature/settings/SettingsScreen.kt`, `SettingsDetailScreen.kt` — dialog/selected/switch/saved-state colours
-- `feature/messages/MessagesScreen.kt` — readable outgoing bubble
-- `feature/orders/OrdersScreen.kt` — emerald selected filters
-- `feature/cart/CartScreen.kt` — semantic primary/selection colours
-- `feature/auth/LoginScreen.kt` — semantic errors/focus/primary, no colour animation
-- `navigation/VelnoxInfoDialog.kt` — semantic primary button
-- `res/drawable/ic_velnox_mark_slate.xml`, `ic_velnox_mark_white.xml`
-- `values/`, `values-en/`, `values-my/strings.xml` — +10 keys each (292 total)
+- `core/session/SessionState.kt`, `SessionStore.kt`, `SessionController.kt`,
+  `SessionProvider.kt` — new session layer
+- `navigation/AccessPolicy.kt` — new centralized guest policy
+- `navigation/VelnoxApp.kt` — guest-first host, two funnels, single Back handler,
+  pending destination, sign-out reset
+- `feature/auth/LoginScreen.kt` — optional `reason` card + 44dp dismiss action
+- `feature/home/HomeScreen.kt` — search placeholder vertical centring
+- `VelnoxApplication.kt` — owns `SessionController`
+- `values/`, `values-en/`, `values-my/strings.xml` — +8 keys each (300 total)
 
 Full evidence: `.ai/reports/LATEST.md`. Previous snapshots: `.ai/history/`.
 
@@ -102,13 +96,16 @@ Full evidence: `.ai/reports/LATEST.md`. Previous snapshots: `.ai/history/`.
 
 ## Known issues
 
-- Runtime behaviour is verified only by compilation, static logic checks and APK
-  inspection; no device/emulator run.
-- Search is local preview data; no server-wide search or paging.
-- Notifications have no source; only the empty state exists.
-- Category listing is a scrollable column over the small local catalogue; a real
-  backend will need lazy paging there.
-- Product detail and checkout remain placeholder destinations.
+- No session can be restored yet: nothing has ever been issued or persisted.
+  Part 3 needs a Keystore-backed `SessionStore` **and** a native token from the API
+  (Part 1 risk R1: mobile responses set a cookie but return no token).
+- Sign-in is still the pre-existing demo submit; no credential check, no token.
+- Add-to-cart has no UI; when added it must route through `requestOverlay`.
+- Product detail is still `PlaceholderDestination`; search and the catalogue are
+  local preview data.
+- Runtime behaviour is verified by compilation and source tracing only; no
+  device/emulator run.
+- Notification bell is not gated (it opens an empty popover, not a route).
 - `.ai/AI_RULES.md` and `.ai/context/project-map.md` still use older VelShop names.
 - GitHub Actions emits `setup-java@v4` / Node 20 deprecation annotations.
 
@@ -133,4 +130,4 @@ No secrets in `.ai/`. No tokens, keystores or passwords in this repository.
 ## Signature
 
 > This handoff supersedes the previous snapshots.
-> **Last updated:** 2026-11-17 by the Phase 3 Home/brand/UX session.
+> **Last updated:** 2026-11-18 by the Part 2 guest-first navigation session.
