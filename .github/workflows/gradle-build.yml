@@ -141,6 +141,9 @@ jobs:
           echo "- SHA-256: `$SHA256`" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Register the SHA-1 on an Android OAuth client for this package." >> "$GITHUB_STEP_SUMMARY"
+          # Also emit it as an annotation: the job summary is not readable from
+          # the API, and this value has to be copied into Google Cloud Console.
+          echo "::notice title=APK signing SHA-1 ($SHA1)::SHA-1 $SHA1 / SHA-256 $SHA256 for package com.velnox.app"
         env:
           ANDROID_SDK_ROOT: /home/runner/android-sdk
 
