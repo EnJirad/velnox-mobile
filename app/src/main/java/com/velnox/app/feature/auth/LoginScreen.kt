@@ -2,6 +2,7 @@
 
 package com.velnox.app.feature.auth
 
+import com.velnox.app.navigation.LoginReason
 import com.velnox.app.ui.components.velnoxClickable
 import com.velnox.app.ui.components.velnoxToggleable
 
@@ -88,11 +89,18 @@ import kotlinx.coroutines.launch
  * Same visual language as Home: white surfaces on the slate page, dark primary
  * action, emerald accents, squircle controls and the shared type scale. The
  * screen keeps its original behaviour — inline validation, show/hide password,
- * remember-me — and now calls [onSignedIn] so navigation owns the transition to
- * Home. Authentication itself arrives in Phase 2.
+ * remember-me — and calls [onSignedIn] so navigation owns the transition.
+ *
+ * Since Part 2 this is no longer a startup screen: it is a gate the guest reaches
+ * by asking for a protected destination. [reason] explains why it opened, and
+ * [onDismiss] returns the guest to browsing without signing in.
  */
 @Composable
-fun LoginScreen(onSignedIn: () -> Unit) {
+fun LoginScreen(
+    onSignedIn: () -> Unit,
+    reason: LoginReason? = null,
+    onDismiss: (() -> Unit)? = null,
+) {
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
 
@@ -188,6 +196,11 @@ fun LoginScreen(onSignedIn: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.widthIn(max = 340.dp),
             )
+
+            if (reason != null) {
+                Spacer(Modifier.height(14.dp))
+                SignInReasonCard(reason = reason)
+            }
 
             Spacer(Modifier.height(22.dp))
 
@@ -311,6 +324,25 @@ fun LoginScreen(onSignedIn: () -> Unit) {
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+
+            if (onDismiss != null) {
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .clip(Squircle)
+                        .velnoxClickable(enabled = !isSubmitting, role = Role.Button, onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.login_continue_browsing),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             AnimatedVisibility(
@@ -630,6 +662,46 @@ private fun SignUpRow(enabled: Boolean, onClick: () -> Unit) {
                 .velnoxClickable(enabled = enabled, role = Role.Button, onClick = onClick)
                 .padding(horizontal = 6.dp, vertical = 6.dp),
         )
+    }
+}
+
+// ----------------------------------------------------------------- gate reason
+
+/**
+ * Explains why Login appeared. One sentence, semantic colours only, so it reads
+ * correctly in both light and dark schemes.
+ */
+@Composable
+private fun SignInReasonCard(reason: LoginReason) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(Squircle)
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = VelnoxIcons.Lock,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                text = stringResource(R.string.auth_reason_title),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = stringResource(reason.messageRes),
+                style = TextXs,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
     }
 }
 

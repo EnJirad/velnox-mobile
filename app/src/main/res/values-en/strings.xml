@@ -306,6 +306,14 @@
     <string name="login_error_email_invalid">Email format is not valid</string>
     <string name="login_error_password_required">Enter your password</string>
     <string name="login_error_password_short">Password must be at least 6 characters</string>
+    <string name="login_continue_browsing">Continue browsing without signing in</string>
+    <string name="auth_reason_title">Sign-in required</string>
+    <string name="auth_reason_cart">Your cart belongs to your account. Sign in to keep the items you picked.</string>
+    <string name="auth_reason_orders">Orders are tied to your account. Sign in to follow your deliveries.</string>
+    <string name="auth_reason_profile">Profile details and shipping addresses belong to your account. Sign in to continue.</string>
+    <string name="auth_reason_messages">Chatting with shops needs an account. Sign in to see your messages.</string>
+    <string name="auth_reason_checkout">Checkout needs an account. Sign in to place your order.</string>
+    <string name="auth_reason_account">This is part of your account. Sign in to continue.</string>
     <string name="placeholder_product">Product details</string>
     <string name="placeholder_category">Category</string>
     <string name="placeholder_search">Search</string>

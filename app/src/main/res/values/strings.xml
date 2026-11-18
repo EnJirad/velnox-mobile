@@ -306,6 +306,14 @@
     <string name="login_error_email_invalid">รูปแบบอีเมลไม่ถูกต้อง</string>
     <string name="login_error_password_required">กรุณากรอกรหัสผ่าน</string>
     <string name="login_error_password_short">รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร</string>
+    <string name="login_continue_browsing">กลับไปเลือกซื้อสินค้าโดยไม่เข้าสู่ระบบ</string>
+    <string name="auth_reason_title">ต้องเข้าสู่ระบบ</string>
+    <string name="auth_reason_cart">ตะกร้าสินค้าเป็นของคุณเฉพาะเมื่อมีบัญชี กรุณาเข้าสู่ระบบเพื่อเก็บสินค้าที่เลือกไว้</string>
+    <string name="auth_reason_orders">คำสั่งซื้อผูกกับบัญชีของคุณ กรุณาเข้าสู่ระบบเพื่อดูสถานะการจัดส่ง</string>
+    <string name="auth_reason_profile">ข้อมูลโปรไฟล์และที่อยู่จัดส่งผูกกับบัญชีของคุณ กรุณาเข้าสู่ระบบ</string>
+    <string name="auth_reason_messages">การสนทนากับร้านค้าต้องมีบัญชี กรุณาเข้าสู่ระบบเพื่อดูข้อความ</string>
+    <string name="auth_reason_checkout">การชำระเงินต้องมีบัญชี กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ</string>
+    <string name="auth_reason_account">ส่วนนี้เป็นข้อมูลบัญชีของคุณ กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ</string>
     <string name="placeholder_product">รายละเอียดสินค้า</string>
     <string name="placeholder_category">หมวดหมู่สินค้า</string>
     <string name="placeholder_search">ค้นหาสินค้า</string>

@@ -351,7 +351,13 @@ private fun HomeSearchField(
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(VelnoxSpacing.sm))
-        Box(modifier = Modifier.weight(1f)) {
+        // CenterStart, not the default TopStart: the text field carries vertical
+        // padding, so a top-aligned placeholder sat ~12dp above the typed text and
+        // the 18dp search icon. Centering makes all three share one baseline box.
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+        ) {
             if (query.isEmpty()) {
                 Text(
                     text = stringResource(R.string.home_search_placeholder),
