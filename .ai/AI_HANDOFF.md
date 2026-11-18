@@ -1,133 +1,141 @@
 # AI_HANDOFF.md — Velnox Mobile Current Snapshot
 
-> **Current snapshot (not a log).** Supersedes the Phase 3 snapshot, archived
-> verbatim in `.ai/history/20261118_135900_AI_HANDOFF_before_part2.md`.
+> **Current snapshot (not a log).** Supersedes the Part 2 snapshot, archived
+> verbatim in `.ai/history/20261118_155500_AI_HANDOFF_before_part3.md`.
 > Statuses: **VERIFIED / UNVERIFIED / FAILED / BLOCKED / SKIPPED / NOT TESTED**.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Current State (2026-11-18, commit `cc8a093`, run 44254710010)
+## Current State (2026-11-18, commit `8bea21f`, run 44261281798)
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Startup destination | **VERIFIED (source)** | Opens on Home for everyone; Login is no longer a launch screen |
-| Session restore | **VERIFIED (source)** | `SessionController.restoreOnce()` runs once per process; `NoStoredSessionStore` truthfully reports no session, so the result is Guest |
-| Session during restore | **VERIFIED (source)** | `Restoring` renders the shell; no full-screen Login, no spinner, protected taps ignored until resolved |
-| Guest browsing | **VERIFIED (source)** | Home, categories, listings, product route, search |
-| Guest gate | **VERIFIED (source)** | Cart / Orders / Profile / Messages / checkout / wishlist / settings / order + thread detail |
-| Gate centralization | **VERIFIED (source)** | `AccessPolicy` + two funnels (`requestTab`, `requestOverlay`); no per-screen auth checks |
-| Gate reason copy | **VERIFIED (compile)** | `LoginReason` card on `secondaryContainer`; localized in th/en/my |
-| Gate escape | **VERIFIED (source)** | 44dp "continue browsing" + system Back; pending destination cleared, no loop |
-| Pending destination | **VERIFIED (source)** | `tab:<key>` / `overlay:<key>` restored by `completeSignIn()` |
-| Sign-in | **DEMO (unchanged)** | `LoginScreen`'s pre-existing simulated submit; `completeDemoSignIn()` persists nothing |
-| Home search alignment | **VERIFIED (compile)** | Placeholder, typed text and icon share one vertical centre (was ~12dp high) |
-| Localisation | **VERIFIED (packaged)** | 300 keys × th/en/my, identical key sets |
-| CI build | **VERIFIED** | run 44254710010, all steps success; artifact 10,176,620 bytes |
-| On-device runtime | **NOT TESTED** | No install route in this session; no device-level claim |
+| Startup destination | **VERIFIED (source)** | Opens on Home for everyone; Login is a gate, not a launch screen |
+| Auth states | **VERIFIED (unit tests)** | `Loading` / `Guest` / `Authenticated` / `ExpiredSession`, one holder |
+| Session restore | **VERIFIED (unit tests)** | `/api/auth/me` decides; token never trusted on its own |
+| Secure storage | **VERIFIED (compile)** | AES-256-GCM, Keystore key, `filesDir/session/session.bin`, excluded from backup |
+| Expiry handling | **VERIFIED (unit tests)** | `exp` skips a guaranteed-401 call; API stays authoritative |
+| Refresh tokens | **BLOCKED** | Backend has no refresh endpoint; 7-day JWT only |
+| Sign-out | **VERIFIED (unit tests)** | Clears storage first, then revokes best-effort |
+| Invalid session | **VERIFIED (unit tests)** | 401 → token cleared → `ExpiredSession` |
+| Offline restore | **VERIFIED (unit tests)** | `Guest` + notice; token kept; never authenticated |
+| Email sign-in | **VERIFIED (API contract + tests)** | Live `401 INVALID_CREDENTIALS` maps correctly; **success path has no live account to test** |
+| Google / LINE | **NOT IMPLEMENTED** | Part 6; server side ready (`google:true, line:false`) |
+| Registration UI | **NOT IMPLEMENTED** | Part 4; repository call exists and is tested |
+| Guest gate | **VERIFIED (unit tests)** | `AccessPolicy`; unknown routes fail closed |
+| Unit tests | **VERIFIED (CI)** | 41 tests, 5 classes, green in run 44261281798 |
+| APK | **VERIFIED (CI)** | 10,564,666 bytes, integrity OK |
+| On-device runtime | **NOT TESTED** | No install route; Keystore and UI unverified on hardware |
+
+Architecture detail: **`.ai/ARCHITECTURE_AUTH.md`**. Evidence: `.ai/reports/LATEST.md`.
 
 ---
 
 ## Architecture
 
 ```
-MainActivity
-└── VelnoxApp (preferences → locale → theme → session)
-    └── VelnoxSessionProvider          LocalSession (process-scoped controller)
-        └── VelnoxNavHost              starts on AppTab.Home
-            ├── requestTab / requestOverlay   ← the only destination funnels
-            │     └── AccessPolicy            ← the only guest decision
-            ├── Login gate                 (reason + pending destination)
-            └── TabScaffold + five tabs
-                └── Home / Messages / Orders / Cart / Profile
-                    └── Overlay destinations
-                        settings, settings/<page>, category, category:<id>,
-                        order:<id>, thread:<id>, product:<id>, placeholders
+LoginScreen / any protected action
+        │ (onSubmit, callbacks)
+        ▼
+SessionController  ── LocalSession ──▶  UI reads state
+        │
+        ▼
+AuthRepository ──▶ AuthRemoteDataSource ──▶ https://velnox-api.onrender.com
+        │                                        /api/auth/mobile/{login,register}
+        │                                        /api/auth/me, /api/auth/logout
+        ▼
+SessionManager ──▶ SessionVault (AES-GCM + Android Keystore)
+        │
+        ▼
+navigation/AccessPolicy  ← the only place that maps state → allowed destinations
 ```
 
-- `core/session/` — `SessionState`, `SessionStore` (+ `NoStoredSessionStore`),
-  `SessionController`, `SessionProvider`.
-- `navigation/AccessPolicy.kt` — `LoginReason` + public/protected route tables.
-- `HomeCatalog` still implements `CatalogSource`; a repository can replace the
-  four read methods without touching Home.
-- `CartState` remains hoisted in the nav host; `HomeNotifications.items` is empty.
-- No Navigation Compose, backend client, database, auth SDK or new dependency.
+Session transport: the API sets `velnox_session` as an httpOnly cookie and never
+returns the token in a body, so the data source reads `Set-Cookie` and replays the
+value as `Authorization: Bearer` (accepted by `bearerOrCookie`). No cookie jar, no
+WebView, no invented token.
 
 ---
 
 ## Decisions
 
-1. **Guest-first, gate-on-demand.** Home is the launch destination; authentication
-   is requested only when a protected destination is opened.
-2. **One policy object.** `AccessPolicy` is the only place that knows what a guest
-   may reach, and unknown routes fail closed to "sign-in required".
-3. **Two funnels, no scattered checks.** `requestTab` and `requestOverlay` are the
-   only ways a destination changes, so a new screen cannot quietly bypass the gate.
-4. **Client gate is not the security boundary.** The API's `requireAuth` on
-   `/api/customer/cart*`, `/checkout`, `/orders*`, `/profile`, `/addresses` remains
-   the authority; the client gate is UX and defence in depth.
-5. **Honest session, no fake auth.** `NoStoredSessionStore` returns `null` rather
-   than inventing a session; the demo sign-in is named `completeDemoSignIn()` and
-   persists nothing.
-6. **Restore never blocks the UI.** The restore runs after the first frame, so
-   Home paints immediately and Login cannot flash.
-7. **Messages is account-specific.** Gated with the other account surfaces; change
-   `AccessPolicy` if guests should read threads.
-8. **Search fix is alignment-only.** `CenterStart` on the text box; no colour,
-   size or spacing change, so light and dark behave identically.
+1. **Four states, one writer.** `SessionController` is the only thing that changes
+   `SessionState`; screens read `LocalSession.current.state`.
+2. **`Authenticated` requires a server answer.** `me() == 200` or a sign-in
+   response. Nothing else — not a stored token, not a flag.
+3. **Offline is not a session.** `Unverified` → `Guest` with the token kept for
+   the next launch. `SessionNotice.NetworkUnavailable` is a notice, not a state.
+4. **Keystore over `EncryptedSharedPreferences`.** The library is deprecated and
+   would be the only new dependency for one file; a Keystore AES-GCM key plus a
+   private file does the same job with platform APIs.
+5. **OkHttp is the only new runtime dependency.** JSON uses platform `org.json`;
+   no serialization plugin, no DI, no Navigation library.
+6. **Password rules live server-side.** Sign-in only checks "not empty"; the old
+   6-char client rule could reject a valid legacy password.
+7. **Sign-out is local-first.** Storage is cleared before the revoke request, so a
+   network failure cannot leave a usable token.
+8. **Expiry is advisory.** `exp` avoids a wasted round trip; only the API may
+   invalidate a session.
 
 ---
 
 ## What changed this phase
 
-- `core/session/SessionState.kt`, `SessionStore.kt`, `SessionController.kt`,
-  `SessionProvider.kt` — new session layer
-- `navigation/AccessPolicy.kt` — new centralized guest policy
-- `navigation/VelnoxApp.kt` — guest-first host, two funnels, single Back handler,
-  pending destination, sign-out reset
-- `feature/auth/LoginScreen.kt` — optional `reason` card + 44dp dismiss action
-- `feature/home/HomeScreen.kt` — search placeholder vertical centring
-- `VelnoxApplication.kt` — owns `SessionController`
-- `values/`, `values-en/`, `values-my/strings.xml` — +8 keys each (300 total)
-
-Full evidence: `.ai/reports/LATEST.md`. Previous snapshots: `.ai/history/`.
+- New `core/auth/`: models, JWT reader, API interface, OkHttp data source,
+  repository.
+- New `core/session/`: `SessionManager`, `SessionVault`; `SessionState`,
+  `SessionStore`, `SessionController`, `SessionProvider` rewritten for the four
+  states.
+- `navigation/AccessPolicy.kt`: `isAllowed`, `reasonFor`, `LoginReason.Expired`.
+- `navigation/VelnoxApp.kt`: real credential submit, error mapping, status pill.
+- `feature/auth/LoginScreen.kt`: `onSubmit`/`isSubmitting`/`errorRes`, error banner,
+  demo delay removed.
+- `AndroidManifest.xml`: `INTERNET`, backup rules. `app/build.gradle.kts`: OkHttp,
+  test deps, `API_BASE_URL`, `buildConfig = true`.
+- `.github/workflows/gradle-build.yml`: unit-test step, failure annotations, test
+  report artifact.
+- `strings.xml` ×3: 308 keys each.
+- Docs: `.ai/ARCHITECTURE_AUTH.md`, `.ai/reports/LATEST.md`, this file.
 
 ---
 
 ## Known issues
 
-- No session can be restored yet: nothing has ever been issued or persisted.
-  Part 3 needs a Keystore-backed `SessionStore` **and** a native token from the API
-  (Part 1 risk R1: mobile responses set a cookie but return no token).
-- Sign-in is still the pre-existing demo submit; no credential check, no token.
-- Add-to-cart has no UI; when added it must route through `requestOverlay`.
-- Product detail is still `PlaceholderDestination`; search and the catalogue are
-  local preview data.
-- Runtime behaviour is verified by compilation and source tracing only; no
-  device/emulator run.
-- Notification bell is not gated (it opens an empty popover, not a route).
+- **No refresh token** (no backend endpoint). Sessions last 7 days, then
+  `ExpiredSession` → sign in again.
+- **Google / LINE not in the app** (Part 6). No SDK, no ID-token source. LINE is
+  unconfigured on the server (`line:false`).
+- **Registration UI missing** (Part 4); `AuthRepository.register` exists, tested,
+  unreachable.
+- **Profile/Settings still demo data**; the real account is in
+  `SessionState.Authenticated.user` but unused.
+- **`onUnauthorized()` has no caller** until an authenticated feature call exists.
+- **No device verification** of Keystore, banners or the restore pill.
 - `.ai/AI_RULES.md` and `.ai/context/project-map.md` still use older VelShop names.
-- GitHub Actions emits `setup-java@v4` / Node 20 deprecation annotations.
+- CI still emits `setup-java@v4` / Node 20 deprecation annotations.
 
 ---
 
 ## Next Agent Startup Order
 
 1. `.ai/AI_HANDOFF.md` ← **YOU ARE HERE**
-2. `.ai/AI_RULES.md` (stale names; verify against source)
-3. `.ai/VELNOX_DESIGN_THEME.md`
-4. `.ai/reports/LATEST.md`
-5. `git fetch origin && git rev-parse HEAD && git rev-parse origin/main`
+2. `.ai/ARCHITECTURE_AUTH.md`
+3. `.ai/AI_RULES.md` (stale names; verify against source)
+4. `.ai/VELNOX_DESIGN_THEME.md`
+5. `.ai/reports/LATEST.md`
+6. `git fetch origin && git rev-parse HEAD && git rev-parse origin/main`
 
 ---
 
 ## Secrets / Credentials
 
 No secrets in `.ai/`. No tokens, keystores or passwords in this repository.
+The app embeds only the public API origin (`BuildConfig.API_BASE_URL`).
 
 ---
 
 ## Signature
 
 > This handoff supersedes the previous snapshots.
-> **Last updated:** 2026-11-18 by the Part 2 guest-first navigation session.
+> **Last updated:** 2026-11-18 by the Part 3 authentication-foundation session.

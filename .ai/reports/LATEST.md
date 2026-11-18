@@ -1,17 +1,18 @@
 # LATEST.md — Velnox Mobile Latest Change Report
 
-> **Current snapshot (overwritten each task).** Previous report (the Part 1 audit)
-> archived verbatim in `.ai/history/20261118_135900_LATEST_before_part2.md`.
+> **Current snapshot (overwritten each task).** Previous report (Part 2)
+> archived verbatim in `.ai/history/20261118_155500_LATEST_before_part3.md`.
 > Repository: `EnJirad/velnox-mobile`
 
 ---
 
-## Task: Part 2 — Guest-First Home & Navigation
+## Task: Part 3 — Authentication Foundation & Secure Session Architecture
 
 **Date:** 2026-11-18
-**Commit:** `cc8a093` — "Open app to Home for guests and gate protected destinations"
-**Verified CI run:** [44254710010](https://github.com/EnJirad/velnox-mobile/actions/runs/44254710010)
-**Status:** **VERIFIED — BUILD SUCCESSFUL** (all build/verify/upload steps green)
+**Commits:** `edc2b0e` (implementation), `169a0eb` (CI failure surfacing),
+`8bea21f` (compile fixes)
+**Verified CI run:** [44261281798](https://github.com/EnJirad/velnox-mobile/actions/runs/44261281798)
+**Status:** **VERIFIED — unit tests pass, BUILD SUCCESSFUL**
 
 ---
 
@@ -19,233 +20,211 @@
 
 | Check | Result |
 |---|---|
-| `git fetch origin main` before work | Done |
-| Base commit | `09207a3` (Part 1 audit report, committed upstream) |
-| Local vs `origin/main` at start | Divergence `0 0` |
+| `git fetch origin main` before work | Done; local == remote (`3537116`) |
 | Uncommitted work at start | None |
-| Work preserved | Yes — no file deleted, no history rewritten |
-| Local Android build | Not run, per `.ai/AI_RULES.md` §1 |
-| Push | `09207a3..cc8a093` to `origin/main` |
+| Work preserved | Yes — nothing deleted, no history rewritten |
+| Local Android build | Not run (`.ai/AI_RULES.md` §1) |
+| Backend / database | Untouched; read-only verification only |
 
 ---
 
-## 2. What changed
+## 2. What was built
 
-### 2.1 New session layer (`app/src/main/java/com/velnox/app/core/session/`)
+### 2.1 Authentication states (one source of truth)
 
-| File | Responsibility |
+`core/session/SessionState.kt`:
+
+```kotlin
+sealed interface SessionState {
+    data object Loading : SessionState
+    data object Guest : SessionState
+    data class Authenticated(override val user: AuthUser) : SessionState
+    data object ExpiredSession : SessionState
+    val isAuthenticated: Boolean
+    val user: AuthUser?
+}
+```
+
+No screen keeps its own flag. `LocalSession.current.state` is the only read path,
+and `SessionController` is the only writer.
+
+### 2.2 Layered implementation
+
+| File | Role |
 |---|---|
-| `SessionState.kt` | `sealed interface SessionState { Restoring, Guest, Authenticated }` with `isAuthenticated` / `isGuest`. Single source of truth for the guest decision; no screen keeps its own flag. |
-| `SessionStore.kt` | Persistence seam (`read()`, `clear()`) plus `NoStoredSessionStore`, which reports "nothing stored" — the truth in Part 2. Part 3 swaps in a Keystore-backed store. |
-| `SessionController.kt` | Holds `state`, resolves the stored session **once per process**, fails safe to `Guest` on a storage error, and owns local sign-out. |
-| `SessionProvider.kt` | `LocalSession` + `VelnoxSessionProvider`, which starts the restore in a `LaunchedEffect` so Home paints before storage is consulted. |
+| `core/auth/AuthModels.kt` | `AuthUser`, `AuthSession`, `AuthError` (10 cases), `ApiResult`, `SignInResult`, `RestoreOutcome` |
+| `core/auth/Jwt.kt` | `exp` reader. Used **only** to skip a guaranteed-401 call; never for authorization |
+| `core/auth/AuthApi.kt` | Interface (tests) |
+| `core/auth/AuthRemoteDataSource.kt` | OkHttp + `org.json`; login, register, me, logout; error mapping; token capture |
+| `core/auth/AuthRepository.kt` | The rules: what counts as signed in, restore matrix, sign-out ordering |
+| `core/session/SessionStore.kt` | Persistence seam + `StoredSession` |
+| `core/session/SessionVault.kt` | AES-256-GCM, Android Keystore key, atomic file write |
+| `core/session/SessionManager.kt` | One in-memory token, expiry check, clear |
+| `core/session/SessionController.kt` | The four states, `signIn`, `signOut`, `onUnauthorized`, notice |
+| `core/session/SessionProvider.kt` | `LocalSession` + one-shot restore after first frame |
+| `navigation/AccessPolicy.kt` | `isAllowed(state)`, `reasonForTab/Overlay`, `reasonFor(base, state)` |
 
-`VelnoxApplication` now owns `session` next to `preferences`, so a rotation cannot
-re-run the restore or lose the resolved state.
+### 2.3 Session transport — the Part 1 blocker, resolved without a backend change
 
-### 2.2 Centralized access policy (`navigation/AccessPolicy.kt`)
+Part 1 recorded that mobile responses set `velnox_session` but never return the
+token, while `bearerOrCookie` accepts the same value as a Bearer token. Verified
+again this session: `backend/routes/mobile-auth.ts` is **byte-identical** to the
+Part 1 snapshot.
 
-`LoginReason` (cart, orders, profile, messages, checkout, account) carries the
-localized explanation. `AccessPolicy.reasonForTab` / `reasonForOverlay` return
-`null` for public destinations and a reason for protected ones.
+Implementation: `captureSession()` reads the token from `Set-Cookie` and replays it
+as `Authorization: Bearer`. That is the path the backend's own comment describes
+for native clients. If the server later adds `data.token`, only that one function
+changes.
 
-Public: `home`, `category`, `category:<id>`, `product:<id>`, `search`.
-Protected: `messages`, `orders`, `cart`, `profile`, `checkout`, `wishlist`,
-`order:<id>`, `thread:<id>`, `settings`, `settings/<page>`.
-Unknown routes **fail closed** to `LoginReason.Account`.
+### 2.4 Secure storage
 
-### 2.3 Navigation (`navigation/VelnoxApp.kt`)
+- AES-256-GCM, 256-bit key in `AndroidKeyStore` (alias `velnox.session.v1`,
+  non-exportable, no user-auth requirement so a cold start can restore).
+- File: `filesDir/session/session.bin`, layout `[version][12-byte IV][ciphertext]`,
+  written to a temp file then renamed.
+- Unreadable/invalidated key or corrupt file → `null` **and** the file is deleted:
+  the app falls back to Guest rather than crashing or retrying dead bytes.
+- `res/xml/backup_rules.xml` + `data_extraction_rules.xml` exclude `session/`, so
+  neither cloud backup nor device transfer can carry a session off the device.
+- Nothing is written to DataStore or SharedPreferences.
 
-- Removed the startup `signedIn` demo gate. `VelnoxNavHost` now starts on
-  `AppTab.Home` for everyone; Login is a destination, not a launch screen.
-- Two funnels are the only way a destination changes:
-  `requestTab(AppTab)` and `requestOverlay(String)`. Both consult `AccessPolicy`
-  and, for a guest, store `pendingDestinationKey` (`tab:<key>` /
-  `overlay:<key>`) and set `loginReasonKey` instead of navigating.
-- One `BackHandler` handles everything in a fixed order: close Login → child page
-  to its hub → close overlay → back to Home tab → system exit.
-- `completeSignIn()` applies the pending destination after sign-in (the Login
-  screen's pre-existing demo submit calls it, so Part 3 only swaps the credential
-  call); `dismissLogin()` clears the pending destination and leaves the current
-  tab untouched.
-- `signOut()` clears Login/pending/overlay, returns to the Home tab, then clears
-  the session.
+### 2.5 UI changes
 
-### 2.4 Login screen (`feature/auth/LoginScreen.kt`)
+- `LoginScreen` now takes `onSubmit`, `isSubmitting`, `errorRes`; the simulated
+  700 ms delay and `LoginNotice.Success` are gone.
+- Failures render in an `errorContainer` banner with a distinct message per case
+  (credentials, offline, rate limited, disabled, validation, generic).
+- Sign-in password rule relaxed to "not empty". Strength rules stay server-side:
+  the old client `length < 6` rule could reject a valid legacy password, and
+  duplicating the server pattern only invites drift.
+- A 12dp top-end pill shows "Checking session…" during `Loading`, and
+  "Session couldn't be verified (offline)" (tap to dismiss) after an unverified
+  restore. Browsing is never blocked.
+- `AccessPolicy` gained `LoginReason.Expired`, so a dead session says so instead
+  of looking like a first visit.
 
-Added three optional parameters — `reason: LoginReason?`, `onDismiss: (() -> Unit)?` —
-and two UI pieces:
+### 2.6 Dependencies
 
-- `SignInReasonCard`: lock icon, "Sign-in required" label and one sentence, on
-  `secondaryContainer` / `onSecondaryContainer` so it is correct in light and dark.
-- A 44dp "Continue browsing without signing in" action, so a guest is never
-  trapped in the gate.
+| Added | Why |
+|---|---|
+| `com.squareup.okhttp3:okhttp:4.12.0` | The app had no HTTP client at all |
+| `junit:junit:4.13.2`, `kotlinx-coroutines-core:1.8.1` (test only) | Unit tests |
+| `buildConfigField API_BASE_URL` | One place for the API origin; not a secret |
 
-Nothing else on the screen changed: fields, validation, show/hide, remember-me,
-social buttons, notice banner and previews are untouched. Preview call sites
-compile unchanged thanks to the default arguments.
-
-### 2.5 Home search placeholder (`feature/home/HomeScreen.kt`)
-
-**Root cause:** the `Box` wrapping the placeholder and the `BasicTextField` used
-the default `TopStart` alignment, while the field applies
-`padding(vertical = VelnoxSpacing.md)`. The placeholder therefore sat ~12dp above
-the typed text and above the 18dp search icon, which the `Row` centres.
-
-**Fix:** `contentAlignment = Alignment.CenterStart` on that `Box`, so the
-placeholder, the typed text and the icon share one vertical centre. One line plus
-a comment; no colour, size, spacing or shape changed, so the fix is
-scheme-independent and verified the same way in Light and Dark.
-
-### 2.6 Localization
-
-`+8` keys in `values/` (Thai), `values-en/` and `values-my/`, identical key sets:
-`auth_reason_title`, `auth_reason_cart`, `auth_reason_orders`,
-`auth_reason_profile`, `auth_reason_messages`, `auth_reason_checkout`,
-`auth_reason_account`, `login_continue_browsing`.
-**300 keys per locale** (was 292); all three files parse as XML.
+No serialization plugin, no DI framework, no Navigation library, no security-crypto
+library: `org.json` is platform, Keystore is platform, DataStore already existed.
 
 ---
 
-## 3. Startup behaviour now
+## 3. Security properties (implemented, not claimed)
 
-```
-VelnoxApplication.onCreate()          preferences + SessionController
-MainActivity → VelnoxApp()
-  preferences → locale → theme → VelnoxSessionProvider → VelnoxNavHost
-      state = Restoring  →  Home renders immediately (no Login screen, no spinner)
-      LaunchedEffect    →  SessionController.restoreOnce()
-                              NoStoredSessionStore.read() = null → Guest
-```
-
-- A fresh install opens **Home**, as a guest.
-- No full-screen Login is shown while restoring: the shell is already on screen
-  and `Restoring` only suppresses a protected-action prompt for the few
-  milliseconds the restore takes.
-- A stored session would resolve to `Authenticated`; none can exist yet because
-  no token has ever been issued. The path is implemented, not simulated.
-- Process death returns to `Guest` (nothing is persisted), which is correct until
-  Part 3 stores a token.
+| Property | Where |
+|---|---|
+| A boolean cannot authenticate | `Authenticated` only from `me() == 200` or a sign-in response; `AccessPolicy.isAllowed` accepts only that state |
+| Token never in plaintext | `SessionVault`; DataStore/SharedPreferences untouched |
+| No secrets in the APK | Only the public API origin is compiled in |
+| Network failure ≠ signed in | `Unverified` → `Guest`, token kept, no account |
+| Invalid session dropped | `restore()` clears storage on 401 or passed `exp` |
+| Server is the authority | `/api/auth/me` + existing `requireAuth` on every account route |
+| Backup cannot leak a session | Backup rules exclude `session/` |
+| Sign-out is local-first | Storage cleared before the revoke call |
 
 ---
 
-## 4. Guest permission matrix (as implemented)
+## 4. Verification
 
-| Capability | Guest | Enforcement |
+### 4.1 CI
+
+| Item | Result |
+|---|---|
+| Run | [44261281798](https://github.com/EnJirad/velnox-mobile/actions/runs/44261281798) on `8bea21f` |
+| Run unit tests | **success** (1m 43s) |
+| Build debug APK | **success** |
+| Verify APK / integrity / upload | **success** |
+| Artifacts | `velnox-unit-test-report` 19,823 B · `velnox-debug-apk` **10,564,666 B** |
+
+The earlier run `44259933404` failed and `44260777809` failed again; the second
+failure's annotations gave the two compile errors, both fixed in `8bea21f`. The
+workflow now re-emits compiler/test failures as annotations and uploads the log,
+because job logs are not readable with this token (`403 Must have admin rights`).
+
+### 4.2 Unit tests — 41 tests, 5 classes
+
+| Class | Tests | Covers |
 |---|---|---|
-| Browse Home, feed, featured rail | Allowed | `AccessPolicy.reasonForTab(Home) = null` |
-| Browse categories + listings | Allowed | `reasonForOverlay("category*") = null` |
-| Open product detail | Allowed | `reasonForOverlay("product:*") = null` |
-| Search | Allowed | local `CatalogSource.search` |
-| Cart tab | **Login gate** | `requestTab(Cart)` |
-| Orders tab + order detail | **Login gate** | `requestTab` / `reasonForOverlay("order:*")` |
-| Profile tab, settings, addresses, wishlist | **Login gate** | `requestTab` / `reasonForOverlay("settings*", "wishlist")` |
-| Messages tab + threads | **Login gate** | `requestTab` / `reasonForOverlay("thread:*")` |
-| Checkout | **Login gate** | `reasonForOverlay("checkout")` |
+| `JwtTest` | 5 | `exp` parsing, boundary at/after expiry, no-exp, malformed, non-numeric |
+| `SessionManagerTest` | 6 | save/read/clear, unreadable store, failed clear still drops memory, expiry |
+| `AuthRepositoryTest` | 12 | no token, valid, 401 → cleared, expired without a call, network/server keep token, sign-in success/failure/unstorable, sign-out ordering |
+| `SessionControllerTest` | 13 | initial `Loading`, guest startup, valid restore, invalid, expired, offline notice, sign-in, failed sign-in, sign-out, 401 demotion, restart after sign-in, restart after sign-out, restore-once |
+| `AccessPolicyTest` | 5 | public vs protected routes, fail-closed default, `isAllowed` matrix, expired reason |
 
-Protected surfaces are enforced by the two navigation funnels, not by per-screen
-`if (signedIn)` checks. The client gate is UX plus defence in depth; the security
-boundary stays the API, where `requireAuth` guards `/api/customer/cart*`,
-`/checkout`, `/orders*`, `/profile` and `/addresses` (verified in the Part 1 audit).
+This maps 1:1 onto the Part 3 test list: guest startup, valid restoration, invalid
+session, expired session, logout, application restart, network unavailable.
 
----
+### 4.3 Live backend contract (read-only probes)
 
-## 5. Why there is no redirect loop
-
-1. `requestTab` / `requestOverlay` **do not change** `tabKey` / `overlayKey` when
-   they gate — the guest stays exactly where they were.
-2. Login is rendered from `loginReason`, which is independent of the tab state, so
-   showing it cannot re-trigger a gate.
-3. `dismissLogin()` clears the reason and the pending destination, so Back or
-   "Continue browsing" lands on the unchanged screen.
-4. Signing in applies the pending destination once and clears it.
-5. `askForSignIn` ignores taps while `Restoring`, so a slow store cannot open
-   Login on a state that is not yet known.
-
----
-
-## 6. Verification
-
-| Check | Method | Result |
+| Probe | Response | Matches client mapping |
 |---|---|---|
-| Kotlin/Compose compilation | GitHub Actions run 44254710010, step "Build debug APK" | **success** |
-| APK produced and non-empty | step "Verify APK" | **success** |
-| APK zip integrity (`unzip -t`) | step "Verify APK integrity" | **success** |
-| Artifact upload | step "Upload APK" | **success** — `velnox-debug-apk`, 10,176,620 bytes |
-| String resources | 300 keys in each of th/en/my, XML parse | **passed** |
-| Resource references (`R.string.auth_reason_*`, `R.string.login_continue_browsing`) | resolved by the successful compile | **passed** |
-| Fresh install → Home | source path traced: `signedIn` gate removed, `tabKey` starts `Home`, `SessionState` starts `Restoring` | **VERIFIED (source)** |
-| Guest browsing / search / product detail | `AccessPolicy` returns `null` for those routes; navigation unchanged | **VERIFIED (source)** |
-| Cart / Orders / Profile → Login | `reasonForTab` returns a reason for all three; `requestTab` gates | **VERIFIED (source)** |
-| Back behaviour | single `BackHandler`, order documented in §5 | **VERIFIED (source)** |
-| Light + Dark placeholder alignment | alignment-only change using semantic colours already in place | **VERIFIED (source)**; visual confirmation **NOT TESTED** on a device |
+| `GET /api/auth/me` (no token) | `401 UNAUTHORIZED` | `AuthError.Unauthorized` → `ExpiredSession` |
+| `POST /api/auth/mobile/login` (bad credentials) | `401 INVALID_CREDENTIALS` | `AuthError.InvalidCredentials` → banner |
 
-**Not verified:** on-device/emulator runtime — there is no install route in this
-session. Every runtime claim above is a source-level trace, not an observed run.
-Job log text (`BUILD SUCCESSFUL in …`) could not be downloaded: this token has no
-Actions-log read scope (`403 Must have admin rights to Repository`). The per-step
-**step conclusions** and the produced artifact size were read from the API.
+No account was created, no row was written, no schema was touched.
+
+### 4.4 Not verified
+
+- **A successful end-to-end sign-in on a device.** No customer account exists in
+  Neon (verified in Part 1: 3 users, all owner/seller/staff) and creating one is
+  the owner's decision. The success path is covered by unit tests and the API
+  contract, not by a live login.
+- **Keystore behaviour on hardware.** `SessionVault` compiles and its logic is
+  straightforward, but no instrumented test ran on a device.
+- Visual confirmation of the loading/unverified pill and the error banner.
 
 ---
 
-## 7. Remaining issues / limits
-
-1. **No real session can be restored yet.** `NoStoredSessionStore` always returns
-   `null` because no token exists; Part 3 must implement `SessionStore` with a
-   Keystore-backed write, and the API must return a token to the native client
-   (Part 1 risk R1).
-2. **The sign-in that completes the gate is still the pre-existing demo submit**
-   (`delay` + local validation). It is clearly named `completeDemoSignIn()` and
-   persists nothing; Part 3 replaces the call site.
-3. **Add-to-cart has no UI yet**, so there is nothing to gate. When it is added it
-   must be a protected route through `requestOverlay`, per `AccessPolicy`'s KDoc.
-4. **Product detail is still `PlaceholderDestination`**, so "open product details"
-   works as navigation but shows the honest preview notice, not real content.
-5. **Search and the catalogue remain local preview data** (`HomeCatalog`); Part 5
-   replaces the source behind the same `CatalogSource` seam.
-6. **Messages is treated as account-specific** and gated. That is a product
-   decision made here; if guests should read threads it must be reclassified in
-   `AccessPolicy`.
-7. **Notification bell is not gated** — it opens an empty popover, not a route.
-8. `.ai/AI_RULES.md` still names VelShop; GitHub Actions still emits
-   `setup-java@v4` / Node 20 deprecation annotations (non-blocking).
-
----
-
-## 8. Files changed
+## 5. Files changed
 
 **Added**
 
-- `app/src/main/java/com/velnox/app/core/session/SessionState.kt`
-- `app/src/main/java/com/velnox/app/core/session/SessionStore.kt`
-- `app/src/main/java/com/velnox/app/core/session/SessionController.kt`
-- `app/src/main/java/com/velnox/app/core/session/SessionProvider.kt`
-- `app/src/main/java/com/velnox/app/navigation/AccessPolicy.kt`
+- `app/src/main/java/com/velnox/app/core/auth/{AuthModels,Jwt,AuthApi,AuthRemoteDataSource,AuthRepository}.kt`
+- `app/src/main/java/com/velnox/app/core/session/{SessionManager,SessionVault}.kt`
+- `app/src/main/res/xml/{backup_rules,data_extraction_rules}.xml`
+- `app/src/test/java/com/velnox/app/core/auth/{JwtTest,AuthRepositoryTest}.kt`
+- `app/src/test/java/com/velnox/app/core/session/{SessionManagerTest,SessionControllerTest}.kt`
+- `app/src/test/java/com/velnox/app/navigation/AccessPolicyTest.kt`
+- `.ai/ARCHITECTURE_AUTH.md`
 
 **Modified**
 
-- `app/src/main/java/com/velnox/app/VelnoxApplication.kt`
-- `app/src/main/java/com/velnox/app/navigation/VelnoxApp.kt`
+- `app/src/main/java/com/velnox/app/{VelnoxApplication.kt,navigation/VelnoxApp.kt,navigation/AccessPolicy.kt}`
+- `app/src/main/java/com/velnox/app/core/session/{SessionState,SessionStore,SessionController,SessionProvider}.kt`
 - `app/src/main/java/com/velnox/app/feature/auth/LoginScreen.kt`
-- `app/src/main/java/com/velnox/app/feature/home/HomeScreen.kt`
-- `app/src/main/res/values/strings.xml`, `values-en/strings.xml`, `values-my/strings.xml`
+- `app/src/main/AndroidManifest.xml` (INTERNET, backup rules)
+- `app/build.gradle.kts` (OkHttp, test deps, BuildConfig, testOptions)
+- `app/src/main/res/values{,-en,-my}/strings.xml` (308 keys each)
+- `.github/workflows/gradle-build.yml` (unit-test step, failure annotations, reports)
+- `.ai/reports/LATEST.md`, `.ai/AI_HANDOFF.md`
 
-**Documentation**
+**Removed**
 
-- `.ai/reports/LATEST.md` (this report)
-- `.ai/AI_HANDOFF.md`
-- `.ai/history/20261118_135900_LATEST_before_part2.md`, `…_AI_HANDOFF_before_part2.md`
-
-No backend, database, workflow, Gradle or dependency change. No new dependency.
+- `NoStoredSessionStore` and the Part 2 demo sign-in (`completeDemoSignIn`).
 
 ---
 
-## 9. Next: Part 3 inputs
+## 6. Remaining issues
 
-- Replace `NoStoredSessionStore` with a real `SessionStore` and swap
-  `completeDemoSignIn()` for an `AuthRepository` sign-in.
-- Decide the native session carrier with the backend owner (Part 1 risk R1:
-  return the token in the mobile response body, or add an exchange endpoint).
-- Registration screen, password policy alignment (≥ 8 + strength, not 6) and the
-  `VALIDATION_ERROR` / `INVALID_CREDENTIALS` / `ACCOUNT_CONFLICT` copy mapping.
-- Real account identity in Profile/Settings once `/api/customer/profile` is wired.
+1. **No refresh token** — the backend has none. A 7-day JWT either validates or
+   becomes `ExpiredSession`; there is no silent renewal. Adding it needs a backend
+   endpoint (owner decision).
+2. **Google and LINE are still unimplemented in the app** (Part 6). Server side is
+   ready; `mobile/config` reports `google:true, line:false`.
+3. **Registration has no screen** (Part 4). `AuthRepository.register` is
+   implemented and tested but unreachable from UI.
+4. **Profile still shows demo identity** — `Authenticated` carries the real
+   account, but Profile/Settings do not render it yet.
+5. **`onUnauthorized()` has no caller yet**, because no authenticated feature call
+   exists; it is the seam Part 4/5 will use.
+6. **No instrumented tests** — Keystore and Compose UI behaviour are unverified on
+   a device.
+7. `.ai/AI_RULES.md` still names VelShop; `setup-java@v4` / Node 20 deprecation
+   annotations remain.
