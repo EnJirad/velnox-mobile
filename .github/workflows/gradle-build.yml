@@ -66,10 +66,42 @@ jobs:
           KEYSTORE="$HOME/.android/debug.keystore"
           mkdir -p "$HOME/.android"
           if [ -n "$KEYSTORE_BASE64" ]; then
+            # Decoded only into the runner's home directory, never echoed, never
+            # committed. 0600 because a keystore is a credential.
+            umask 077
             printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
+            chmod 600 "$KEYSTORE"
             echo "Using the pinned keystore from ANDROID_DEBUG_KEYSTORE_BASE64."
+            # Public fingerprints only: this is what must be registered with Google,
+            # and printing it here proves the same key is used on every run.
+            keytool -list -v -keystore "$KEYSTORE" -storepass android 2>/dev/null \
+              | grep -E "SHA-1:|SHA-256:" \
+              | sed 's/^/  pinned debug keystore /'
           else
             echo "::warning title=Debug signing key is not pinned::No ANDROID_DEBUG_KEYSTORE_BASE64 secret is set, so this runner generates its own debug keystore. The APK signing SHA-1 will change on the next build, and an Android OAuth client registered against it will stop working."
+            {
+              echo "### ⚠️ ACTION REQUIRED — Google Sign-In cannot work until the debug key is pinned"
+              echo ""
+              echo "No \`ANDROID_DEBUG_KEYSTORE_BASE64\` repository secret is set, so every"
+              echo "run signs the APK with a different key. Google binds an Android OAuth"
+              echo "client to \`com.velnox.app\` + one SHA-1, so no client can match this build."
+              echo ""
+              echo "Owner steps (once):"
+              echo ""
+              echo '```bash'
+              echo 'keytool -genkeypair -v -keystore velnox-debug.keystore -storepass android \'
+              echo '  -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \'
+              echo '  -validity 10000 -dname "CN=Android Debug,O=Android,C=US"'
+              echo 'base64 -w0 velnox-debug.keystore | pbcopy   # or: > keystore.b64'
+              echo '```'
+              echo ""
+              echo "1. Save the base64 output as the repository secret \`ANDROID_DEBUG_KEYSTORE_BASE64\`"
+              echo "   (Settings → Secrets and variables → Actions → New repository secret)."
+              echo "2. Re-run this workflow and copy the SHA-1 from the step summary."
+              echo "3. Register that SHA-1 on an **Android** OAuth client for \`com.velnox.app\`"
+              echo "   in the same Google Cloud project as the Web client."
+              echo "4. Delete the local \`velnox-debug.keystore\` after uploading it."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Make Gradle wrapper executable
