@@ -64,6 +64,14 @@ class AuthRepositoryTest {
             return logoutResult
         }
 
+        override suspend fun googleSignIn(idToken: String): ApiResult<AuthSession> {
+            googleCalls++
+            lastGoogleToken = idToken
+            return googleResult
+        }
+
+        override suspend fun googleClientId(): ApiResult<String?> = clientIdResult
+
         override suspend fun forgotPassword(email: String): ApiResult<Unit> {
             forgotCalls++
             lastForgotEmail = email
@@ -324,7 +332,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `an existing account is never merged: LinkRequired stores nothing`() = runBlocking {
+    fun `an existing account is never merged and LinkRequired stores nothing`() = runBlocking {
         val api = FakeApi().apply { googleResult = ApiResult.Error(AuthError.LinkRequired) }
         val store = FakeStore()
 

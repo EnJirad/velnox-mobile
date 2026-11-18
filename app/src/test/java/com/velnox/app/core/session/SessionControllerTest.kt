@@ -44,6 +44,13 @@ class SessionControllerTest {
             return logoutResult
         }
 
+        override suspend fun googleSignIn(idToken: String): ApiResult<AuthSession> {
+            googleCalls++
+            return googleResult
+        }
+
+        override suspend fun googleClientId(): ApiResult<String?> = ApiResult.Ok(null)
+
         override suspend fun forgotPassword(email: String): ApiResult<Unit> = forgotResult
 
         override suspend fun resetPassword(token: String, password: String): ApiResult<Unit> =
