@@ -136,6 +136,9 @@ fun ProductDetailScreen(
     var quantity by remember(productId) { mutableIntStateOf(1) }
     var addedFeedbackMessage by remember { mutableStateOf<String?>(null) }
     var showOptionsSheet by remember(productId) { mutableStateOf(false) }
+    var optionsPopupIntent by remember(productId) {
+        mutableStateOf(ProductSelectionIntent.SELECT_OPTIONS)
+    }
     var selectedTab by remember(productId) { mutableIntStateOf(0) } // 0 = Recs, 1 = Details, 2 = Reviews
 
     // Recommendations and Reviews state
@@ -416,9 +419,9 @@ fun ProductDetailScreen(
                             }
                         }
 
-                        // 3. Product Options / Variants Row (Opens Options Bottom Sheet)
+                        // 3. Product Options Selection Entry Point (Replaces old horizontal selector)
                         if (product.optionGroups.isNotEmpty() || product.variants.size > 1) {
-                            item(key = "options_selector", contentType = "options") {
+                            item(key = "options_entry", contentType = "options") {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -432,26 +435,34 @@ fun ProductDetailScreen(
                                             .background(MaterialTheme.colorScheme.surface)
                                             .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
                                             .velnoxClickable(role = Role.Button) {
+                                                optionsPopupIntent = ProductSelectionIntent.SELECT_OPTIONS
                                                 showOptionsSheet = true
                                             }
-                                            .padding(VelnoxSpacing.md),
+                                            .padding(horizontal = 16.dp, vertical = 14.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = stringResource(R.string.product_select_options),
-                                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                                 color = MaterialTheme.colorScheme.onSurface,
                                             )
+                                            Spacer(Modifier.height(4.dp))
                                             val summaryText = selectedVariant?.title
                                                 ?: product.optionGroups.joinToString(", ") { it.name }
                                             if (summaryText.isNotBlank()) {
                                                 Text(
-                                                    text = summaryText,
-                                                    style = Text2xs,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    text = stringResource(R.string.product_options_selected, summaryText),
+                                                    style = TextXs.copy(fontWeight = FontWeight.Medium),
+                                                    color = VelnoxBrand,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = stringResource(R.string.product_options_none_selected),
+                                                    style = TextXs,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
                                             }
                                         }
@@ -459,116 +470,8 @@ fun ProductDetailScreen(
                                             imageVector = VelnoxIcons.ChevronRight,
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp),
+                                            modifier = Modifier.size(20.dp),
                                         )
-                                    }
-                                }
-                            }
-                        }
-
-                        // 4. Quick Variant Selection Chips (if product has multiple variants)
-                        if (product.variants.size > 1) {
-                            item(key = "variants_section", contentType = "variants") {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = PageGutter)
-                                        .padding(top = VelnoxSpacing.md),
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.product_variants_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = MaterialTheme.colorScheme.onBackground,
-                                        )
-
-                                        selectedVariant?.let { v ->
-                                            Text(
-                                                text = v.title,
-                                                style = Text2xs.copy(fontWeight = FontWeight.Medium),
-                                                color = VelnoxBrand,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(Modifier.height(VelnoxSpacing.sm))
-
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        items(
-                                            items = product.variants,
-                                            key = { it.id },
-                                        ) { variant ->
-                                            val isSelected = variant.id == selectedVariant?.id
-                                            val variantOutOfStock = variant.stock != null && variant.stock <= 0
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(Squircle)
-                                                    .background(
-                                                        when {
-                                                            isSelected -> VelnoxBrand.copy(alpha = 0.12f)
-                                                            variantOutOfStock -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                                                            else -> MaterialTheme.colorScheme.surface
-                                                        },
-                                                    )
-                                                    .border(
-                                                        width = if (isSelected) 1.5.dp else 1.dp,
-                                                        color = when {
-                                                            isSelected -> VelnoxBrand
-                                                            else -> MaterialTheme.colorScheme.outline
-                                                        },
-                                                        shape = Squircle,
-                                                    )
-                                                    .velnoxClickable(
-                                                        enabled = !variantOutOfStock,
-                                                        role = Role.RadioButton,
-                                                    ) {
-                                                        selectedVariantId = variant.id
-                                                    }
-                                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text(
-                                                        text = variant.title,
-                                                        style = TextXs.copy(
-                                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                        ),
-                                                        color = when {
-                                                            variantOutOfStock -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                                            isSelected -> VelnoxBrand
-                                                            else -> MaterialTheme.colorScheme.onSurface
-                                                        },
-                                                    )
-
-                                                    variant.price?.let { vPrice ->
-                                                        PriceFormat.format(
-                                                            vPrice,
-                                                            product.currency,
-                                                            LocalConfiguration.current.locales[0],
-                                                        )?.let { formattedPrice ->
-                                                            Text(
-                                                                text = formattedPrice,
-                                                                style = Text2xs,
-                                                                color = if (variantOutOfStock) {
-                                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                                                } else {
-                                                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                                                },
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
                                     }
                                 }
                             }
@@ -1107,14 +1010,36 @@ fun ProductDetailScreen(
                     }
                 }
 
-                // 8. Options Bottom Sheet Popup
+                // 8. Large Product Options Bottom Sheet Popup (Context-Aware)
                 if (showOptionsSheet) {
                     ProductOptionsBottomSheet(
                         product = product,
                         initialVariantId = selectedVariantId,
                         initialQuantity = quantity,
+                        intent = optionsPopupIntent,
                         onDismissRequest = { showOptionsSheet = false },
-                        onConfirm = { variant, newQuantity ->
+                        onAddToCart = { variant, newQuantity ->
+                            selectedVariantId = variant?.id
+                            quantity = newQuantity
+                            showOptionsSheet = false
+                            if (canPurchase) {
+                                onAddToCart?.invoke(product, variant, newQuantity)
+                                addedFeedbackMessage = product.name
+                                scope.launch {
+                                    delay(2800)
+                                    addedFeedbackMessage = null
+                                }
+                            }
+                        },
+                        onBuyNow = { variant, newQuantity ->
+                            selectedVariantId = variant?.id
+                            quantity = newQuantity
+                            showOptionsSheet = false
+                            if (canPurchase) {
+                                onBuyNow?.invoke(product, variant, newQuantity)
+                            }
+                        },
+                        onConfirmSelection = { variant, newQuantity ->
                             selectedVariantId = variant?.id
                             quantity = newQuantity
                             showOptionsSheet = false
@@ -1122,23 +1047,33 @@ fun ProductDetailScreen(
                     )
                 }
 
-                // 9. Bottom Action Area
+                // 9. Bottom Action Area (Context-Aware Add to Cart & Buy Now)
                 BottomPurchaseArea(
                     canPurchase = canPurchase,
                     isOutOfStock = isOutOfStock,
                     onAddToCart = {
                         if (canPurchase) {
-                            onAddToCart?.invoke(product, selectedVariant, quantity)
-                            addedFeedbackMessage = product.name
-                            scope.launch {
-                                delay(2800)
-                                addedFeedbackMessage = null
+                            if (product.variants.size > 1 || product.optionGroups.isNotEmpty()) {
+                                optionsPopupIntent = ProductSelectionIntent.ADD_TO_CART
+                                showOptionsSheet = true
+                            } else {
+                                onAddToCart?.invoke(product, selectedVariant, quantity)
+                                addedFeedbackMessage = product.name
+                                scope.launch {
+                                    delay(2800)
+                                    addedFeedbackMessage = null
+                                }
                             }
                         }
                     },
                     onBuyNow = {
                         if (canPurchase) {
-                            onBuyNow?.invoke(product, selectedVariant, quantity)
+                            if (product.variants.size > 1 || product.optionGroups.isNotEmpty()) {
+                                optionsPopupIntent = ProductSelectionIntent.BUY_NOW
+                                showOptionsSheet = true
+                            } else {
+                                onBuyNow?.invoke(product, selectedVariant, quantity)
+                            }
                         }
                     },
                 )

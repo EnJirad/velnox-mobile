@@ -463,6 +463,12 @@
     <string name="product_reviews_count">%1$d รีวิว</string>
     <string name="product_confirm">ยืนยัน</string>
     <string name="product_options_selected">เลือกแล้ว: %1$s</string>
+    <string name="product_thumbnail_size">ขนาดตัวเลือก</string>
+    <string name="product_thumbnail_size_decrease">เล็กลง</string>
+    <string name="product_thumbnail_size_increase">ใหญ่ขึ้น</string>
+    <string name="product_please_select_option">กรุณาเลือก %1$s</string>
+    <string name="product_options_none_selected">แตะเพื่อเลือกตัวเลือก</string>
+    <string name="product_close">ปิด</string>
     <string name="product_unavailable_title">ไม่พบสินค้านี้</string>
     <string name="product_unavailable_body">สินค้าอาจถูกนำออก หรือยังไม่เผยแพร่</string>
 </resources>

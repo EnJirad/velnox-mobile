@@ -459,6 +459,12 @@
     <string name="product_reviews_count">သုံးသပ်ချက် %1$d ခု</string>
     <string name="product_confirm">အတည်ပြုပါ</string>
     <string name="product_options_selected">ရွေးချယ်ထားသော: %1$s</string>
+    <string name="product_thumbnail_size">ရွေးချယ်စရာ အရွယ်အစား</string>
+    <string name="product_thumbnail_size_decrease">သေးအောင်</string>
+    <string name="product_thumbnail_size_increase">ကြီးအောင်</string>
+    <string name="product_please_select_option">ကျေးဇူးပြု၍ %1$s ရွေးပါ</string>
+    <string name="product_options_none_selected">ရွေးချယ်ရန် နှိပ်ပါ</string>
+    <string name="product_close">ပိတ်ရန်</string>
     <string name="product_unavailable_title">ဤကုန်ပစ္စည်းကို မတွေ့ပါ</string>
     <string name="product_unavailable_body">ဖယ်ရှားခံရခြင်း သို့မဟုတ် ထုတ်ပြန်မှု ရပ်ဆိုင်းခံရခြင်း ဖြစ်နိုင်သည်</string>
 </resources>

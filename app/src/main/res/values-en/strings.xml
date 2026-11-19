@@ -463,6 +463,12 @@
     <string name="product_reviews_count">%1$d reviews</string>
     <string name="product_confirm">Confirm</string>
     <string name="product_options_selected">Selected: %1$s</string>
+    <string name="product_thumbnail_size">Option size</string>
+    <string name="product_thumbnail_size_decrease">Smaller</string>
+    <string name="product_thumbnail_size_increase">Larger</string>
+    <string name="product_please_select_option">Please select %1$s</string>
+    <string name="product_options_none_selected">Tap to select options</string>
+    <string name="product_close">Close</string>
     <string name="product_unavailable_title">This product isn\'t available</string>
     <string name="product_unavailable_body">It may have been removed or is no longer published</string>
 </resources>
