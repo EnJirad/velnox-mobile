@@ -14,11 +14,19 @@ import com.velnox.app.feature.home.ProductArt
  */
 data class CartItem(
     val productId: String,
-    @StringRes val nameRes: Int,
-    @StringRes val storeRes: Int,
-    val art: ProductArt,
+    @StringRes val nameRes: Int = 0,
+    @StringRes val storeRes: Int = 0,
+    val art: ProductArt = ProductArt.Headphones,
     val quantity: Int,
     val selected: Boolean,
+    val name: String? = null,
+    val storeName: String? = null,
+    val imageUrl: String? = null,
+    val variantId: String? = null,
+    val variantName: String? = null,
+    val price: Double? = null,
+    val currency: String = "THB",
+    val maxStock: Int? = null,
 )
 
 /**
@@ -41,7 +49,10 @@ class CartState {
         if (index >= 0) items[index] = transform(items[index])
     }
 
-    fun increase(id: String) = update(id) { it.copy(quantity = (it.quantity + 1).coerceAtMost(99)) }
+    fun increase(id: String) = update(id) {
+        val limit = it.maxStock ?: 99
+        it.copy(quantity = (it.quantity + 1).coerceAtMost(limit))
+    }
 
     fun decrease(id: String) = update(id) { it.copy(quantity = (it.quantity - 1).coerceAtLeast(1)) }
 
@@ -54,5 +65,49 @@ class CartState {
     fun toggleAll() {
         val target = !allSelected
         items.replaceAll { it.copy(selected = target) }
+    }
+
+    fun add(
+        productId: String,
+        name: String,
+        storeName: String?,
+        imageUrl: String?,
+        variantId: String?,
+        variantName: String?,
+        price: Double?,
+        currency: String,
+        quantity: Int,
+        maxStock: Int?,
+    ) {
+        val key = if (variantId != null) "${productId}_${variantId}" else productId
+        val existingIndex = items.indexOfFirst { it.productId == key }
+        val stockLimit = maxStock ?: 99
+        if (existingIndex >= 0) {
+            val current = items[existingIndex]
+            items[existingIndex] = current.copy(
+                quantity = (current.quantity + quantity).coerceAtMost(stockLimit),
+                selected = true,
+            )
+        } else {
+            items.add(
+                0,
+                CartItem(
+                    productId = key,
+                    nameRes = 0,
+                    storeRes = 0,
+                    art = ProductArt.Headphones,
+                    quantity = quantity.coerceAtMost(stockLimit),
+                    selected = true,
+                    name = name,
+                    storeName = storeName,
+                    imageUrl = imageUrl,
+                    variantId = variantId,
+                    variantName = variantName,
+                    price = price,
+                    currency = currency,
+                    maxStock = maxStock,
+                ),
+            )
+        }
     }
 }

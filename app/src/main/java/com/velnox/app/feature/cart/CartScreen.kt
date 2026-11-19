@@ -31,12 +31,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.velnox.app.R
+import com.velnox.app.core.catalog.PriceFormat
 import com.velnox.app.feature.home.ProductArtTile
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.EmptyState
@@ -186,36 +190,73 @@ private fun CartLine(
         Column {
             SelectionBox(checked = item.selected, onClick = onToggle)
             Spacer(Modifier.height(8.dp))
-            Box(modifier = Modifier.size(72.dp)) {
-                ProductArtTile(art = item.art, modifier = Modifier.fillMaxSize())
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(SquircleSm)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                if (item.imageUrl != null) {
+                    AsyncImage(
+                        model = item.imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    ProductArtTile(art = item.art, modifier = Modifier.fillMaxSize())
+                }
             }
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
+            val itemName = item.name ?: if (item.nameRes != 0) stringResource(item.nameRes) else ""
             Text(
-                text = stringResource(item.nameRes),
+                text = itemName,
                 style = TextXs.copy(fontWeight = FontWeight.Medium),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = stringResource(item.storeRes),
-                style = Text2xs,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
+            val store = item.storeName ?: if (item.storeRes != 0) stringResource(item.storeRes) else ""
+            if (store.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = store,
+                    style = Text2xs,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            if (item.variantName != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = item.variantName,
+                    style = Text2xs,
+                    color = VelnoxBrand,
+                )
+            }
             Spacer(Modifier.height(8.dp))
-            StatusChip(
-                text = stringResource(R.string.common_value_placeholder),
-                tone = StatusTone.Neutral,
-            )
+            if (item.price != null) {
+                PriceFormat.format(item.price, item.currency, LocalConfiguration.current.locales[0])?.let { p ->
+                    Text(
+                        text = p,
+                        style = TextXs.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            } else {
+                StatusChip(
+                    text = stringResource(R.string.common_value_placeholder),
+                    tone = StatusTone.Neutral,
+                )
+            }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 QuantityStepper(
                     value = item.quantity,
                     onDecrease = onDecrease,
                     onIncrease = onIncrease,
+                    increaseEnabled = item.quantity < (item.maxStock ?: 99),
                 )
                 Spacer(Modifier.weight(1f))
                 Row(

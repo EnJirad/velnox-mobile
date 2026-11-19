@@ -437,6 +437,15 @@
     <string name="product_sold">ขายแล้ว %1$d</string>
     <string name="product_description_title">รายละเอียดสินค้า</string>
     <string name="product_variants_title">ตัวเลือกสินค้า</string>
+    <string name="product_add_to_cart">เพิ่มลงตะกร้า</string>
+    <string name="product_buy_now">ซื้อเลย</string>
+    <string name="product_added_to_cart">เพิ่ม \"%1$s\" ลงในตะกร้าแล้ว</string>
+    <string name="product_quantity_label">จำนวน</string>
+    <string name="product_seller_title">ข้อมูลร้านค้า</string>
+    <string name="product_category_title">หมวดหมู่</string>
+    <string name="product_view_cart">ดูตะกร้า</string>
+    <string name="product_variant_selected">ตัวเลือกที่เลือก: %1$s</string>
+    <string name="product_full_screen_zoom">แตะเพื่อดูภาพขนาดเต็ม</string>
     <string name="product_unavailable_title">ไม่พบสินค้านี้</string>
     <string name="product_unavailable_body">สินค้าอาจถูกนำออก หรือยังไม่เผยแพร่</string>
 </resources>

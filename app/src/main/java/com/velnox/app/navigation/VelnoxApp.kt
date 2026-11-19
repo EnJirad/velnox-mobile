@@ -561,6 +561,39 @@ private fun VelnoxNavHost() {
                             ProductDetailScreen(
                                 productId = overlay.removePrefix("product:"),
                                 onBack = ::closeOverlay,
+                                onAddToCart = { product, variant, qty ->
+                                    cart.add(
+                                        productId = product.id,
+                                        name = product.name,
+                                        storeName = product.shopName,
+                                        imageUrl = variant?.let { v -> product.images.firstOrNull { it.id == v.id }?.url } ?: product.images.firstOrNull()?.url,
+                                        variantId = variant?.id,
+                                        variantName = variant?.title ?: variant?.name,
+                                        price = variant?.price ?: product.displayPrice,
+                                        currency = product.currency,
+                                        quantity = qty,
+                                        maxStock = variant?.stock ?: product.availableStock,
+                                    )
+                                },
+                                onBuyNow = { product, variant, qty ->
+                                    cart.add(
+                                        productId = product.id,
+                                        name = product.name,
+                                        storeName = product.shopName,
+                                        imageUrl = variant?.let { v -> product.images.firstOrNull { it.id == v.id }?.url } ?: product.images.firstOrNull()?.url,
+                                        variantId = variant?.id,
+                                        variantName = variant?.title ?: variant?.name,
+                                        price = variant?.price ?: product.displayPrice,
+                                        currency = product.currency,
+                                        quantity = qty,
+                                        maxStock = variant?.stock ?: product.availableStock,
+                                    )
+                                    requestOverlay("checkout")
+                                },
+                                onOpenCart = {
+                                    closeOverlay()
+                                    requestTab(AppTab.Cart)
+                                },
                             )
                         } else {
                             val page = SettingsPage.fromKey(overlay)

@@ -475,6 +475,7 @@ fun QuantityStepper(
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     decreaseEnabled: Boolean = value > 1,
+    increaseEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -497,7 +498,7 @@ fun QuantityStepper(
         )
         StepButton(
             icon = VelnoxIcons.Plus,
-            enabled = true,
+            enabled = increaseEnabled,
             onClick = onIncrease,
         )
     }

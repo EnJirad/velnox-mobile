@@ -437,6 +437,15 @@
     <string name="product_sold">%1$d sold</string>
     <string name="product_description_title">Product details</string>
     <string name="product_variants_title">Product Variants</string>
+    <string name="product_add_to_cart">Add to Cart</string>
+    <string name="product_buy_now">Buy Now</string>
+    <string name="product_added_to_cart">Added \"%1$s\" to cart</string>
+    <string name="product_quantity_label">Quantity</string>
+    <string name="product_seller_title">Seller Information</string>
+    <string name="product_category_title">Category</string>
+    <string name="product_view_cart">View Cart</string>
+    <string name="product_variant_selected">Selected: %1$s</string>
+    <string name="product_full_screen_zoom">Tap to view full screen</string>
     <string name="product_unavailable_title">This product isn\'t available</string>
     <string name="product_unavailable_body">It may have been removed or is no longer published</string>
 </resources>
