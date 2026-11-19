@@ -89,6 +89,19 @@ The workflow is now fail-closed. It validates the decoded store, requires the
 compares the assembled APK's certificate against the keystore's. Any mismatch
 fails the job. It never generates a replacement key.
 
+On the first fail-closed run (2026-11-19) the gate reported exactly what the
+stored secret is:
+
+```
+keytool error: java.io.EOFException
+```
+
+The decoded bytes are not a keystore — the value is truncated, or is not the raw
+base64 of a `.keystore` file. Only one secret exists (`ANDROID_DEBUG_KEYSTORE_BASE64`),
+so `ANDROID_DEBUG_KEYSTORE_PASSWORD` defaulted to `android`; the failure is the
+file, not the password. Replace the secret with the output of `base64 -w0` on a
+complete keystore.
+
 Create one keystore and store it as the repository secret
 `ANDROID_DEBUG_KEYSTORE_BASE64` (add `ANDROID_DEBUG_KEYSTORE_PASSWORD` only if the
 store password is not `android`):
