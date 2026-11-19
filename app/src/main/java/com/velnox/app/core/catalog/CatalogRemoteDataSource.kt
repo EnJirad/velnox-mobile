@@ -368,7 +368,7 @@ class CatalogRemoteDataSource(
             productCount = sObj.optInt("productCount", 0),
             rating = sObj.numberOrNull("rating"),
             reviewCount = sObj.optInt("reviewCount", 0),
-            isVerified = sObj.stringOrNull("verificationStatus") == "verified",
+            isVerified = sObj.optBoolean("isVerified", false) || sObj.stringOrNull("verificationStatus") == "verified",
         )
 
         val productsList = ArrayList<CatalogProduct>()
