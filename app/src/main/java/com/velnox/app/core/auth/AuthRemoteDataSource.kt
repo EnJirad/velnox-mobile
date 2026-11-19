@@ -308,6 +308,21 @@ class AuthRemoteDataSource(
 
         return when {
             status == 401 && isSignIn -> AuthError.InvalidCredentials
+
+            // Provider rejections are matched on their code before any status
+            // check. `POST /api/auth/mobile/google` answers 401 for a token it
+            // will not accept — wrong audience, expired, unverified email — and a
+            // status-first `when` reported that as "your session expired", which
+            // is both wrong and unactionable. A real expired session carries the
+            // `UNAUTHORIZED` code and still falls through to that branch below.
+            code == "INVALID_GOOGLE_TOKEN" || code == "EMAIL_NOT_VERIFIED" ->
+                AuthError.InvalidProviderToken
+            code == "GOOGLE_NOT_CONFIGURED" || code == "GOOGLE_UNAVAILABLE" ->
+                AuthError.ProviderUnavailable
+            code == "LINK_REQUIRED" -> AuthError.LinkRequired
+            code == "EMAIL_MISMATCH" -> AuthError.EmailMismatch
+            code == "IDENTITY_CONFLICT" -> AuthError.IdentityConflict
+
             status == 401 -> AuthError.Unauthorized
             status == 429 -> AuthError.RateLimited
             code == "EMAIL_EXISTS" -> AuthError.EmailExists
@@ -315,13 +330,6 @@ class AuthRemoteDataSource(
             code == "ACCOUNT_CONFLICT" -> AuthError.AccountConflict
             code == "EMAIL_NOT_CONFIGURED" -> AuthError.EmailNotConfigured
             code == "INVALID_RESET_TOKEN" -> AuthError.InvalidResetToken
-            code == "INVALID_GOOGLE_TOKEN" || code == "EMAIL_NOT_VERIFIED" ->
-                AuthError.InvalidProviderToken
-            code == "LINK_REQUIRED" -> AuthError.LinkRequired
-            code == "EMAIL_MISMATCH" -> AuthError.EmailMismatch
-            code == "IDENTITY_CONFLICT" -> AuthError.IdentityConflict
-            code == "GOOGLE_NOT_CONFIGURED" || code == "GOOGLE_UNAVAILABLE" ->
-                AuthError.ProviderUnavailable
             status == 400 -> AuthError.Validation
             status >= 500 -> AuthError.Server
             else -> AuthError.Unknown

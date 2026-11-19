@@ -324,6 +324,19 @@ class AuthRemoteDataSourceTest {
     }
 
     @Test
+    fun `a revoked session is still a session problem, not a provider one`() = runBlocking {
+        // Guards the ordering in `errorFor`: provider codes are matched before
+        // the bare 401 branch, so the plain `UNAUTHORIZED` code must still land
+        // on `Unauthorized` rather than being swept up with the Google answers.
+        val server = FakeServer(
+            code = 401,
+            body = """{"success":false,"error":{"code":"UNAUTHORIZED","message":"Session revoked"}}""",
+        )
+
+        assertEquals(ApiResult.Error(AuthError.Unauthorized), server.api().me("revoked-token"))
+    }
+
+    @Test
     fun `logout revokes on the server`() = runBlocking {
         val server = FakeServer(code = 200, body = """{"success":true}""")
 
