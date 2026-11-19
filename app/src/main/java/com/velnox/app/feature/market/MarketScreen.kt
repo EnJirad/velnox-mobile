@@ -7,6 +7,7 @@ import androidx.compose.animation.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,8 +30,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetState
+import androidx.compose.material3.ModalBottomSheetValue
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -106,17 +112,6 @@ fun MarketScreen(
     var categories by remember { mutableStateOf<List<CatalogCategory>>(emptyList()) }
 
     // Feed state
-    sealed interface MarketFeed {
-        data object Loading : MarketFeed
-        data object Empty : MarketFeed
-        data object Error : MarketFeed
-        data class Content(
-            val items: List<CatalogProduct>,
-            val hasMore: Boolean,
-            val loadingMore: Boolean = false,
-        ) : MarketFeed
-    }
-
     var feed by remember { mutableStateOf<MarketFeed>(MarketFeed.Loading) }
     var reloadKey by remember { mutableIntStateOf(0) }
 
@@ -178,14 +173,6 @@ fun MarketScreen(
                 )
                 is CatalogResult.Failed -> current.copy(loadingMore = false, hasMore = false)
             }
-        }
-    }
-
-    fun retry() {
-        scope.launch {
-            catalog.invalidate()
-            categories = emptyList()
-            reloadKey++
         }
     }
 
@@ -357,6 +344,19 @@ private fun CatalogResult<CatalogPage>.toMarketFeed(): MarketFeed = when (this) 
     }
 }
 
+// ───────────────────────────────────────────────────────────── Feed State
+
+sealed interface MarketFeed {
+    data object Loading : MarketFeed
+    data object Empty : MarketFeed
+    data object Error : MarketFeed
+    data class Content(
+        val items: List<CatalogProduct>,
+        val hasMore: Boolean,
+        val loadingMore: Boolean = false,
+    ) : MarketFeed
+}
+
 // ───────────────────────────────────────────────────────────── Top Bar
 
 @Composable
@@ -430,7 +430,7 @@ private fun MarketTopBar(
                             innerTextField()
                             if (query.isNotBlank()) {
                                 Icon(
-                                    imageVector = VelnoxIcons.X,
+                                    imageVector = VelnoxIcons.Close,
                                     contentDescription = stringResource(R.string.home_search_clear),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
@@ -444,24 +444,6 @@ private fun MarketTopBar(
                 }
                 Spacer(Modifier.width(VelnoxSpacing.sm))
 
-                // Chat button (MessageCircle)
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(com.velnox.app.ui.theme.Circle)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.12f))
-                        .velnoxClickable(role = Role.Button, onClick = { /* handled in VelnoxApp */ }),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = VelnoxIcons.MessageCircle,
-                        contentDescription = stringResource(R.string.nav_messages),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                Spacer(Modifier.width(VelnoxSpacing.xs))
-
                 // Filter button
                 Box(
                     modifier = Modifier
@@ -472,7 +454,7 @@ private fun MarketTopBar(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = VelnoxIcons.Filter,
+                        imageVector = VelnoxIcons.SlidersHorizontal,
                         contentDescription = stringResource(R.string.home_filter),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp),
@@ -832,6 +814,10 @@ enum class SortOption(
     PriceLow(R.string.market_sort_price_low),
     PriceHigh(R.string.market_sort_price_high),
     Rating(R.string.market_sort_rating),
+    
+    val label: String
+        @Composable
+        get() = stringResource(labelRes),
 }
 
 @Composable
@@ -846,11 +832,12 @@ private fun FilterBottomSheet(
     sortOption: SortOption,
     onSortChange: (SortOption) -> Unit,
 ) {
-    androidx.compose.material3.ModalBottomSheet(
-        sheetState = rememberModalBottomSheetState(
-            initialValue = androidx.compose.material3.BottomSheetValue.Hidden,
-            confirmStateChange = { it != androidx.compose.material3.BottomSheetValue.Hidden },
-        ),
+    val sheetState = rememberModalBottomSheetState(
+        initialValue = ModalBottomSheetValue.Hidden,
+        confirmStateChange = { it != ModalBottomSheetValue.Hidden },
+    )
+    ModalBottomSheet(
+        sheetState = sheetState,
         sheetShape = com.velnox.app.ui.theme.SquircleLg,
         sheetContent = {
             Column(
@@ -869,7 +856,7 @@ private fun FilterBottomSheet(
                         modifier = Modifier.weight(1f),
                     )
                     Icon(
-                        imageVector = VelnoxIcons.X,
+                        imageVector = VelnoxIcons.Close,
                         contentDescription = stringResource(R.string.common_close),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
@@ -940,9 +927,7 @@ private fun FilterBottomSheet(
                 Spacer(Modifier.height(VelnoxSpacing.xl))
             }
         },
-    ) {
-        // Sheet content is in sheetContent
-    }
+    )
 }
 
 @Composable
@@ -1016,7 +1001,6 @@ private fun SortDropdownMenu(
     currentOption: SortOption,
     onSelect: (SortOption) -> Unit,
 ) {
-    val popupPositionProvider = remember { androidx.compose.material3.DropdownMenuPositionProvider() }
     DropdownMenu(
         expanded = true,
         onDismissRequest = onDismiss,

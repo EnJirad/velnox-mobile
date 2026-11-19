@@ -458,4 +458,43 @@ object VelnoxIcons {
             ),
         )
     }
+
+    // ───────────────────────────────────────────────────────────── market icons
+
+    val SlidersHorizontal: ImageVector by lazy {
+        stroke(
+            "lucide-sliders-horizontal",
+            listOf(
+                "M3 15h18",
+                "M3 9h18",
+                "M3 3h18",
+                "M17 13v4",
+                "M17 7v4",
+                "M17 1v4",
+            ),
+        )
+    }
+
+    val WifiOff: ImageVector by lazy {
+        stroke(
+            "lucide-wifi-off",
+            listOf(
+                "M8.5 16.5A5 5 0 0 1 12 18c1.1 0 2.12-.33 3-1",
+                "M2.07 2.07A12 12 0 0 1 2.83 7",
+                "M12 12a3 3 0 0 0 4 1.26",
+                "M2 2l20 20",
+                "M13.73 8A9 9 0 0 0 4 12.27",
+            ),
+        )
+    }
+
+    val TrendingUp: ImageVector by lazy {
+        stroke(
+            "lucide-trending-up",
+            listOf(
+                "M21 21H3v-9l7-4 4 3 6-6",
+                "M18 13v6h-6",
+            ),
+        )
+    }
 }
