@@ -57,7 +57,6 @@ import com.velnox.app.feature.catalog.ProductDetailScreen
 import com.velnox.app.feature.home.ALL_CATEGORY
 import com.velnox.app.feature.home.CategoryScreen
 import com.velnox.app.feature.home.HomeScreen
-import com.velnox.app.feature.home.MarketScreen
 import com.velnox.app.feature.messages.ConversationScreen
 import com.velnox.app.feature.messages.MessagesScreen
 import com.velnox.app.feature.orders.OrderDetailScreen
@@ -571,11 +570,6 @@ private fun VelnoxNavHost() {
                                     threadId = overlay.removePrefix("thread:"),
                                     onBack = ::closeOverlay,
                                 )
-                            } else if (overlay == "chat") {
-                                MessagesScreen(
-                                    onOpenThread = { requestOverlay("thread:$it") },
-                                    onBrowseProducts = { requestTab(AppTab.Home) },
-                                )
                             } else {
                                 PlaceholderDestination(
                                     overlayKey = overlay,
@@ -710,15 +704,9 @@ private fun TabContent(
             onOpenProduct = { onOpenOverlay("product:$it") },
         )
 
-        AppTab.Market -> MarketScreen(
-            onOpenCategory = { categoryId ->
-                if (categoryId == ALL_CATEGORY) {
-                    onOpenOverlay("category")
-                } else {
-                    onOpenOverlay("category:$categoryId")
-                }
-            },
-            onOpenProduct = { onOpenOverlay("product:$it") },
+        AppTab.Messages -> MessagesScreen(
+            onOpenThread = { onOpenOverlay("thread:$it") },
+            onBrowseProducts = { onOpenTab(AppTab.Home) },
         )
 
         AppTab.Orders -> OrdersScreen(
@@ -746,7 +734,7 @@ private fun TabContent(
                     onOpenAddresses = { onOpenOverlay(SettingsPage.Addresses.key) },
                     onOpenOrders = { onOpenTab(AppTab.Orders) },
                     onOpenWishlist = { onOpenOverlay("wishlist") },
-                    onOpenMessages = { onOpenOverlay("chat") },
+                    onOpenMessages = { onOpenTab(AppTab.Messages) },
                 )
             }
         }
