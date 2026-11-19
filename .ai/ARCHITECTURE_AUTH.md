@@ -197,8 +197,16 @@ deployed** until PR #16 merges.
 
 An existing account with the same email is **not** merged. The API answers
 `409 LINK_REQUIRED`; the user signs in with their password, then calls
-`POST /api/auth/mobile/link`, which is the proof of ownership. Configuration and
-current blockers: `.ai/GOOGLE_SETUP.md`.
+`POST /api/auth/mobile/link`, which is the proof of ownership.
+
+The app implements that path (`AuthRepository.linkGoogle`): the ID token from the
+failed Google attempt is held in memory only — never in saved instance state —
+and is sent to `/api/auth/mobile/link` with `Authorization: Bearer <session>`
+immediately after the password sign-in that answers `LINK_REQUIRED` succeeds.
+Linking is reported through `SessionNotice.GoogleLinked` /
+`GoogleLinkFailed`; it never changes who is signed in, and a refusal
+(`EMAIL_MISMATCH`, `IDENTITY_CONFLICT`) leaves the account exactly as it was.
+Configuration and current blockers: `.ai/GOOGLE_SETUP.md`.
 
 ## 9. Not implemented yet
 

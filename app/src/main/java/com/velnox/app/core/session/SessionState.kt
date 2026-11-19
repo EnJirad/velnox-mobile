@@ -47,4 +47,13 @@ sealed interface SessionState {
  */
 enum class SessionNotice {
     NetworkUnavailable,
+
+    /** The signed-in account now also accepts Google sign-in. */
+    GoogleLinked,
+
+    /**
+     * Linking was attempted and refused or failed. The account is untouched — the
+     * user still signs in with the password they just used.
+     */
+    GoogleLinkFailed,
 }

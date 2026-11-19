@@ -92,6 +92,24 @@ class AuthRepository(
     }
 
     /**
+     * Attach the Google identity behind [idToken] to the account that is already
+     * signed in.
+     *
+     * This is the only path that can create a Google mapping for an existing
+     * account, and it needs both halves: a live session (proof of ownership) and a
+     * token the server verifies. Without a stored session there is nothing to
+     * prove, so the call is refused locally instead of being attempted and
+     * answered with a 401.
+     *
+     * Nothing about the session changes on success — it is the same account, now
+     * with a second way to sign in.
+     */
+    suspend fun linkGoogle(idToken: String): ApiResult<Unit> {
+        val token = sessions.current() ?: return ApiResult.Error(AuthError.Unauthorized)
+        return api.linkGoogle(idToken.trim(), token)
+    }
+
+    /**
      * Ask the server to send a reset link.
      *
      * The outcome is intentionally not "does this account exist": the API answers

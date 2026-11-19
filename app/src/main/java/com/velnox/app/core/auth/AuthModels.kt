@@ -76,6 +76,24 @@ enum class AuthError {
     /** 503 `GOOGLE_NOT_CONFIGURED` / `GOOGLE_UNAVAILABLE`. */
     ProviderUnavailable,
 
+    /**
+     * 409 `EMAIL_MISMATCH` on `POST /api/auth/mobile/link`: the verified Google
+     * address is not the signed-in account's address.
+     *
+     * Linking to a different mailbox would attach someone else's identity to this
+     * account, so it is refused rather than reconciled.
+     */
+    EmailMismatch,
+
+    /**
+     * 409 `IDENTITY_CONFLICT` on `POST /api/auth/mobile/link`: that Google account
+     * is already bound to another Velnox user.
+     *
+     * Nothing is moved. The alternative — re-pointing the mapping — would take the
+     * identity away from the account that owns it.
+     */
+    IdentityConflict,
+
     /** The request never reached the server, or the reply never arrived. */
     Network,
 

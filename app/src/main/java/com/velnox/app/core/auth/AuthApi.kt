@@ -38,6 +38,20 @@ interface AuthApi {
     suspend fun googleSignIn(idToken: String): ApiResult<AuthSession>
 
     /**
+     * `POST /api/auth/mobile/link` — attaches a Google identity to the account
+     * that is already signed in.
+     *
+     * Requires [sessionToken]: holding a session for the account **is** the proof
+     * of ownership that the backend accepts. An unauthenticated caller cannot
+     * link anything, which is the whole point — a verified Google email alone is
+     * not evidence that the person owns the password account.
+     *
+     * The token is the only payload. No email or user id is sent; the server
+     * derives both from the token it verifies and from the session.
+     */
+    suspend fun linkGoogle(idToken: String, sessionToken: String): ApiResult<Unit>
+
+    /**
      * `GET /api/auth/mobile/config` — the deployment's public Google client id.
      *
      * `null` when the deployment does not publish one, which means Google
