@@ -44,6 +44,7 @@ import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.preferences.ThemeMode
 import com.velnox.app.core.preferences.VelnoxPreferencesProvider
 import com.velnox.app.core.session.LocalSession
+import com.velnox.app.core.session.SessionNotice
 import com.velnox.app.core.session.SessionState
 import com.velnox.app.core.session.VelnoxSessionProvider
 import com.velnox.app.feature.auth.ForgotPasswordScreen
@@ -151,6 +152,13 @@ private fun VelnoxNavHost() {
     var googleAvailable by remember { mutableStateOf(false) }
     var googleBusy by remember { mutableStateOf(false) }
 
+    // Holds the Google ID token only between LINK_REQUIRED and the password
+    // sign-in that proves ownership of the account it collided with. Deliberately
+    // `remember`, not `rememberSaveable`: an ID token is a bearer credential and
+    // does not belong in the saved-instance-state bundle. A rotation loses it,
+    // which costs the user one extra Google sheet and leaks nothing.
+    var pendingGoogleIdToken by remember { mutableStateOf<String?>(null) }
+
     // Sign-in progress and the last failure, owned here so LoginScreen stays a
     // pure renderer of what the repository reported. `isSubmitting` is plain
     // remember: a rotation cancels the request coroutine, so restoring a stale
@@ -205,6 +213,8 @@ private fun VelnoxNavHost() {
         authSucceeded = false
         forgotSent = false
         resetToken = ""
+        // A token kept for linking is only useful inside this attempt at the gate.
+        pendingGoogleIdToken = null
     }
 
     /** Move to another step inside the gate, keeping the pending destination. */
@@ -286,7 +296,11 @@ private fun VelnoxNavHost() {
                         is SignInResult.Failure -> {
                             // LINK_REQUIRED is not a dead end: an account exists, so
                             // send the user to password sign-in to prove ownership.
+                            // The Google token is kept so the link can be completed
+                            // straight after that sign-in succeeds — the backend
+                            // will not accept it before.
                             if (result.error == AuthError.LinkRequired) {
+                                pendingGoogleIdToken = outcome.idToken
                                 authStepKey = AuthStep.Login.key
                             }
                             signInErrorRes = authMessage(result.error)
@@ -339,6 +353,13 @@ private fun VelnoxNavHost() {
                     signInErrorRes = null
                     authStepKey = null
                     loginReasonKey = null
+                    // Completing a link needs the session that was just created,
+                    // so it runs after the sign-in, not before. Failures are
+                    // reported through SessionNotice and never sign the user out.
+                    pendingGoogleIdToken?.let { googleToken ->
+                        pendingGoogleIdToken = null
+                        session.linkGoogle(googleToken)
+                    }
                     applyPendingDestination()
                 }
 
@@ -558,14 +579,15 @@ private fun VelnoxNavHost() {
             }
         }
 
+        val activeNotice = session.notice
         if (sessionState is SessionState.Loading) {
             SessionStatusPill(
                 textRes = R.string.session_checking,
                 showSpinner = true,
             )
-        } else if (session.notice != null) {
+        } else if (activeNotice != null) {
             SessionStatusPill(
-                textRes = R.string.session_unverified,
+                textRes = noticeMessage(activeNotice),
                 showSpinner = false,
                 onClick = session::acknowledgeNotice,
             )
@@ -621,6 +643,19 @@ private fun BoxScope.SessionStatusPill(
 }
 
 /**
+ * What the status pill says for each notice.
+ *
+ * Each notice is a different sentence to the user: "we could not verify your
+ * session" is not "your Google account is now connected", and neither is "it could
+ * not be connected".
+ */
+private fun noticeMessage(notice: SessionNotice): Int = when (notice) {
+    SessionNotice.NetworkUnavailable -> R.string.session_unverified
+    SessionNotice.GoogleLinked -> R.string.google_link_success
+    SessionNotice.GoogleLinkFailed -> R.string.login_error_google_link_failed
+}
+
+/**
  * Maps a failed sign-in to a message resource.
  *
  * Network and server failures say "try again", credential failures say "check
@@ -639,6 +674,8 @@ private fun authMessage(error: AuthError): Int = when (error) {
     AuthError.InvalidProviderToken -> R.string.login_error_google_failed
     AuthError.ProviderUnavailable -> R.string.login_error_google_unavailable
     AuthError.LinkRequired -> R.string.login_error_google_link_required
+    AuthError.EmailMismatch -> R.string.login_error_google_email_mismatch
+    AuthError.IdentityConflict -> R.string.login_error_google_identity_conflict
     else -> R.string.login_error_generic
 }
 

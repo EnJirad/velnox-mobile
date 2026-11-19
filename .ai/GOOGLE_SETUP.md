@@ -160,3 +160,10 @@ with `access_denied`. Publish the app, or add test users.
 
 This behaviour ships in PR #16. Until it is merged, the deployed backend still
 auto-links a verified Google email, so **the safe-linking rules are not live yet**.
+
+The app side is implemented either way: it holds the Google ID token only in
+memory, sends it to `/api/auth/mobile/link` once the password sign-in has created
+a session, and reports `SessionNotice.GoogleLinked` or `GoogleLinkFailed`. On the
+current deployment that endpoint does not exist yet, so the link reports a
+failure and the account is unchanged — which is the honest outcome, not a silent
+merge.

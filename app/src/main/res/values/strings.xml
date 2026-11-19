@@ -344,6 +344,10 @@
     <string name="login_error_google_failed">เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองอีกครั้ง</string>
     <string name="login_error_google_no_account">ไม่พบบัญชี Google ในเครื่องนี้ กรุณาเพิ่มบัญชีใน Settings</string>
     <string name="login_error_google_link_required">อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านก่อน แล้วจึงเชื่อม Google</string>
+    <string name="login_error_google_email_mismatch">อีเมลของบัญชี Google ไม่ตรงกับอีเมลของบัญชีนี้ จึงเชื่อมไม่ได้</string>
+    <string name="login_error_google_identity_conflict">บัญชี Google นี้ถูกเชื่อมกับบัญชีอื่นอยู่แล้ว</string>
+    <string name="login_error_google_link_failed">เชื่อมบัญชี Google ไม่สำเร็จ กรุณาลองอีกครั้งภายหลัง</string>
+    <string name="google_link_success">เชื่อมบัญชี Google แล้ว</string>
     <string name="login_continue_browsing">กลับไปเลือกซื้อสินค้าโดยไม่เข้าสู่ระบบ</string>
     <string name="auth_reason_title">ต้องเข้าสู่ระบบ</string>
     <string name="auth_reason_cart">ตะกร้าสินค้าเป็นของคุณเฉพาะเมื่อมีบัญชี กรุณาเข้าสู่ระบบเพื่อเก็บสินค้าที่เลือกไว้</string>

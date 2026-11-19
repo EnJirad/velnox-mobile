@@ -26,6 +26,7 @@
 | Logout + revocation | **VERIFIED (live)** | Bearer logout 200, then `/api/auth/me` → 401 "Session revoked" |
 | Forgot / reset password | **BLOCKED (not deployed)** | Backend PR #15 open; live API answers 404. Client half unit-tested |
 | Google Sign-In | **BLOCKED (owner config)** | Credential Manager flow, client-id resolution and server-side claim checks are in place; the flow cannot run until the signing key is pinned, an Android OAuth client exists, and the Web client id is published. See `.ai/GOOGLE_SETUP.md` |
+| Google account linking | **UNVERIFIED (CI pending)** | Client half of PR #16's `POST /api/auth/mobile/link`: token held in memory only, sent with `Authorization` after the password sign-in that answers `LINK_REQUIRED`, reported as `SessionNotice.GoogleLinked` / `GoogleLinkFailed`. The endpoint is not deployed until PR #16 merges |
 | Debug signing SHA-1 | **UNSTABLE — owner action** | `d8a33542…` → `ce53e36d…` → `ee55aa8b…` on three runs; set `ANDROID_DEBUG_KEYSTORE_BASE64` |
 | Product catalogue | **VERIFIED (live API + CI)** | Home, categories, search and product detail read `/api/products/catalog`, `/api/products/:id`, `/api/categories/tree`; 2 real published products, R2 images |
 | Mock product data | **REMOVED** | `HomeCatalog.kt` deleted; no demo products in the catalogue path. Cart and Orders still demo (unrelated) |

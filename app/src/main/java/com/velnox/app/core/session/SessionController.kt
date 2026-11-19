@@ -112,6 +112,23 @@ class SessionController(
         }
     }
 
+    /**
+     * Attach Google to the account that is already signed in.
+     *
+     * Only meaningful on [SessionState.Authenticated]; the repository refuses
+     * without a stored token. The result is reported back so the caller can say
+     * whether it worked, and the session state is left alone either way — linking
+     * never changes *who* is signed in.
+     */
+    suspend fun linkGoogle(idToken: String): ApiResult<Unit> {
+        val result = repository.linkGoogle(idToken)
+        notice = when (result) {
+            is ApiResult.Ok -> SessionNotice.GoogleLinked
+            is ApiResult.Error -> SessionNotice.GoogleLinkFailed
+        }
+        return result
+    }
+
     suspend fun signOut() {
         repository.signOut()
         notice = null

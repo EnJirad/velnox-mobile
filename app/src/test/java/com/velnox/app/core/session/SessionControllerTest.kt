@@ -35,6 +35,8 @@ class SessionControllerTest {
         var resetResult: ApiResult<Unit> = ApiResult.Ok(Unit)
         var googleResult: ApiResult<AuthSession> = ApiResult.Error(AuthError.Network)
         var googleCalls = 0
+        var linkResult: ApiResult<Unit> = ApiResult.Ok(Unit)
+        var linkCalls = 0
 
         override suspend fun login(email: String, password: String) = loginResult
         override suspend fun register(name: String, email: String, password: String) = loginResult
@@ -50,6 +52,11 @@ class SessionControllerTest {
         }
 
         override suspend fun googleClientId(): ApiResult<String?> = ApiResult.Ok(null)
+
+        override suspend fun linkGoogle(idToken: String, sessionToken: String): ApiResult<Unit> {
+            linkCalls++
+            return linkResult
+        }
 
         override suspend fun forgotPassword(email: String): ApiResult<Unit> = forgotResult
 
@@ -350,5 +357,42 @@ class SessionControllerTest {
         second.restoreOnce()
 
         assertEquals(SessionState.Authenticated(user), second.state)
+    }
+
+    // ---------------------------------------------------------------- linking
+
+    @Test
+    fun `a successful link reports Connected and keeps the same account`() = runBlocking {
+        val api = FakeApi().apply {
+            loginResult = ApiResult.Ok(AuthSession(tokenExpiringAt(1_900_000_000_000L), user))
+            linkResult = ApiResult.Ok(Unit)
+        }
+        val controller = controller(api, FakeStore())
+        controller.restoreOnce()
+        controller.signIn("a@b.co", "password12")
+
+        val result = controller.linkGoogle("google-id-token")
+
+        assertEquals(ApiResult.Ok(Unit), result)
+        assertEquals(1, api.linkCalls)
+        assertEquals(SessionState.Authenticated(user), controller.state)
+        assertEquals(SessionNotice.GoogleLinked, controller.notice)
+    }
+
+    @Test
+    fun `a refused link reports failure without signing the user out`() = runBlocking {
+        val api = FakeApi().apply {
+            loginResult = ApiResult.Ok(AuthSession(tokenExpiringAt(1_900_000_000_000L), user))
+            linkResult = ApiResult.Error(AuthError.EmailMismatch)
+        }
+        val controller = controller(api, FakeStore())
+        controller.restoreOnce()
+        controller.signIn("a@b.co", "password12")
+
+        val result = controller.linkGoogle("google-id-token")
+
+        assertEquals(ApiResult.Error(AuthError.EmailMismatch), result)
+        assertEquals(SessionState.Authenticated(user), controller.state)
+        assertEquals(SessionNotice.GoogleLinkFailed, controller.notice)
     }
 }

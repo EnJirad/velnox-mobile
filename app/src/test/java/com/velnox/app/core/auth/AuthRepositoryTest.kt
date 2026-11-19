@@ -42,6 +42,10 @@ class AuthRepositoryTest {
         var clientIdResult: ApiResult<String?> = ApiResult.Ok(null)
         var googleCalls = 0
         var lastGoogleToken: String? = null
+        var linkResult: ApiResult<Unit> = ApiResult.Ok(Unit)
+        var linkCalls = 0
+        var lastLinkToken: String? = null
+        var lastLinkSession: String? = null
 
         override suspend fun login(email: String, password: String): ApiResult<AuthSession> {
             loginCalls++
@@ -71,6 +75,13 @@ class AuthRepositoryTest {
         }
 
         override suspend fun googleClientId(): ApiResult<String?> = clientIdResult
+
+        override suspend fun linkGoogle(idToken: String, sessionToken: String): ApiResult<Unit> {
+            linkCalls++
+            lastLinkToken = idToken
+            lastLinkSession = sessionToken
+            return linkResult
+        }
 
         override suspend fun forgotPassword(email: String): ApiResult<Unit> {
             forgotCalls++
@@ -362,5 +373,57 @@ class AuthRepositoryTest {
 
         assertEquals(SignInResult.Failure(AuthError.ProviderUnavailable), result)
         assertNull(store.token)
+    }
+
+    // ---------------------------------------------------------------- linking
+
+    /**
+     * Linking is the only path that can add Google to an existing account, and the
+     * session — not the Google email — is what proves ownership. These cases pin
+     * that: no session means no call at all, and a refusal changes nothing.
+     */
+    @Test
+    fun `linking sends the stored session as the proof of ownership`() = runBlocking {
+        val api = FakeApi().apply { linkResult = ApiResult.Ok(Unit) }
+        val store = FakeStore("session-token")
+
+        val result = repository(api, store).linkGoogle("  google-id-token  ")
+
+        assertEquals(ApiResult.Ok(Unit), result)
+        assertEquals(1, api.linkCalls)
+        assertEquals("google-id-token", api.lastLinkToken)
+        assertEquals("session-token", api.lastLinkSession)
+    }
+
+    @Test
+    fun `linking without a session never reaches the API`() = runBlocking {
+        val api = FakeApi()
+
+        val result = repository(api, FakeStore()).linkGoogle("google-id-token")
+
+        assertEquals(ApiResult.Error(AuthError.Unauthorized), result)
+        assertEquals(0, api.linkCalls)
+    }
+
+    @Test
+    fun `a mismatched google email is refused and the session is untouched`() = runBlocking {
+        val api = FakeApi().apply { linkResult = ApiResult.Error(AuthError.EmailMismatch) }
+        val store = FakeStore("session-token")
+
+        val result = repository(api, store).linkGoogle("google-id-token")
+
+        assertEquals(ApiResult.Error(AuthError.EmailMismatch), result)
+        assertEquals("session-token", store.token)
+    }
+
+    @Test
+    fun `an identity already bound elsewhere is never moved`() = runBlocking {
+        val api = FakeApi().apply { linkResult = ApiResult.Error(AuthError.IdentityConflict) }
+        val store = FakeStore("session-token")
+
+        val result = repository(api, store).linkGoogle("google-id-token")
+
+        assertEquals(ApiResult.Error(AuthError.IdentityConflict), result)
+        assertEquals("session-token", store.token)
     }
 }

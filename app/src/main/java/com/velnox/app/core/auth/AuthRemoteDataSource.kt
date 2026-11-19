@@ -117,6 +117,41 @@ class AuthRemoteDataSource(
     ).toSessionResult()
 
     /**
+     * `POST /api/auth/mobile/link`.
+     *
+     * The session travels in `Authorization: Bearer …`, which the backend's
+     * `sessionToken()` accepts alongside the cookie. The app never holds a cookie
+     * jar, so this header is the only way to prove ownership of the account.
+     *
+     * A `200` is only reported as success when the body actually says
+     * `data.linked === true`: a success status without the confirmation is
+     * treated as a server fault instead of being assumed to have worked.
+     */
+    override suspend fun linkGoogle(
+        idToken: String,
+        sessionToken: String,
+    ): ApiResult<Unit> {
+        val raw = post(
+            path = "/api/auth/mobile/link",
+            body = JSONObject().put("idToken", idToken),
+            token = sessionToken,
+        )
+        return when (raw) {
+            is Raw.Fail -> ApiResult.Error(raw.error)
+            is Raw.Ok -> {
+                val linked = try {
+                    JSONObject(raw.body)
+                        .optJSONObject("data")
+                        ?.optBoolean("linked") == true
+                } catch (_: JSONException) {
+                    false
+                }
+                if (linked) ApiResult.Ok(Unit) else ApiResult.Error(AuthError.Server)
+            }
+        }
+    }
+
+    /**
      * `GET /api/auth/mobile/config`.
      *
      * The Google client id is a public identifier, so publishing it lets the app
@@ -189,11 +224,13 @@ class AuthRemoteDataSource(
         path: String,
         body: JSONObject,
         isSignIn: Boolean = false,
+        token: String? = null,
     ): Raw =
         withContext(Dispatchers.IO) {
             val request = Request.Builder()
                 .url(baseUrl + path)
                 .header("Accept", "application/json")
+                .apply { if (token != null) header("Authorization", "Bearer " + token) }
                 .post(body.toString().toRequestBody(JSON))
                 .build()
 
@@ -281,6 +318,8 @@ class AuthRemoteDataSource(
             code == "INVALID_GOOGLE_TOKEN" || code == "EMAIL_NOT_VERIFIED" ->
                 AuthError.InvalidProviderToken
             code == "LINK_REQUIRED" -> AuthError.LinkRequired
+            code == "EMAIL_MISMATCH" -> AuthError.EmailMismatch
+            code == "IDENTITY_CONFLICT" -> AuthError.IdentityConflict
             code == "GOOGLE_NOT_CONFIGURED" || code == "GOOGLE_UNAVAILABLE" ->
                 AuthError.ProviderUnavailable
             status == 400 -> AuthError.Validation

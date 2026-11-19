@@ -43,6 +43,11 @@ class GoogleClientIdSourceTest {
         override suspend fun googleSignIn(idToken: String): ApiResult<AuthSession> =
             ApiResult.Error(AuthError.Network)
 
+        override suspend fun linkGoogle(
+            idToken: String,
+            sessionToken: String,
+        ): ApiResult<Unit> = ApiResult.Error(AuthError.Network)
+
         override suspend fun googleClientId(): ApiResult<String?> {
             calls++
             return result
