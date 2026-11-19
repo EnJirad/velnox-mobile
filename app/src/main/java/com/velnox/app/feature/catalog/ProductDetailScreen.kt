@@ -562,13 +562,6 @@ fun ProductDetailScreen(
                                                 style = TextXs.copy(fontWeight = FontWeight.SemiBold),
                                                 color = MaterialTheme.colorScheme.onSurface,
                                             )
-                                            product.shopSlug?.let { slug ->
-                                                Text(
-                                                    text = "@$slug",
-                                                    style = Text2xs,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
                                         }
                                     }
                                 }
@@ -610,47 +603,51 @@ fun ProductDetailScreen(
                     }
 
                     // Added feedback banner
-                    AnimatedVisibility(
-                        visible = addedFeedbackMessage != null,
-                        enter = fadeIn() + slideInVertically { -it },
-                        exit = fadeOut() + slideOutVertically { -it },
+                    Column(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .padding(top = 8.dp, start = PageGutter, end = PageGutter),
                     ) {
-                        addedFeedbackMessage?.let { msg ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(Squircle)
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .border(1.dp, VelnoxBrand, Squircle)
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = VelnoxIcons.Check,
-                                    contentDescription = null,
-                                    tint = VelnoxBrand,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = msg,
-                                    style = TextXs.copy(fontWeight = FontWeight.Medium),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                if (onOpenCart != null) {
+                        AnimatedVisibility(
+                            visible = addedFeedbackMessage != null,
+                            enter = fadeIn() + slideInVertically { -it },
+                            exit = fadeOut() + slideOutVertically { -it },
+                        ) {
+                            val msg = addedFeedbackMessage
+                            if (msg != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(Squircle)
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .border(1.dp, VelnoxBrand, Squircle)
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        imageVector = VelnoxIcons.Check,
+                                        contentDescription = null,
+                                        tint = VelnoxBrand,
+                                        modifier = Modifier.size(16.dp),
+                                    )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = stringResource(R.string.product_view_cart),
-                                        style = TextXs.copy(fontWeight = FontWeight.Bold),
-                                        color = VelnoxBrand,
-                                        modifier = Modifier.velnoxClickable(role = Role.Button, onClick = onOpenCart),
+                                        text = msg,
+                                        style = TextXs.copy(fontWeight = FontWeight.Medium),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
+                                    if (onOpenCart != null) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = stringResource(R.string.product_view_cart),
+                                            style = TextXs.copy(fontWeight = FontWeight.Bold),
+                                            color = VelnoxBrand,
+                                            modifier = Modifier.velnoxClickable(role = Role.Button, onClick = onOpenCart),
+                                        )
+                                    }
                                 }
                             }
                         }
