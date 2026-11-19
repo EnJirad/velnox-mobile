@@ -296,22 +296,6 @@ object VelnoxIcons {
         )
     }
 
-    val Filter: ImageVector by lazy {
-        stroke(
-            "lucide-filter",
-            listOf(
-                "M3 3h18v18H3z",
-                "M7 7h10",
-                "M7 12h6",
-                "M7 17h10",
-            ),
-        )
-    }
-
-    val ChevronUp: ImageVector by lazy {
-        stroke("lucide-chevron-up", listOf("m18 15l-6-6-6 6"))
-    }
-
     val Package: ImageVector by lazy {
         stroke(
             "lucide-package",

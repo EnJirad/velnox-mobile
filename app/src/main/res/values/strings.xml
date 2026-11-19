@@ -14,10 +14,10 @@
 
     <!-- ═════════════════════════════ navigation ═════════════════════════════ -->
     <string name="nav_home">หน้าแรก</string>
-    <string name="nav_market">ตลาด</string>
+    <string name="nav_messages">ข้อความ</string>
     <string name="nav_orders">คำสั่งซื้อ</string>
     <string name="nav_cart">ตะกร้า</string>
-    <string name="nav_account">บัญชี</string>
+    <string name="nav_profile">บัญชี</string>
 
     <!-- ═════════════════════════════ home ═════════════════════════════ -->
     <string name="home_greeting_morning">สวัสดีตอนเช้า</string>
@@ -71,51 +71,24 @@
     <string name="product_6_name">โคมไฟตั้งโต๊ะ LED</string>
     <string name="product_6_store">Lumen House</string>
 
-    <!-- ═════════════════════════════ chat ═════════════════════════════ -->
-    <string name="chat_title">แชท</string>
-    <string name="chat_search_placeholder">ค้นหาผู้ขายหรือบทสนทนา</string>
-    <string name="chat_empty_title">ยังไม่มีข้อความ</string>
-    <string name="chat_empty_body">เมื่อคุณเริ่มพูดคุยกับผู้ขาย บทสนทนาจะปรากฏที่นี่</string>
-    <string name="chat_empty_action">ไปเลือกสินค้า</string>
-    <string name="chat_demo_notice">บทสนทนาตัวอย่างสำหรับการออกแบบ</string>
-    <string name="chat_thread_title">บทสนทนา</string>
-    <string name="chat_input_placeholder">พิมพ์ข้อความ…</string>
-    <string name="chat_input_hint">การส่งข้อความจริงจะเปิดให้ใช้ในเฟสถัดไป</string>
-    <string name="chat_today">วันนี้</string>
-    <string name="chat_yesterday">เมื่อวาน</string>
-    <string name="chat_seller_1">Nord Studio</string>
-    <string name="chat_seller_2">Aural Labs</string>
-    <string name="chat_seller_3">Clay Works</string>
-    <string name="chat_preview_1">สินค้าพร้อมส่งแล้วครับ ขอบคุณที่รอ</string>
-    <string name="chat_preview_2">มีสีดำให้เลือกเพิ่มไหมครับ</string>
-    <string name="chat_preview_3">ได้รับสินค้าแล้ว ขอบคุณมากครับ</string>
-
-    <!-- ═════════════════════════════ market ═════════════════════════════ -->
-    <string name="market_title">ตลาด</string>
-    <string name="market_search_placeholder">ค้นหาสินค้า แบรนด์ หรือหมวดหมู่</string>
-    <string name="market_categories">หมวดหมู่</string>
-    <string name="market_all_categories">ทั้งหมด</string>
-    <string name="market_filter">ตัวกรอง</string>
-    <string name="market_sort">เรียงลำดับ</string>
-    <string name="market_sort_popular">ยอดฮิต</string>
-    <string name="market_sort_best_selling">สินค้าขายดี</string>
-    <string name="market_sort_newest">ใหม่ล่าสุด</string>
-    <string name="market_sort_price_low">ราคาต่ำสุด</string>
-    <string name="market_sort_price_high">ราคาสูงสุด</string>
-    <string name="market_price_range">ช่วงราคา</string>
-    <string name="market_min_price">ราคาต่ำสุด</string>
-    <string name="market_max_price">ราคาสูงสุด</string>
-    <string name="market_apply_filter">ใช้ตัวกรอง</string>
-    <string name="market_clear_filter">ล้างตัวกรอง</string>
-    <string name="market_no_results_title">ไม่พบสินค้า</string>
-    <string name="market_no_results_body">ลองปรับตัวกรองหรือค้นหาด้วยคำค้นหาอื่น</string>
-    <string name="market_category_popular">ยอดฮิต</string>
-    <string name="market_category_best_selling">สินค้าขายดี</string>
-    <string name="market_category_most_wanted">เป็นที่ต้องการ</string>
-    <string name="market_category_trending">กำลังนิยม</string>
-    <string name="market_category_new_arrivals">สินค้าใหม่</string>
-    <string name="market_category_recommended">แนะนำสำหรับคุณ</string>
-    <string name="market_see_all">ดูทั้งหมด</string>
+    <!-- ═════════════════════════════ messages ═════════════════════════════ -->
+    <string name="messages_title">ข้อความ</string>
+    <string name="messages_search_placeholder">ค้นหาผู้ขายหรือบทสนทนา</string>
+    <string name="messages_empty_title">ยังไม่มีข้อความ</string>
+    <string name="messages_empty_body">เมื่อคุณเริ่มพูดคุยกับผู้ขาย บทสนทนาจะปรากฏที่นี่</string>
+    <string name="messages_empty_action">ไปเลือกสินค้า</string>
+    <string name="messages_demo_notice">บทสนทนาตัวอย่างสำหรับการออกแบบ</string>
+    <string name="messages_thread_title">บทสนทนา</string>
+    <string name="messages_input_placeholder">พิมพ์ข้อความ…</string>
+    <string name="messages_input_hint">การส่งข้อความจริงจะเปิดให้ใช้ในเฟสถัดไป</string>
+    <string name="messages_today">วันนี้</string>
+    <string name="messages_yesterday">เมื่อวาน</string>
+    <string name="messages_seller_1">Nord Studio</string>
+    <string name="messages_seller_2">Aural Labs</string>
+    <string name="messages_seller_3">Clay Works</string>
+    <string name="messages_preview_1">สินค้าพร้อมส่งแล้วครับ ขอบคุณที่รอ</string>
+    <string name="messages_preview_2">มีสีดำให้เลือกเพิ่มไหมครับ</string>
+    <string name="messages_preview_3">ได้รับสินค้าแล้ว ขอบคุณมากครับ</string>
 
     <!-- ═════════════════════════════ orders ═════════════════════════════ -->
     <string name="orders_title">คำสั่งซื้อของฉัน</string>

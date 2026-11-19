@@ -41,10 +41,10 @@ enum class AppTab(
     val icon: ImageVector,
 ) {
     Home("home", R.string.nav_home, VelnoxIcons.Home),
-    Market("market", R.string.nav_market, VelnoxIcons.ShoppingBag),
+    Messages("messages", R.string.nav_messages, VelnoxIcons.MessageCircle),
     Orders("orders", R.string.nav_orders, VelnoxIcons.Package),
     Cart("cart", R.string.nav_cart, VelnoxIcons.ShoppingCart),
-    Account("account", R.string.nav_account, VelnoxIcons.User);
+    Profile("profile", R.string.nav_profile, VelnoxIcons.User);
 
     companion object {
         fun fromKey(key: String?): AppTab = entries.firstOrNull { it.key == key } ?: Home
