@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -113,6 +114,7 @@ import kotlinx.coroutines.launch
  * - Three-tab layout: Recommendations (real catalog query), Details (specs & description), Reviews (real reviews API)
  * - Integrated Add to Cart and Buy Now purchase actions
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductDetailScreen(
     productId: String,
@@ -1456,7 +1458,7 @@ private fun FullScreenImageDialog(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = VelnoxIcons.ArrowLeft,
+                        imageVector = VelnoxIcons.Close,
                         contentDescription = "Close",
                         tint = Color.White,
                         modifier = Modifier.size(20.dp),
