@@ -488,6 +488,9 @@ private fun VelnoxNavHost() {
                         isSubmitting = isSubmitting,
                         errorRes = signInErrorRes,
                         onBackToLogin = { goToStep(AuthStep.Login) },
+                        onGoogleSignIn = ::startGoogleSignIn,
+                        googleAvailable = googleAvailable,
+                        googleBusy = googleBusy,
                     )
 
                     AuthStep.Forgot -> ForgotPasswordScreen(

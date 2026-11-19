@@ -301,7 +301,12 @@ fun LoginScreen(
                 // Inert while a request is in flight, and disabled outright when
                 // the deployment has no Google client configured — tapping a
                 // button that cannot work is worse than showing it greyed out.
-                enabled = !isSubmitting && !googleBusy && googleAvailable,
+                // See `googleButtonEnabled` for the three reasons, tested there.
+                enabled = googleButtonEnabled(
+                    isSubmitting = isSubmitting,
+                    googleBusy = googleBusy,
+                    googleAvailable = googleAvailable,
+                ),
                 modifier = Modifier.weight(1f),
                 onClick = onGoogleSignIn,
             )
