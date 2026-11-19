@@ -60,6 +60,22 @@
     <string name="home_quick_orders">Orders</string>
     <string name="home_quick_wishlist">Wishlist</string>
     <string name="home_quick_cart">Cart</string>
+    <string name="home_quick_categories_title">Quick Categories</string>
+    <string name="home_quick_categories_subtitle">Explore products by category</string>
+    <string name="home_popular_products_title">Popular Products</string>
+    <string name="home_popular_products_subtitle">Top products shoppers choose most</string>
+    <string name="home_trending_title">Trending Products</string>
+    <string name="home_trending_subtitle">What is trending right now</string>
+    <string name="home_best_sellers_title">Best Sellers</string>
+    <string name="home_best_sellers_subtitle">Highest demand customer favorites</string>
+    <string name="home_recommended_title">Recommended for You</string>
+    <string name="home_recommended_subtitle">Curated picks tailored for you</string>
+    <string name="home_new_arrivals_title">New Arrivals</string>
+    <string name="home_new_arrivals_subtitle">Fresh items recently added</string>
+    <string name="home_special_deals_title">Special Deals</string>
+    <string name="home_special_deals_subtitle">Exclusive limited-time promotions</string>
+    <string name="home_discovery_title">Discover More</string>
+    <string name="home_discovery_subtitle">Browse all products from verified shops</string>
 
     <!-- sample products (UI preview only) -->
     <string name="product_1_name">Lightweight shell jacket</string>

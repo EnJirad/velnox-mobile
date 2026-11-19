@@ -60,6 +60,22 @@
     <string name="home_quick_orders">အမှာစာများ</string>
     <string name="home_quick_wishlist">နှစ်သက်စာရင်း</string>
     <string name="home_quick_cart">ကုန်တောင်း</string>
+    <string name="home_quick_categories_title">အမြန် ကဏ္ဍများ</string>
+    <string name="home_quick_categories_subtitle">အမျိုးအစားအလိုက် ပစ္စည်းများ ရှာဖွေပါ</string>
+    <string name="home_popular_products_title">လူကြိုက်များသော ပစ္စည်းများ</string>
+    <string name="home_popular_products_subtitle">လူကြိုက်အများဆုံး ပစ္စည်းများ</string>
+    <string name="home_trending_title">ခေတ်စားနေသော ပစ္စည်းများ</string>
+    <string name="home_trending_subtitle">ယခုအချိန်တွင် လူပြောအများဆုံး ပစ္စည်းများ</string>
+    <string name="home_best_sellers_title">အရောင်းရဆုံး ပစ္စည်းများ</string>
+    <string name="home_best_sellers_subtitle">ရောင်းအားအကောင်းဆုံး ပစ္စည်းများ</string>
+    <string name="home_recommended_title">သင့်အတွက် အကြံပြုချက်များ</string>
+    <string name="home_recommended_subtitle">သင့်အတွက် အထူးရွေးချယ်ထားပါသည်</string>
+    <string name="home_new_arrivals_title">အသစ်ရောက်ရှိ ပစ္စည်းများ</string>
+    <string name="home_new_arrivals_subtitle">လတ်တလော ရောက်ရှိလာသော ပစ္စည်းများ</string>
+    <string name="home_special_deals_title">အထူး ပရိုမိုးရှင်းများ</string>
+    <string name="home_special_deals_subtitle">ကန့်သတ်ချိန် အထူးစျေးနှုန်းများ</string>
+    <string name="home_discovery_title">အားလုံး ကြည့်ရှုပါ</string>
+    <string name="home_discovery_subtitle">စိစစ်ပြီး ဆိုင်များမှ ပစ္စည်းအားလုံးကို ကြည့်ရှုပါ</string>
 
     <!-- sample products (UI preview only) -->
     <string name="product_1_name">ပေါ့ပါးသော အပြင်အင်္ကျီ</string>

@@ -60,6 +60,22 @@
     <string name="home_quick_orders">คำสั่งซื้อ</string>
     <string name="home_quick_wishlist">รายการโปรด</string>
     <string name="home_quick_cart">ตะกร้า</string>
+    <string name="home_quick_categories_title">หมวดหมู่ด่วน</string>
+    <string name="home_quick_categories_subtitle">สำรวจสินค้าตามหมวดหมู่</string>
+    <string name="home_popular_products_title">สินค้ายอดนิยม</string>
+    <string name="home_popular_products_subtitle">สินค้าที่มีผู้สนใจและเลือกซื้อมากที่สุด</string>
+    <string name="home_trending_title">สินค้ามาแรง</string>
+    <string name="home_trending_subtitle">เทรนด์ฮิตที่กำลังมาแรงในตลาด</string>
+    <string name="home_best_sellers_title">สินค้าขายดี</string>
+    <string name="home_best_sellers_subtitle">สินค้าขายดีการันตีความคุ้มค่า</string>
+    <string name="home_recommended_title">สินค้าแนะนำสำหรับคุณ</string>
+    <string name="home_recommended_subtitle">คัดสรรมาเพื่อคุณโดยเฉพาะ</string>
+    <string name="home_new_arrivals_title">สินค้าใหม่ล่าสุด</string>
+    <string name="home_new_arrivals_subtitle">ไอเทมใหม่ที่เพิ่งเข้ามาสดๆ ร้อนๆ</string>
+    <string name="home_special_deals_title">ดีลพิเศษ</string>
+    <string name="home_special_deals_subtitle">โปรโมชั่นราคาพิเศษช่วงนี้เท่านั้น</string>
+    <string name="home_discovery_title">ค้นพบสินค้าทั้งหมด</string>
+    <string name="home_discovery_subtitle">เลือกชมสินค้าหลากหลายจากร้านค้าชั้นนำ</string>
 
     <!-- sample products (UI preview only) -->
     <string name="product_1_name">เสื้อตัวนอกโครงเบา</string>

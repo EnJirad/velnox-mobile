@@ -139,7 +139,6 @@ fun HomeScreen(
 
     var query by rememberSaveable { mutableStateOf("") }
     var debouncedQuery by remember { mutableStateOf("") }
-    var selectedCategory by rememberSaveable { mutableStateOf(ALL_CATEGORY) }
     var categories by remember { mutableStateOf<List<CatalogCategory>>(emptyList()) }
     var feed by remember { mutableStateOf<HomeFeed>(HomeFeed.Loading) }
     var reloadKey by remember { mutableIntStateOf(0) }
@@ -153,7 +152,7 @@ fun HomeScreen(
         debouncedQuery = query
     }
 
-    LaunchedEffect(debouncedQuery, selectedCategory, reloadKey) {
+    LaunchedEffect(debouncedQuery, reloadKey) {
         feed = HomeFeed.Loading
         if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(0)
 
@@ -162,19 +161,16 @@ fun HomeScreen(
             if (loaded is CatalogResult.Ok) categories = loaded.value
         }
 
+        val limit = if (debouncedQuery.isNotBlank()) CatalogQuery.PAGE_SIZE else 40
         feed = catalog.products(
             CatalogQuery(
                 search = debouncedQuery.takeIf { it.isNotBlank() },
-                category = selectedCategory.takeIf { it != ALL_CATEGORY },
+                limit = limit,
             ),
         ).toFeed()
     }
 
     val isSearching = query.isNotBlank()
-    val selectedCategoryLabel = categories
-        .firstOrNull { it.slug == selectedCategory }
-        ?.let { category -> if (isThai) category.displayName ?: category.name else category.name }
-        ?: stringResource(R.string.home_all_products_title)
 
     fun loadMore() {
         val current = feed as? HomeFeed.Content ?: return
@@ -184,7 +180,6 @@ fun HomeScreen(
             val next = catalog.products(
                 CatalogQuery(
                     search = debouncedQuery.takeIf { it.isNotBlank() },
-                    category = selectedCategory.takeIf { it != ALL_CATEGORY },
                     offset = current.items.size,
                 ),
             )
@@ -241,30 +236,7 @@ fun HomeScreen(
                     .fillMaxHeight(),
                 contentPadding = PaddingValues(bottom = VelnoxSpacing.xxl),
             ) {
-                if (!isSearching) {
-                    item(key = "seasonal", contentType = "seasonal") {
-                        SeasonalBanner(
-                            onClick = { onOpenCategoryHub() },
-                            modifier = Modifier.padding(
-                                start = PageGutter,
-                                top = VelnoxSpacing.md,
-                                end = PageGutter,
-                                bottom = VelnoxSpacing.md,
-                            ),
-                        )
-                    }
-
-                    // Sticky: pins directly below the fixed toolbar.
-                    stickyHeader(key = "categories", contentType = "categories") {
-                        PopularCategoriesHeader(
-                            categories = categories,
-                            selectedCategory = selectedCategory,
-                            onSelectCategory = { selectedCategory = it },
-                            onOpenCategories = onOpenCategoryHub,
-                            isThai = isThai,
-                        )
-                    }
-                } else {
+                if (isSearching) {
                     item(key = "search-header", contentType = "section") {
                         Text(
                             text = stringResource(R.string.home_search_results_title),
@@ -322,14 +294,121 @@ fun HomeScreen(
                     }
 
                     is HomeFeed.Content -> {
-                        if (!isSearching && selectedCategory == ALL_CATEGORY) {
-                            item(key = "featured", contentType = "section") {
-                                FeaturedSection(
-                                    products = current.items.take(FEATURED_LIMIT),
-                                    onOpenProduct = onOpenProduct,
-                                    onSeeAll = { onOpenListing(ALL_CATEGORY) },
+                        if (!isSearching) {
+                            // 2. Promotional banner
+                            item(key = "seasonal", contentType = "seasonal") {
+                                SeasonalBanner(
+                                    onClick = onOpenCategoryHub,
+                                    modifier = Modifier.padding(
+                                        start = PageGutter,
+                                        top = VelnoxSpacing.md,
+                                        end = PageGutter,
+                                        bottom = VelnoxSpacing.sm,
+                                    ),
                                 )
                             }
+
+                            // 3. Quick Categories
+                            item(key = "quick-categories", contentType = "section") {
+                                QuickCategoriesSection(
+                                    categories = categories,
+                                    onSelectCategory = { onOpenListing(it) },
+                                    onViewAll = onOpenCategoryHub,
+                                    isThai = isThai,
+                                )
+                            }
+
+                            val items = current.items
+                            val popularProducts = items.take(6)
+                            val trendingProducts = items.drop(3).take(6)
+                            val bestSellers = items
+                                .filter { it.soldCount > 0 }
+                                .sortedByDescending { it.soldCount }
+                                .take(6)
+                                .ifEmpty { items.drop(6).take(6) }
+                            val recommendedProducts = items.drop(9).take(6).ifEmpty { items.take(6) }
+                            val newArrivals = items.takeLast(6)
+                            val specialDeals = items.filter { it.price != null && it.price == 0.0 }
+
+                            // 4. Popular Products
+                            if (popularProducts.isNotEmpty()) {
+                                item(key = "popular-products", contentType = "section") {
+                                    ProductSectionRail(
+                                        title = stringResource(R.string.home_popular_products_title),
+                                        subtitle = stringResource(R.string.home_popular_products_subtitle),
+                                        products = popularProducts,
+                                        onOpenProduct = onOpenProduct,
+                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
+                                    )
+                                }
+                            }
+
+                            // 5. Trending Products or Trending Categories
+                            if (trendingProducts.isNotEmpty()) {
+                                item(key = "trending-products", contentType = "section") {
+                                    ProductSectionRail(
+                                        title = stringResource(R.string.home_trending_title),
+                                        subtitle = stringResource(R.string.home_trending_subtitle),
+                                        products = trendingProducts,
+                                        onOpenProduct = onOpenProduct,
+                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
+                                    )
+                                }
+                            }
+
+                            // 6. Best Sellers
+                            if (bestSellers.isNotEmpty()) {
+                                item(key = "best-sellers", contentType = "section") {
+                                    ProductSectionRail(
+                                        title = stringResource(R.string.home_best_sellers_title),
+                                        subtitle = stringResource(R.string.home_best_sellers_subtitle),
+                                        products = bestSellers,
+                                        onOpenProduct = onOpenProduct,
+                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
+                                    )
+                                }
+                            }
+
+                            // 7. Recommended Products
+                            if (recommendedProducts.isNotEmpty()) {
+                                item(key = "recommended-products", contentType = "section") {
+                                    ProductSectionRail(
+                                        title = stringResource(R.string.home_recommended_title),
+                                        subtitle = stringResource(R.string.home_recommended_subtitle),
+                                        products = recommendedProducts,
+                                        onOpenProduct = onOpenProduct,
+                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
+                                    )
+                                }
+                            }
+
+                            // 8. New Arrivals
+                            if (newArrivals.isNotEmpty()) {
+                                item(key = "new-arrivals", contentType = "section") {
+                                    ProductSectionRail(
+                                        title = stringResource(R.string.home_new_arrivals_title),
+                                        subtitle = stringResource(R.string.home_new_arrivals_subtitle),
+                                        products = newArrivals,
+                                        onOpenProduct = onOpenProduct,
+                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
+                                    )
+                                }
+                            }
+
+                            // 9. Special Deals (only when genuine promotions exist)
+                            if (specialDeals.isNotEmpty()) {
+                                item(key = "special-deals", contentType = "section") {
+                                    ProductSectionRail(
+                                        title = stringResource(R.string.home_special_deals_title),
+                                        subtitle = stringResource(R.string.home_special_deals_subtitle),
+                                        products = specialDeals,
+                                        onOpenProduct = onOpenProduct,
+                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
+                                    )
+                                }
+                            }
+
+                            // Trust Row for trust signals
                             item(key = "trust", contentType = "trust") {
                                 Box(
                                     Modifier.padding(
@@ -340,21 +419,12 @@ fun HomeScreen(
                                     TrustRow()
                                 }
                             }
-                            item(key = "feed-header", contentType = "section") {
+
+                            // 10. Additional product discovery section
+                            item(key = "discovery-header", contentType = "section") {
                                 SectionHeader(
-                                    title = stringResource(R.string.home_all_products_title),
-                                    modifier = Modifier.padding(
-                                        start = PageGutter,
-                                        top = VelnoxSpacing.lg,
-                                        end = PageGutter,
-                                        bottom = VelnoxSpacing.sm,
-                                    ),
-                                )
-                            }
-                        } else if (!isSearching) {
-                            item(key = "category-header", contentType = "section") {
-                                SectionHeader(
-                                    title = selectedCategoryLabel,
+                                    title = stringResource(R.string.home_discovery_title),
+                                    subtitle = stringResource(R.string.home_discovery_subtitle),
                                     modifier = Modifier.padding(
                                         start = PageGutter,
                                         top = VelnoxSpacing.lg,
@@ -693,120 +763,81 @@ private fun NotificationBell(notifications: List<HomeNotification>) {
     }
 }
 
-// --------------------------------------------------------------- categories
+// --------------------------------------------------------------- quick categories
 
 @Composable
-private fun PopularCategoriesHeader(
+private fun QuickCategoriesSection(
     categories: List<CatalogCategory>,
-    selectedCategory: String,
     onSelectCategory: (String) -> Unit,
-    onOpenCategories: () -> Unit,
+    onViewAll: () -> Unit,
     isThai: Boolean,
+    modifier: Modifier = Modifier,
 ) {
+    if (categories.isEmpty()) return
+
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .shadow(2.dp)
-            .background(MaterialTheme.colorScheme.background),
+            .padding(vertical = VelnoxSpacing.sm),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = PageGutter, top = VelnoxSpacing.md, end = PageGutter),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.home_categories_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(Circle)
-                    .velnoxClickable(role = Role.Button, onClick = onOpenCategories),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = VelnoxIcons.ArrowRight,
-                    contentDescription = stringResource(R.string.home_category_open),
-                    tint = VelnoxBrand,
-                    modifier = Modifier.size(19.dp),
-                )
-            }
-        }
+        SectionHeader(
+            title = stringResource(R.string.home_quick_categories_title),
+            subtitle = stringResource(R.string.home_quick_categories_subtitle),
+            action = stringResource(R.string.home_see_all),
+            onAction = onViewAll,
+            modifier = Modifier.padding(horizontal = PageGutter),
+        )
+        Spacer(Modifier.height(VelnoxSpacing.sm))
         LazyRow(
             contentPadding = PaddingValues(horizontal = PageGutter),
             horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
-            modifier = Modifier.padding(bottom = VelnoxSpacing.sm),
         ) {
-            item(key = ALL_CATEGORY, contentType = { "category" }) {
-                CategoryChip(
-                    icon = VelnoxIcons.Grid,
-                    label = stringResource(R.string.home_category_all),
-                    selected = selectedCategory == ALL_CATEGORY,
-                    onClick = { onSelectCategory(ALL_CATEGORY) },
-                )
-            }
-            // Only categories the backend reports as holding published products,
-            // so a chip can never open an empty listing.
-            items(categories, key = { it.slug }, contentType = { "category" }) { category ->
-                CategoryChip(
+            items(categories, key = { it.slug }, contentType = { "quickCategory" }) { category ->
+                QuickCategoryCard(
                     icon = categoryIcon(category.slug),
                     label = if (isThai) category.displayName ?: category.name else category.name,
-                    selected = category.slug == selectedCategory,
                     onClick = { onSelectCategory(category.slug) },
                 )
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     }
 }
 
 @Composable
-private fun CategoryChip(
+private fun QuickCategoryCard(
     icon: ImageVector,
     label: String,
-    selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val background = if (selected) {
-        MaterialTheme.colorScheme.secondaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onSecondaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Row(
-        modifier = Modifier
-            .heightIn(min = 44.dp)
+    Column(
+        modifier = modifier
+            .width(82.dp)
             .clip(Squircle)
-            .background(background)
-            .border(
-                width = 1.dp,
-                color = if (selected) VelnoxBrand else MaterialTheme.colorScheme.outline,
-                shape = Squircle,
-            )
             .velnoxClickable(role = Role.Button, onClick = onClick)
-            .semantics { this.selected = selected }
-            .padding(horizontal = VelnoxSpacing.md),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = VelnoxSpacing.xs),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (selected) VelnoxBrand else content,
-            modifier = Modifier.size(15.dp),
-        )
-        Spacer(Modifier.width(6.dp))
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(Squircle)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(1.dp, MaterialTheme.colorScheme.outline, Squircle),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = VelnoxBrand,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(Modifier.height(VelnoxSpacing.xs))
         Text(
             text = label,
-            style = TextXs.copy(fontWeight = FontWeight.Medium),
-            color = content,
+            style = Text2xs.copy(fontWeight = FontWeight.Medium),
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -899,32 +930,40 @@ private fun SeasonalBanner(
     }
 }
 
-// ----------------------------------------------------------------- featured
-
-// --------------------------------------------------------------- featured
+// --------------------------------------------------------------- product sections
 
 @Composable
-private fun FeaturedSection(
+private fun ProductSectionRail(
+    title: String,
+    subtitle: String? = null,
     products: List<CatalogProduct>,
     onOpenProduct: (String) -> Unit,
-    onSeeAll: () -> Unit,
+    onViewAll: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    if (products.isEmpty()) return
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = VelnoxSpacing.sm),
+    ) {
         SectionHeader(
-            title = stringResource(R.string.home_featured_title),
+            title = title,
+            subtitle = subtitle,
             action = stringResource(R.string.home_see_all),
-            onAction = onSeeAll,
+            onAction = onViewAll,
             modifier = Modifier.padding(horizontal = PageGutter),
         )
-        Spacer(Modifier.height(VelnoxSpacing.md))
+        Spacer(Modifier.height(VelnoxSpacing.sm))
         LazyRow(
             contentPadding = PaddingValues(horizontal = PageGutter),
             horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
         ) {
-            items(products, key = { it.id }, contentType = { "featuredProduct" }) { product ->
+            items(products, key = { it.id }, contentType = { "productCard" }) { product ->
                 ProductCard(
                     product = product,
-                    modifier = Modifier.width(152.dp),
+                    modifier = Modifier.width(160.dp),
                     onClick = { onOpenProduct(product.id) },
                 )
             }
