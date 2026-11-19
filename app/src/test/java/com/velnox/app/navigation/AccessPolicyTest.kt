@@ -24,6 +24,7 @@ class AccessPolicyTest {
         assertNull(AccessPolicy.reasonForOverlay("category"))
         assertNull(AccessPolicy.reasonForOverlay("category:fashion"))
         assertNull(AccessPolicy.reasonForOverlay("product:p1"))
+        assertNull(AccessPolicy.reasonForOverlay("shop:super-gadget-zene"))
         assertNull(AccessPolicy.reasonForOverlay("search"))
     }
 

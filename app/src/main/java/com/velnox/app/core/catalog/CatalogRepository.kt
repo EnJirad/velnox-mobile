@@ -26,6 +26,8 @@ class CatalogRepository(private val api: CatalogApi) {
     private var categories: List<CatalogCategory>? = null
     private val lists = LinkedHashMap<String, CatalogPage>()
     private val details = LinkedHashMap<String, ProductDetail>()
+    private val shops = LinkedHashMap<String, ShopDetail>()
+    private val reviewsCache = LinkedHashMap<String, ProductReviewsData>()
 
     suspend fun categories(force: Boolean = false): CatalogResult<List<CatalogCategory>> {
         mutex.withLock {
@@ -88,12 +90,54 @@ class CatalogRepository(private val api: CatalogApi) {
         }
     }
 
+    suspend fun shop(slugOrId: String, force: Boolean = false): CatalogResult<ShopDetail> {
+        mutex.withLock {
+            if (!force) shops[slugOrId]?.let { return CatalogResult.Ok(it) }
+        }
+
+        return when (val result = api.shop(slugOrId)) {
+            is CatalogResult.Ok -> {
+                mutex.withLock {
+                    shops.remove(slugOrId)
+                    shops[slugOrId] = result.value
+                    while (shops.size > MAX_DETAIL_ENTRIES) {
+                        shops.remove(shops.keys.first())
+                    }
+                }
+                result
+            }
+            is CatalogResult.Failed -> result
+        }
+    }
+
+    suspend fun reviews(productId: String, force: Boolean = false): CatalogResult<ProductReviewsData> {
+        mutex.withLock {
+            if (!force) reviewsCache[productId]?.let { return CatalogResult.Ok(it) }
+        }
+
+        return when (val result = api.reviews(productId)) {
+            is CatalogResult.Ok -> {
+                mutex.withLock {
+                    reviewsCache.remove(productId)
+                    reviewsCache[productId] = result.value
+                    while (reviewsCache.size > MAX_DETAIL_ENTRIES) {
+                        reviewsCache.remove(reviewsCache.keys.first())
+                    }
+                }
+                result
+            }
+            is CatalogResult.Failed -> result
+        }
+    }
+
     /** Drop everything: used when the catalogue is known to have changed. */
     suspend fun invalidate() {
         mutex.withLock {
             categories = null
             lists.clear()
             details.clear()
+            shops.clear()
+            reviewsCache.clear()
         }
     }
 

@@ -51,6 +51,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -60,6 +63,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -67,10 +71,14 @@ import coil.compose.AsyncImage
 import com.velnox.app.R
 import com.velnox.app.VelnoxApplication
 import com.velnox.app.core.catalog.CatalogError
+import com.velnox.app.core.catalog.CatalogProduct
+import com.velnox.app.core.catalog.CatalogQuery
 import com.velnox.app.core.catalog.CatalogResult
 import com.velnox.app.core.catalog.PriceFormat
 import com.velnox.app.core.catalog.ProductDetail
+import com.velnox.app.core.catalog.ProductReviewsData
 import com.velnox.app.core.catalog.ProductVariant
+import com.velnox.app.feature.home.ProductCard
 import com.velnox.app.feature.home.ProductThumbnail
 import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.PageGutter
@@ -95,11 +103,14 @@ import kotlinx.coroutines.launch
  *
  * Implements:
  * - Responsive gallery with large main image on the left and vertical thumbnail strip on the right
+ * - Isolated thumbnail nested scroll connection preventing parent page movement
  * - Horizontal swipe gestures and tap-to-select for gallery thumbnails
  * - Full-screen image zoom viewer (pinch-to-zoom, pan, double-tap to reset)
  * - Real backend prices, compare-at prices, discount badges, and stock levels
- * - Variant selection with real backend attributes, availability checks, and price/stock reactivity
+ * - Variant selection and Product Options Bottom Sheet popup
  * - Quantity selector validated against available stock
+ * - Seller card with navigation to Seller Shop screen
+ * - Three-tab layout: Recommendations (real catalog query), Details (specs & description), Reviews (real reviews API)
  * - Integrated Add to Cart and Buy Now purchase actions
  */
 @Composable
@@ -109,6 +120,8 @@ fun ProductDetailScreen(
     onAddToCart: ((ProductDetail, ProductVariant?, Int) -> Unit)? = null,
     onBuyNow: ((ProductDetail, ProductVariant?, Int) -> Unit)? = null,
     onOpenCart: (() -> Unit)? = null,
+    onOpenShop: ((String) -> Unit)? = null,
+    onOpenProduct: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
@@ -120,6 +133,15 @@ fun ProductDetailScreen(
     var selectedVariantId by remember(productId) { mutableStateOf<String?>(null) }
     var quantity by remember(productId) { mutableIntStateOf(1) }
     var addedFeedbackMessage by remember { mutableStateOf<String?>(null) }
+    var showOptionsSheet by remember(productId) { mutableStateOf(false) }
+    var selectedTab by remember(productId) { mutableIntStateOf(0) } // 0 = Recs, 1 = Details, 2 = Reviews
+
+    // Recommendations and Reviews state
+    var recProducts by remember(productId) { mutableStateOf<List<CatalogProduct>>(emptyList()) }
+    var recLoading by remember(productId) { mutableStateOf(false) }
+    var reviewsData by remember(productId) { mutableStateOf<ProductReviewsData?>(null) }
+    var reviewsLoading by remember(productId) { mutableStateOf(false) }
+
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -139,6 +161,33 @@ fun ProductDetailScreen(
                 CatalogError.NotFound -> ProductState.Unavailable
                 CatalogError.Network, CatalogError.Server -> ProductState.Error
             }
+        }
+    }
+
+    // Load recommendations and reviews when product loads
+    LaunchedEffect(productId, state) {
+        val detail = (state as? ProductState.Content)?.product
+        if (detail != null) {
+            // Load recommendations
+            recLoading = true
+            val recResult = catalog.products(
+                CatalogQuery(
+                    category = detail.categorySlug,
+                    limit = 8,
+                ),
+            )
+            if (recResult is CatalogResult.Ok) {
+                recProducts = recResult.value.items.filter { it.id != productId }.take(6)
+            }
+            recLoading = false
+
+            // Load reviews
+            reviewsLoading = true
+            val revResult = catalog.reviews(productId)
+            if (revResult is CatalogResult.Ok) {
+                reviewsData = revResult.value
+            }
+            reviewsLoading = false
         }
     }
 
@@ -365,14 +414,64 @@ fun ProductDetailScreen(
                             }
                         }
 
-                        // 3. Variant Selection (if product has real variants)
+                        // 3. Product Options / Variants Row (Opens Options Bottom Sheet)
+                        if (product.optionGroups.isNotEmpty() || product.variants.size > 1) {
+                            item(key = "options_selector", contentType = "options") {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = PageGutter)
+                                        .padding(top = VelnoxSpacing.md),
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(SquircleLg)
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                                            .velnoxClickable(role = Role.Button) {
+                                                showOptionsSheet = true
+                                            }
+                                            .padding(VelnoxSpacing.md),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = stringResource(R.string.product_select_options),
+                                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                            )
+                                            val summaryText = selectedVariant?.title
+                                                ?: product.optionGroups.joinToString(", ") { it.name }
+                                            if (summaryText.isNotBlank()) {
+                                                Text(
+                                                    text = summaryText,
+                                                    style = Text2xs,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = VelnoxIcons.ChevronRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 4. Quick Variant Selection Chips (if product has multiple variants)
                         if (product.variants.size > 1) {
                             item(key = "variants_section", contentType = "variants") {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = PageGutter)
-                                        .padding(top = VelnoxSpacing.lg),
+                                        .padding(top = VelnoxSpacing.md),
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -473,7 +572,7 @@ fun ProductDetailScreen(
                             }
                         }
 
-                        // 4. Quantity Selector Section
+                        // 5. Quantity Selector Section
                         item(key = "quantity_section", contentType = "quantity") {
                             Column(
                                 modifier = Modifier
@@ -517,7 +616,7 @@ fun ProductDetailScreen(
                             }
                         }
 
-                        // 5. Seller Information Card
+                        // 6. Seller Information Card with Visit Shop button
                         product.shopName?.let { shop ->
                             item(key = "shop_section", contentType = "shop") {
                                 Column(
@@ -532,12 +631,19 @@ fun ProductDetailScreen(
                                         color = MaterialTheme.colorScheme.onBackground,
                                     )
                                     Spacer(Modifier.height(VelnoxSpacing.xs))
+                                    val shopTarget = product.shopSlug ?: product.shopId
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(SquircleLg)
                                             .background(MaterialTheme.colorScheme.surface)
                                             .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                                            .velnoxClickable(
+                                                role = Role.Button,
+                                                enabled = !shopTarget.isNullOrBlank() && onOpenShop != null,
+                                            ) {
+                                                shopTarget?.let { onOpenShop?.invoke(it) }
+                                            }
                                             .padding(VelnoxSpacing.md),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
@@ -563,39 +669,384 @@ fun ProductDetailScreen(
                                                 color = MaterialTheme.colorScheme.onSurface,
                                             )
                                         }
+                                        if (!shopTarget.isNullOrBlank() && onOpenShop != null) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(SquircleXs)
+                                                    .border(1.dp, VelnoxBrand, SquircleXs)
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.product_shop_visit),
+                                                    style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                                                    color = VelnoxBrand,
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
 
-                        // 6. Product Description
-                        product.description?.takeIf { it.isNotBlank() }?.let { description ->
-                            item(key = "description_section", contentType = "description") {
-                                Column(
+                        // 7. Three-Tab Section: Recommendations, Details, Reviews
+                        item(key = "tabs_header", contentType = "tabs_header") {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = PageGutter)
+                                    .padding(top = VelnoxSpacing.xl, bottom = VelnoxSpacing.sm),
+                            ) {
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = PageGutter)
-                                        .padding(top = VelnoxSpacing.lg),
+                                        .clip(Squircle)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        .padding(4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
-                                    Text(
-                                        text = stringResource(R.string.product_description_title),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onBackground,
+                                    val tabs = listOf(
+                                        stringResource(R.string.product_tab_recommendations),
+                                        stringResource(R.string.product_tab_details),
+                                        stringResource(R.string.product_tab_reviews),
                                     )
-                                    Spacer(Modifier.height(VelnoxSpacing.xs))
+                                    tabs.forEachIndexed { index, tabTitle ->
+                                        val isSelected = selectedTab == index
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(SquircleSm)
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.surface
+                                                    else Color.Transparent,
+                                                )
+                                                .velnoxClickable(role = Role.Tab) {
+                                                    selectedTab = index
+                                                }
+                                                .padding(vertical = 8.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = tabTitle,
+                                                style = TextXs.copy(
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                ),
+                                                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Tab 0: Recommendations
+                        if (selectedTab == 0) {
+                            if (recLoading) {
+                                item(key = "rec_loading") {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clip(SquircleLg)
-                                            .background(MaterialTheme.colorScheme.surface)
-                                            .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
-                                            .padding(VelnoxSpacing.md),
+                                            .padding(32.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    }
+                                }
+                            } else if (recProducts.isEmpty()) {
+                                item(key = "rec_empty") {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = PageGutter, vertical = 24.dp),
+                                        contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
-                                            text = description,
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            text = stringResource(R.string.product_recommendations_empty),
+                                            style = TextXs,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
+                                    }
+                                }
+                            } else {
+                                val pairs = recProducts.chunked(2)
+                                itemsIndexed(items = pairs, key = { index, _ -> "rec_row_$index" }) { _, rowPair ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = PageGutter, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        rowPair.forEach { recProd ->
+                                            ProductCard(
+                                                product = recProd,
+                                                modifier = Modifier.weight(1f),
+                                                onClick = { onOpenProduct?.invoke(recProd.id) },
+                                            )
+                                        }
+                                        if (rowPair.size == 1) {
+                                            Spacer(Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Tab 1: Product Details (Specifications & Description)
+                        if (selectedTab == 1) {
+                            item(key = "details_content") {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = PageGutter, vertical = VelnoxSpacing.sm),
+                                    verticalArrangement = Arrangement.spacedBy(VelnoxSpacing.md),
+                                ) {
+                                    // Specifications Table
+                                    if (product.attributes.isNotEmpty()) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(SquircleLg)
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                                                .padding(VelnoxSpacing.md),
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.product_specifications_title),
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                color = MaterialTheme.colorScheme.onBackground,
+                                            )
+                                            Spacer(Modifier.height(VelnoxSpacing.sm))
+                                            product.attributes.forEachIndexed { index, attr ->
+                                                if (index > 0) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(1.dp)
+                                                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                                                    )
+                                                }
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 8.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                ) {
+                                                    Text(
+                                                        text = attr.name,
+                                                        style = TextXs,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.weight(0.4f),
+                                                    )
+                                                    Text(
+                                                        text = attr.value,
+                                                        style = TextXs.copy(fontWeight = FontWeight.Medium),
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        modifier = Modifier.weight(0.6f),
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Product Description Card
+                                    product.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(SquircleLg)
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                                                .padding(VelnoxSpacing.md),
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.product_description_title),
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                color = MaterialTheme.colorScheme.onBackground,
+                                            )
+                                            Spacer(Modifier.height(VelnoxSpacing.xs))
+                                            Text(
+                                                text = desc,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Tab 2: Reviews
+                        if (selectedTab == 2) {
+                            if (reviewsLoading) {
+                                item(key = "rev_loading") {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(32.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    }
+                                }
+                            } else {
+                                val revData = reviewsData
+                                if (revData == null || revData.items.isEmpty()) {
+                                    item(key = "rev_empty") {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = PageGutter, vertical = 24.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.product_reviews_empty),
+                                                style = TextXs,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    // Aggregate Rating Card
+                                    item(key = "rev_summary") {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = PageGutter, vertical = VelnoxSpacing.xs),
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(SquircleLg)
+                                                    .background(MaterialTheme.colorScheme.surface)
+                                                    .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                                                    .padding(VelnoxSpacing.md),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                            ) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(
+                                                        text = "%.1f".format(revData.avgRating),
+                                                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                                                        color = MaterialTheme.colorScheme.onBackground,
+                                                    )
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                        repeat(5) { starIdx ->
+                                                            val isFilled = starIdx < revData.avgRating.roundToInt()
+                                                            Icon(
+                                                                imageVector = VelnoxIcons.Star,
+                                                                contentDescription = null,
+                                                                tint = if (isFilled) Color(0xFFF59E0B) else MaterialTheme.colorScheme.outline,
+                                                                modifier = Modifier.size(14.dp),
+                                                            )
+                                                        }
+                                                    }
+                                                    Spacer(Modifier.height(4.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.product_reviews_count, revData.total),
+                                                        style = Text2xs,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+
+                                                // Distribution bars
+                                                Column(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                                                ) {
+                                                    (5 downTo 1).forEach { stars ->
+                                                        val count = revData.distribution[stars.toString()] ?: 0
+                                                        val fraction = if (revData.total > 0) count.toFloat() / revData.total else 0f
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        ) {
+                                                            Text(
+                                                                text = "$stars★",
+                                                                style = Text2xs,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            )
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .weight(1f)
+                                                                    .height(6.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                                            ) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .fillMaxHeight()
+                                                                        .fillMaxWidth(fraction)
+                                                                        .clip(CircleShape)
+                                                                        .background(Color(0xFFF59E0B)),
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Reviews list
+                                    itemsIndexed(items = revData.items, key = { idx, item -> item.id.ifBlank { "rev_$idx" } }) { _, review ->
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = PageGutter, vertical = 4.dp)
+                                                .clip(SquircleLg)
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                                                .padding(VelnoxSpacing.md),
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Text(
+                                                    text = review.authorName.orEmpty().ifBlank { "User" },
+                                                    style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                )
+                                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                    repeat(5) { starIdx ->
+                                                        Icon(
+                                                            imageVector = VelnoxIcons.Star,
+                                                            contentDescription = null,
+                                                            tint = if (starIdx < review.rating) Color(0xFFF59E0B) else MaterialTheme.colorScheme.outline,
+                                                            modifier = Modifier.size(12.dp),
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            review.comment?.takeIf { it.isNotBlank() }?.let { comment ->
+                                                Spacer(Modifier.height(6.dp))
+                                                Text(
+                                                    text = comment,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+
+                                            if (review.images.isNotEmpty()) {
+                                                Spacer(Modifier.height(8.dp))
+                                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    items(review.images) { imgUrl ->
+                                                        AsyncImage(
+                                                            model = imgUrl,
+                                                            contentDescription = null,
+                                                            contentScale = ContentScale.Crop,
+                                                            modifier = Modifier
+                                                                .size(48.dp)
+                                                                .clip(SquircleXs)
+                                                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -654,7 +1105,22 @@ fun ProductDetailScreen(
                     }
                 }
 
-                // 8. Bottom Action Area
+                // 8. Options Bottom Sheet Popup
+                if (showOptionsSheet) {
+                    ProductOptionsBottomSheet(
+                        product = product,
+                        initialVariantId = selectedVariantId,
+                        initialQuantity = quantity,
+                        onDismissRequest = { showOptionsSheet = false },
+                        onConfirm = { variant, newQuantity ->
+                            selectedVariantId = variant?.id
+                            quantity = newQuantity
+                            showOptionsSheet = false
+                        },
+                    )
+                }
+
+                // 9. Bottom Action Area
                 BottomPurchaseArea(
                     canPurchase = canPurchase,
                     isOutOfStock = isOutOfStock,
@@ -682,7 +1148,7 @@ fun ProductDetailScreen(
 /**
  * Responsive Product Gallery:
  * - Large main image on the LEFT
- * - Vertical thumbnail strip on the RIGHT
+ * - Vertical thumbnail strip on the RIGHT with isolated nested scroll connection
  * - Horizontal swipe gestures for switching images
  * - Full-screen pinch-to-zoom viewer dialog
  * - Graceful handling of 0, 1, or multiple images
@@ -701,6 +1167,29 @@ private fun ProductGallery(
     LaunchedEffect(validSelected) {
         if (urls.size > 1) {
             thumbListState.animateScrollToItem(validSelected)
+        }
+    }
+
+    // NestedScrollConnection consuming unconsumed vertical scroll and fling
+    // to prevent the thumbnail strip from scrolling the parent Product Detail page.
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                // Trap any remaining scroll delta so it never bubbles up to the parent LazyColumn
+                return available
+            }
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity,
+            ): Velocity {
+                // Trap any remaining fling velocity so the parent page doesn't fling
+                return available
+            }
         }
     }
 
@@ -843,12 +1332,13 @@ private fun ProductGallery(
                     }
                 }
 
-                // Vertical thumbnail strip on the RIGHT
+                // Vertical thumbnail strip on the RIGHT with nested scroll isolated
                 LazyColumn(
                     state = thumbListState,
                     modifier = Modifier
                         .width(thumbWidth)
-                        .fillMaxHeight(),
+                        .fillMaxHeight()
+                        .nestedScroll(nestedScrollConnection),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     itemsIndexed(urls) { index, url ->
@@ -948,12 +1438,12 @@ private fun FullScreenImageDialog(
                 }
             }
 
-            // Top action bar
+            // Top Bar with back/close button and image counter
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = PageGutter, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -961,42 +1451,28 @@ private fun FullScreenImageDialog(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.6f))
+                        .background(Color.Black.copy(alpha = 0.5f))
                         .velnoxClickable(role = Role.Button, onClick = onDismiss),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = VelnoxIcons.Close,
+                        imageVector = VelnoxIcons.ArrowLeft,
                         contentDescription = "Close",
                         tint = Color.White,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
 
                 if (urls.size > 1) {
-                    Text(
-                        text = "${currentIndex + 1} / ${urls.size}",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                    )
-                } else {
-                    Spacer(Modifier.size(36.dp))
-                }
-
-                if (scale > 1f) {
                     Box(
                         modifier = Modifier
                             .clip(SquircleXs)
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .velnoxClickable(role = Role.Button) {
-                                scale = 1f
-                                offset = Offset.Zero
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
                     ) {
                         Text(
-                            text = "Reset",
-                            style = Text2xs,
+                            text = "${currentIndex + 1} / ${urls.size}",
+                            style = TextXs.copy(fontWeight = FontWeight.SemiBold),
                             color = Color.White,
                         )
                     }

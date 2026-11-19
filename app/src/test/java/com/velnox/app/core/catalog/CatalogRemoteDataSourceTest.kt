@@ -230,4 +230,86 @@ class CatalogRemoteDataSourceTest {
         val page = (api.products(CatalogQuery(limit = 20)) as CatalogResult.Ok).value
         assertEquals(false, page.hasMore)
     }
+
+    @Test
+    fun `a shop response parses into shop details and products`() = runBlocking {
+        val body = """
+            {
+              "success": true,
+              "data": {
+                "shop": {
+                  "id": "shop-1",
+                  "sellerId": "seller-1",
+                  "name": "Tech Store",
+                  "slug": "tech-store",
+                  "description": "Premium electronics",
+                  "isVerified": true,
+                  "rating": 4.8,
+                  "reviewCount": 120
+                },
+                "products": [
+                  {
+                    "id": "prod-1",
+                    "name": "Wireless Earbuds",
+                    "price": 99.0,
+                    "currency": "THB"
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+        val api = CatalogRemoteDataSource(
+            baseUrl = "https://example.test",
+            client = client(200, body),
+        )
+
+        val result = api.shop("tech-store")
+        assertTrue(result is CatalogResult.Ok)
+        val shopDetail = (result as CatalogResult.Ok).value
+        assertEquals("shop-1", shopDetail.shop.id)
+        assertEquals("Tech Store", shopDetail.shop.name)
+        assertEquals(true, shopDetail.shop.isVerified)
+        assertEquals(4.8, shopDetail.shop.rating!!, 0.01)
+        assertEquals(1, shopDetail.products.size)
+        assertEquals("prod-1", shopDetail.products.first().id)
+    }
+
+    @Test
+    fun `a reviews response parses into items and distribution`() = runBlocking {
+        val body = """
+            {
+              "success": true,
+              "data": {
+                "items": [
+                  {
+                    "id": "rev-1",
+                    "rating": 5,
+                    "comment": "Excellent quality!",
+                    "authorName": "Alice",
+                    "createdAt": 1700000000000,
+                    "images": ["https://img.test/1.jpg"]
+                  }
+                ],
+                "total": 1,
+                "avgRating": 5.0,
+                "distribution": { "5": 1 }
+              }
+            }
+        """.trimIndent()
+        val api = CatalogRemoteDataSource(
+            baseUrl = "https://example.test",
+            client = client(200, body),
+        )
+
+        val result = api.reviews("prod-1")
+        assertTrue(result is CatalogResult.Ok)
+        val reviews = (result as CatalogResult.Ok).value
+        assertEquals(1, reviews.total)
+        assertEquals(5.0, reviews.avgRating, 0.01)
+        assertEquals(1, reviews.items.size)
+        assertEquals("Alice", reviews.items.first().authorName)
+        assertEquals(5, reviews.items.first().rating)
+        assertEquals("https://img.test/1.jpg", reviews.items.first().images.first())
+        assertEquals(1, reviews.distribution["5"])
+    }
 }

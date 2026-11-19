@@ -110,6 +110,28 @@ class CatalogRemoteDataSource(
             }
         }
 
+    override suspend fun shop(slugOrId: String): CatalogResult<ShopDetail> =
+        when (val raw = get("/api/shops/${encode(slugOrId)}")) {
+            is Raw.Failure -> CatalogResult.Failed(raw.error)
+            is Raw.Success -> {
+                val data = raw.dataObject()
+                    ?: return CatalogResult.Failed(CatalogError.Server)
+                parseShop(data)?.let { CatalogResult.Ok(it) }
+                    ?: CatalogResult.Failed(CatalogError.Server)
+            }
+        }
+
+    override suspend fun reviews(productId: String): CatalogResult<ProductReviewsData> =
+        when (val raw = get("/api/products/${encode(productId)}/reviews")) {
+            is Raw.Failure -> CatalogResult.Failed(raw.error)
+            is Raw.Success -> {
+                val data = raw.dataObject()
+                    ?: return CatalogResult.Failed(CatalogError.Server)
+                parseReviews(data)?.let { CatalogResult.Ok(it) }
+                    ?: CatalogResult.Failed(CatalogError.Server)
+            }
+        }
+
     // ------------------------------------------------------------- transport
 
     private sealed interface Raw {
@@ -260,6 +282,49 @@ class CatalogRemoteDataSource(
             }
         }
 
+        val optionGroupsList = ArrayList<ProductOptionGroup>()
+        val groupsArray = data.optJSONArray("optionGroups")
+        if (groupsArray != null) {
+            for (i in 0 until groupsArray.length()) {
+                val gObj = groupsArray.optJSONObject(i) ?: continue
+                val gId = gObj.stringOrNull("id") ?: continue
+                val gName = gObj.stringOrNull("name") ?: continue
+                val gType = gObj.stringOrNull("displayType")
+                val gRequired = gObj.optBoolean("required", false)
+                val valsList = ArrayList<ProductOptionValue>()
+                val valsArray = gObj.optJSONArray("values")
+                if (valsArray != null) {
+                    for (j in 0 until valsArray.length()) {
+                        val vObj = valsArray.optJSONObject(j) ?: continue
+                        val vId = vObj.stringOrNull("id") ?: continue
+                        val vVal = vObj.stringOrNull("value") ?: continue
+                        val vLabel = vObj.stringOrNull("label") ?: vVal
+                        val vImg = vObj.stringOrNull("imageUrl")
+                        val vStock = vObj.numberOrNull("stock")?.toInt()
+                        valsList += ProductOptionValue(id = vId, value = vVal, label = vLabel, imageUrl = vImg, stock = vStock)
+                    }
+                }
+                optionGroupsList += ProductOptionGroup(id = gId, name = gName, displayType = gType, required = gRequired, values = valsList)
+            }
+        }
+
+        val attrsList = ArrayList<ProductAttribute>()
+        val attrsArray = data.optJSONArray("attributes")
+        if (attrsArray != null) {
+            for (i in 0 until attrsArray.length()) {
+                val aObj = attrsArray.optJSONObject(i) ?: continue
+                val aId = aObj.stringOrNull("id") ?: continue
+                val aName = aObj.stringOrNull("name") ?: continue
+                val aValue = aObj.stringOrNull("value") ?: continue
+                attrsList += ProductAttribute(id = aId, name = aName, value = aValue)
+            }
+        }
+
+        val shopObj = data.optJSONObject("shop")
+        val sId = data.stringOrNull("shopId") ?: shopObj?.stringOrNull("id")
+        val sSlug = shopObj?.stringOrNull("slug") ?: data.stringOrNull("shopSlug")
+        val sellerId = data.stringOrNull("sellerId") ?: shopObj?.stringOrNull("sellerId")
+
         return ProductDetail(
             id = id,
             name = name,
@@ -268,8 +333,7 @@ class CatalogRemoteDataSource(
             currency = data.stringOrNull("currency") ?: DEFAULT_CURRENCY,
             images = images,
             categorySlug = data.stringOrNull("categorySlug") ?: data.stringOrNull("category"),
-            shopName = data.optJSONObject("shop")?.stringOrNull("name")
-                ?: data.stringOrNull("shopName"),
+            shopName = shopObj?.stringOrNull("name") ?: data.stringOrNull("shopName"),
             unit = data.stringOrNull("unit"),
             availableStock = stock,
             soldCount = data.optInt("soldCount", 0),
@@ -277,6 +341,97 @@ class CatalogRemoteDataSource(
             discountPercent = featDiscount,
             variantPrice = featPrice,
             variants = variantsList,
+            optionGroups = optionGroupsList,
+            attributes = attrsList,
+            shopId = sId,
+            shopSlug = sSlug,
+            sellerId = sellerId,
+        )
+    }
+
+    private fun parseShop(data: JSONObject): ShopDetail? {
+        val sObj = data.optJSONObject("shop") ?: return null
+        val id = sObj.stringOrNull("id") ?: return null
+        val name = sObj.stringOrNull("name") ?: ""
+        val slug = sObj.stringOrNull("slug") ?: id
+
+        val sellerShop = SellerShop(
+            id = id,
+            sellerId = sObj.stringOrNull("sellerId"),
+            name = name,
+            slug = slug,
+            description = sObj.stringOrNull("description"),
+            logoUrl = sObj.stringOrNull("logo") ?: sObj.stringOrNull("imageUrl"),
+            coverUrl = sObj.stringOrNull("cover"),
+            phone = sObj.stringOrNull("phone"),
+            status = sObj.stringOrNull("status"),
+            productCount = sObj.optInt("productCount", 0),
+            rating = sObj.numberOrNull("rating"),
+            reviewCount = sObj.optInt("reviewCount", 0),
+            isVerified = sObj.stringOrNull("verificationStatus") == "verified",
+        )
+
+        val productsList = ArrayList<CatalogProduct>()
+        val prodsArray = data.optJSONArray("products")
+        if (prodsArray != null) {
+            for (i in 0 until prodsArray.length()) {
+                val pObj = prodsArray.optJSONObject(i) ?: continue
+                parseProduct(pObj)?.let { productsList += it }
+            }
+        }
+
+        return ShopDetail(shop = sellerShop, products = productsList)
+    }
+
+    private fun parseReviews(data: JSONObject): ProductReviewsData? {
+        val total = data.optInt("total", 0)
+        val avgRating = data.numberOrNull("avgRating") ?: 0.0
+        val distObj = data.optJSONObject("distribution")
+        val distMap = LinkedHashMap<String, Int>()
+        if (distObj != null) {
+            val keys = distObj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                distMap[k] = distObj.optInt(k, 0)
+            }
+        }
+
+        val itemsList = ArrayList<ProductReview>()
+        val itemsArray = data.optJSONArray("items")
+        if (itemsArray != null) {
+            for (i in 0 until itemsArray.length()) {
+                val rObj = itemsArray.optJSONObject(i) ?: continue
+                val rId = rObj.stringOrNull("id") ?: continue
+                val rating = rObj.optInt("rating", 5)
+                val comment = rObj.stringOrNull("comment")
+                val userObj = rObj.optJSONObject("user")
+                val author = userObj?.stringOrNull("name")
+                    ?: rObj.stringOrNull("authorName")
+                    ?: rObj.stringOrNull("userName")
+                val createdAt = rObj.optLong("createdAt", 0L).takeIf { it > 0 }
+                val imagesList = ArrayList<String>()
+                val imgArray = rObj.optJSONArray("images")
+                if (imgArray != null) {
+                    for (j in 0 until imgArray.length()) {
+                        imgArray.optString(j).takeIf { it.isNotBlank() }?.let { imagesList += it }
+                    }
+                }
+                itemsList += ProductReview(
+                    id = rId,
+                    rating = rating,
+                    comment = comment,
+                    authorName = author,
+                    createdAt = createdAt,
+                    images = imagesList,
+                )
+            }
+        }
+
+        return ProductReviewsData(
+            items = itemsList,
+            total = total,
+            avgRating = avgRating,
+            distribution = distMap,
         )
     }
 

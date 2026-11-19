@@ -63,6 +63,72 @@ data class CatalogImage(
     val isPrimary: Boolean,
 )
 
+/** One option value within an option group (e.g. "Red" in "Color"). */
+data class ProductOptionValue(
+    val id: String,
+    val value: String,
+    val label: String,
+    val imageUrl: String? = null,
+    val stock: Int? = null,
+)
+
+/** One option group configured by the seller (e.g. Color, Size, Model). */
+data class ProductOptionGroup(
+    val id: String,
+    val name: String,
+    val displayType: String? = null,
+    val required: Boolean = false,
+    val values: List<ProductOptionValue> = emptyList(),
+)
+
+/** One key-value attribute / specification (e.g. "Brand: Sony", "Material: Aluminum"). */
+data class ProductAttribute(
+    val id: String,
+    val name: String,
+    val value: String,
+)
+
+/** One seller shop profile from `GET /api/shops/:idOrSlug`. */
+data class SellerShop(
+    val id: String,
+    val sellerId: String?,
+    val name: String,
+    val slug: String,
+    val description: String?,
+    val logoUrl: String? = null,
+    val coverUrl: String? = null,
+    val phone: String? = null,
+    val status: String? = null,
+    val productCount: Int = 0,
+    val rating: Double? = null,
+    val reviewCount: Int = 0,
+    val isVerified: Boolean = false,
+)
+
+/** Shop detail including its shop metadata and product list. */
+data class ShopDetail(
+    val shop: SellerShop,
+    val products: List<CatalogProduct> = emptyList(),
+)
+
+/** One product review from `GET /api/products/:id/reviews`. */
+data class ProductReview(
+    val id: String,
+    val rating: Int,
+    val comment: String?,
+    val authorName: String?,
+    val createdAt: Long?,
+    val images: List<String> = emptyList(),
+)
+
+/** Aggregate review data for a product. */
+data class ProductReviewsData(
+    val items: List<ProductReview> = emptyList(),
+    val total: Int = 0,
+    val avgRating: Double = 0.0,
+    val distribution: Map<String, Int> = emptyMap(),
+)
+
 /**
  * A product's own page. [description] is the seller's text; when it is empty the
  * UI shows nothing rather than filler.
@@ -83,6 +149,11 @@ data class ProductDetail(
     val discountPercent: Int? = null,
     val variantPrice: Double? = null,
     val variants: List<ProductVariant> = emptyList(),
+    val optionGroups: List<ProductOptionGroup> = emptyList(),
+    val attributes: List<ProductAttribute> = emptyList(),
+    val shopId: String? = null,
+    val shopSlug: String? = null,
+    val sellerId: String? = null,
 ) {
     val isInStock: Boolean? get() = availableStock?.let { it > 0 }
 

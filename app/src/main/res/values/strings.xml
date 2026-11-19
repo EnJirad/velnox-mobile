@@ -446,6 +446,23 @@
     <string name="product_view_cart">ดูตะกร้า</string>
     <string name="product_variant_selected">ตัวเลือกที่เลือก: %1$s</string>
     <string name="product_full_screen_zoom">แตะเพื่อดูภาพขนาดเต็ม</string>
+    <string name="product_select_options">เลือกตัวเลือกสินค้า</string>
+    <string name="product_confirm_options">ยืนยัน</string>
+    <string name="product_select_all_options_warning">กรุณาเลือกตัวเลือกให้ครบถ้วน</string>
+    <string name="product_shop_visit">ไปที่ร้านค้า</string>
+    <string name="product_shop_verified">ร้านค้ายืนยันตัวตนแล้ว</string>
+    <string name="product_shop_search_hint">ค้นหาในร้านค้านี้</string>
+    <string name="product_shop_all_products">สินค้าทั้งหมดในร้าน</string>
+    <string name="product_shop_empty">ไม่พบสินค้าในร้านนี้</string>
+    <string name="product_tab_recommendations">สินค้าแนะนำ</string>
+    <string name="product_tab_details">รายละเอียด</string>
+    <string name="product_tab_reviews">รีวิวสินค้า</string>
+    <string name="product_recommendations_empty">ไม่มีสินค้าแนะนำในขณะนี้</string>
+    <string name="product_specifications_title">คุณสมบัติสินค้า</string>
+    <string name="product_reviews_empty">ยังไม่มีรีวิวสำหรับสินค้านี้</string>
+    <string name="product_reviews_count">%1$d รีวิว</string>
+    <string name="product_confirm">ยืนยัน</string>
+    <string name="product_options_selected">เลือกแล้ว: %1$s</string>
     <string name="product_unavailable_title">ไม่พบสินค้านี้</string>
     <string name="product_unavailable_body">สินค้าอาจถูกนำออก หรือยังไม่เผยแพร่</string>
 </resources>

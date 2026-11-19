@@ -97,6 +97,7 @@ object AccessPolicy {
     fun reasonForOverlay(key: String): LoginReason? = when {
         key == "category" || key.startsWith("category:") -> null
         key.startsWith("product:") -> null
+        key.startsWith("shop:") -> null
         key == "search" -> null
 
         key == "checkout" -> LoginReason.Checkout

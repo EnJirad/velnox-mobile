@@ -446,6 +446,23 @@
     <string name="product_view_cart">View Cart</string>
     <string name="product_variant_selected">Selected: %1$s</string>
     <string name="product_full_screen_zoom">Tap to view full screen</string>
+    <string name="product_select_options">Select Options</string>
+    <string name="product_confirm_options">Confirm</string>
+    <string name="product_select_all_options_warning">Please select all options</string>
+    <string name="product_shop_visit">Visit Shop</string>
+    <string name="product_shop_verified">Verified Store</string>
+    <string name="product_shop_search_hint">Search in this shop</string>
+    <string name="product_shop_all_products">All Products</string>
+    <string name="product_shop_empty">No products found in this shop</string>
+    <string name="product_tab_recommendations">Recommended</string>
+    <string name="product_tab_details">Details</string>
+    <string name="product_tab_reviews">Reviews</string>
+    <string name="product_recommendations_empty">No recommendations available</string>
+    <string name="product_specifications_title">Specifications</string>
+    <string name="product_reviews_empty">No reviews yet</string>
+    <string name="product_reviews_count">%1$d reviews</string>
+    <string name="product_confirm">Confirm</string>
+    <string name="product_options_selected">Selected: %1$s</string>
     <string name="product_unavailable_title">This product isn\'t available</string>
     <string name="product_unavailable_body">It may have been removed or is no longer published</string>
 </resources>

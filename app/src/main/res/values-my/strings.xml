@@ -442,6 +442,23 @@
     <string name="product_view_cart">စျေးခြင်း ကြည့်ရန်</string>
     <string name="product_variant_selected">ရွေးချယ်ထားသော: %1$s</string>
     <string name="product_full_screen_zoom">ပုံအကြီးကြည့်ရန် နှိပ်ပါ</string>
+    <string name="product_select_options">ရွေးချယ်စရာများ ရွေးပါ</string>
+    <string name="product_confirm_options">အတည်ပြုပါ</string>
+    <string name="product_select_all_options_warning">ရွေးချယ်စရာများ အားလုံး ရွေးပါ</string>
+    <string name="product_shop_visit">ဆိုင်သို့ သွားရန်</string>
+    <string name="product_shop_verified">အတည်ပြုပြီးသော ဆိုင်</string>
+    <string name="product_shop_search_hint">ဤဆိုင်တွင် ရှာပါ</string>
+    <string name="product_shop_all_products">ဆိုင်တွင်း ကုန်ပစ္စည်းများ</string>
+    <string name="product_shop_empty">ဤဆိုင်တွင် ကုန်ပစ္စည်း မရှိပါ</string>
+    <string name="product_tab_recommendations">အကြံပြုချက်များ</string>
+    <string name="product_tab_details">အသေးစိတ်</string>
+    <string name="product_tab_reviews">သုံးသပ်ချက်များ</string>
+    <string name="product_recommendations_empty">လောလောဆယ် အကြံပြုချက် မရှိပါ</string>
+    <string name="product_specifications_title">အချက်အလက်များ</string>
+    <string name="product_reviews_empty">သုံးသပ်ချက် မရှိသေးပါ</string>
+    <string name="product_reviews_count">သုံးသပ်ချက် %1$d ခု</string>
+    <string name="product_confirm">အတည်ပြုပါ</string>
+    <string name="product_options_selected">ရွေးချယ်ထားသော: %1$s</string>
     <string name="product_unavailable_title">ဤကုန်ပစ္စည်းကို မတွေ့ပါ</string>
     <string name="product_unavailable_body">ဖယ်ရှားခံရခြင်း သို့မဟုတ် ထုတ်ပြန်မှု ရပ်ဆိုင်းခံရခြင်း ဖြစ်နိုင်သည်</string>
 </resources>

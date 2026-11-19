@@ -54,6 +54,7 @@ import com.velnox.app.feature.auth.ResetPasswordScreen
 import com.velnox.app.feature.cart.CartScreen
 import com.velnox.app.feature.cart.CartState
 import com.velnox.app.feature.catalog.ProductDetailScreen
+import com.velnox.app.feature.catalog.ShopScreen
 import com.velnox.app.feature.home.ALL_CATEGORY
 import com.velnox.app.feature.home.CategoryScreen
 import com.velnox.app.feature.home.HomeScreen
@@ -557,10 +558,18 @@ private fun VelnoxNavHost() {
                                 onOpenProduct = ::requestOverlay,
                                 onOpenCategory = { slug -> requestOverlay("category:$slug") },
                             )
+                        } else if (overlay.startsWith("shop:")) {
+                            ShopScreen(
+                                shopSlugOrId = overlay.removePrefix("shop:"),
+                                onBack = ::closeOverlay,
+                                onOpenProduct = ::requestOverlay,
+                            )
                         } else if (overlay.startsWith("product:")) {
                             ProductDetailScreen(
                                 productId = overlay.removePrefix("product:"),
                                 onBack = ::closeOverlay,
+                                onOpenShop = { requestOverlay("shop:$it") },
+                                onOpenProduct = ::requestOverlay,
                                 onAddToCart = { product, variant, qty ->
                                     cart.add(
                                         productId = product.id,

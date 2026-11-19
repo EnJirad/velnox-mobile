@@ -18,4 +18,10 @@ interface CatalogApi {
 
     /** `GET /api/products/:id` — one published product, or [CatalogError.NotFound]. */
     suspend fun product(id: String): CatalogResult<ProductDetail>
+
+    /** `GET /api/shops/:slugOrId` — seller shop profile and products. */
+    suspend fun shop(slugOrId: String): CatalogResult<ShopDetail>
+
+    /** `GET /api/products/:id/reviews` — product reviews and summary. */
+    suspend fun reviews(productId: String): CatalogResult<ProductReviewsData>
 }
