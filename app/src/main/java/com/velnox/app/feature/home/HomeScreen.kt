@@ -131,6 +131,7 @@ fun HomeScreen(
     onOpenCategoryHub: () -> Unit,
     onOpenListing: (String) -> Unit,
     onOpenProduct: (String) -> Unit,
+    onOpenChat: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
@@ -218,6 +219,7 @@ fun HomeScreen(
             onQueryChange = { query = it },
             onClearQuery = { query = "" },
             notifications = HomeNotifications.items,
+            onChatClick = onOpenChat,
         )
 
         BoxWithConstraints(
@@ -321,13 +323,56 @@ fun HomeScreen(
 
                     is HomeFeed.Content -> {
                         if (!isSearching && selectedCategory == ALL_CATEGORY) {
-                            item(key = "featured", contentType = "section") {
-                                FeaturedSection(
-                                    products = current.items.take(FEATURED_LIMIT),
+                            // Trending rail
+                            item(key = "trending", contentType = "section") {
+                                HomeRailSection(
+                                    title = stringResource(R.string.home_trending_title),
+                                    subtitle = stringResource(R.string.home_trending_subtitle),
+                                    products = current.items
+                                        .filter { it.soldCount > 0 }
+                                        .sortedByDescending { it.soldCount }
+                                        .take(6),
                                     onOpenProduct = onOpenProduct,
                                     onSeeAll = { onOpenListing(ALL_CATEGORY) },
                                 )
                             }
+                            // Best Sellers rail
+                            item(key = "bestsellers", contentType = "section") {
+                                HomeRailSection(
+                                    title = stringResource(R.string.home_bestsellers_title),
+                                    subtitle = stringResource(R.string.home_bestsellers_subtitle),
+                                    products = current.items
+                                        .filter { it.soldCount > 0 }
+                                        .sortedByDescending { it.soldCount }
+                                        .drop(6)
+                                        .take(6),
+                                    onOpenProduct = onOpenProduct,
+                                    onSeeAll = { onOpenListing(ALL_CATEGORY) },
+                                )
+                            }
+                            // Recommended rail
+                            item(key = "recommended", contentType = "section") {
+                                HomeRailSection(
+                                    title = stringResource(R.string.home_recommended_title),
+                                    subtitle = stringResource(R.string.home_recommended_subtitle),
+                                    products = current.items.take(6),
+                                    onOpenProduct = onOpenProduct,
+                                    onSeeAll = { onOpenListing(ALL_CATEGORY) },
+                                )
+                            }
+                            // Curated Collections (Seasonal Banner)
+                            item(key = "curated", contentType = "section") {
+                                SeasonalBanner(
+                                    onClick = { onOpenCategoryHub() },
+                                    modifier = Modifier.padding(
+                                        start = PageGutter,
+                                        top = VelnoxSpacing.md,
+                                        end = PageGutter,
+                                        bottom = VelnoxSpacing.md,
+                                    ),
+                                )
+                            }
+                            // Trust strip
                             item(key = "trust", contentType = "trust") {
                                 Box(
                                     Modifier.padding(
@@ -338,43 +383,37 @@ fun HomeScreen(
                                     TrustRow()
                                 }
                             }
-                            item(key = "feed-header", contentType = "section") {
-                                SectionHeader(
-                                    title = stringResource(R.string.home_all_products_title),
-                                    modifier = Modifier.padding(
-                                        start = PageGutter,
-                                        top = VelnoxSpacing.lg,
-                                        end = PageGutter,
-                                        bottom = VelnoxSpacing.sm,
-                                    ),
-                                )
-                            }
                         } else if (!isSearching) {
-                            item(key = "category-header", contentType = "section") {
-                                SectionHeader(
-                                    title = selectedCategoryLabel,
-                                    modifier = Modifier.padding(
-                                        start = PageGutter,
-                                        top = VelnoxSpacing.lg,
-                                        end = PageGutter,
-                                        bottom = VelnoxSpacing.sm,
-                                    ),
-                                )
+                            // Category listing: show products in grid
+                            productRows(
+                                products = current.items,
+                                columns = columns,
+                                onOpenProduct = onOpenProduct,
+                            )
+
+                            if (current.hasMore) {
+                                item(key = "load-more", contentType = "state") {
+                                    LoadMoreRow(
+                                        loading = current.loadingMore,
+                                        onLoadMore = { loadMore() },
+                                    )
+                                }
                             }
-                        }
+                        } else {
+                            // Search results: show products in grid
+                            productRows(
+                                products = current.items,
+                                columns = columns,
+                                onOpenProduct = onOpenProduct,
+                            )
 
-                        productRows(
-                            products = current.items,
-                            columns = columns,
-                            onOpenProduct = onOpenProduct,
-                        )
-
-                        if (current.hasMore) {
-                            item(key = "load-more", contentType = "state") {
-                                LoadMoreRow(
-                                    loading = current.loadingMore,
-                                    onLoadMore = { loadMore() },
-                                )
+                            if (current.hasMore) {
+                                item(key = "load-more", contentType = "state") {
+                                    LoadMoreRow(
+                                        loading = current.loadingMore,
+                                        onLoadMore = { loadMore() },
+                                    )
+                                }
                             }
                         }
                     }
@@ -448,11 +487,12 @@ private fun HomeToolbar(
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
     notifications: List<HomeNotification>,
+    onChatClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding(),
         contentAlignment = Alignment.TopCenter,
     ) {
@@ -463,7 +503,7 @@ private fun HomeToolbar(
                 .padding(horizontal = VelnoxSpacing.md, vertical = VelnoxSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BrandMark(size = 40)
+            BrandMark(size = 40, tile = com.velnox.app.ui.components.TileStyle.Brand)
             Spacer(Modifier.width(VelnoxSpacing.sm))
             HomeSearchField(
                 query = query,
@@ -472,11 +512,28 @@ private fun HomeToolbar(
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(VelnoxSpacing.sm))
+            // Chat button (MessageCircle)
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(com.velnox.app.ui.theme.Circle)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.12f))
+                    .velnoxClickable(role = Role.Button, onClick = onChatClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = VelnoxIcons.MessageCircle,
+                    contentDescription = stringResource(R.string.home_chat),
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(VelnoxSpacing.xs))
             NotificationBell(notifications = notifications)
         }
         HorizontalDivider(
             modifier = Modifier.align(Alignment.BottomCenter),
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f),
         )
     }
 }
@@ -873,6 +930,41 @@ private fun SeasonalBanner(
 }
 
 // ----------------------------------------------------------------- featured
+
+// --------------------------------------------------------------- home rails
+
+@Composable
+private fun HomeRailSection(
+    title: String,
+    subtitle: String,
+    products: List<CatalogProduct>,
+    onOpenProduct: (String) -> Unit,
+    onSeeAll: () -> Unit,
+) {
+    if (products.isEmpty()) return
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(
+            title = title,
+            subtitle = subtitle,
+            action = stringResource(R.string.home_see_all),
+            onAction = onSeeAll,
+            modifier = Modifier.padding(horizontal = PageGutter),
+        )
+        Spacer(Modifier.height(VelnoxSpacing.md))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = PageGutter),
+            horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
+        ) {
+            items(products, key = { it.id }, contentType = { "railProduct" }) { product ->
+                ProductCard(
+                    product = product,
+                    modifier = Modifier.width(152.dp),
+                    onClick = { onOpenProduct(product.id) },
+                )
+            }
+        }
+    }
+}
 
 // --------------------------------------------------------------- featured
 

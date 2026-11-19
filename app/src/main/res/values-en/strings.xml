@@ -14,7 +14,7 @@
 
     <!-- ═════════════════════════════ navigation ═════════════════════════════ -->
     <string name="nav_home">Home</string>
-    <string name="nav_messages">Messages</string>
+    <string name="nav_market">Market</string>
     <string name="nav_orders">Orders</string>
     <string name="nav_cart">Cart</string>
     <string name="nav_profile">Account</string>
@@ -55,9 +55,32 @@
     <string name="home_popular_subtitle">What shoppers choose most</string>
     <string name="home_new_title">New arrivals</string>
     <string name="home_see_all">See all</string>
+    <string name="home_trending_title">Trending</string>
+    <string name="home_trending_subtitle">Hottest products right now</string>
+    <string name="home_bestsellers_title">Best Sellers</string>
+    <string name="home_bestsellers_subtitle">All-time top selling products</string>
+    <string name="home_recommended_title">Recommended for You</string>
+    <string name="home_recommended_subtitle">Handpicked just for you</string>
+    <string name="home_curated_title">Curated Collections</string>
+    <string name="home_curated_subtitle">Special product selections for you</string>
+    <string name="home_chat">Chat</string>
     <string name="home_quick_orders">Orders</string>
     <string name="home_quick_wishlist">Wishlist</string>
     <string name="home_quick_cart">Cart</string>
+
+    <!-- ═════════════════════════════ market ═════════════════════════════ -->
+    <string name="market_filter_title">Filter products</string>
+    <string name="market_filter_price_range">Price range</string>
+    <string name="market_filter_min_price">Min price (THB)</string>
+    <string name="market_filter_max_price">Max price (THB)</string>
+    <string name="market_filter_sort_by">Sort by</string>
+    <string name="market_filter_clear">Clear filters</string>
+    <string name="market_filter_apply">Apply</string>
+    <string name="market_sort_newest">Newest</string>
+    <string name="market_sort_popular">Popular</string>
+    <string name="market_sort_price_low">Price: low to high</string>
+    <string name="market_sort_price_high">Price: high to low</string>
+    <string name="market_sort_rating">Top rated</string>
 
     <!-- sample products (UI preview only) -->
     <string name="product_1_name">Lightweight shell jacket</string>

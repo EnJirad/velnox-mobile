@@ -14,7 +14,7 @@
 
     <!-- ═════════════════════════════ navigation ═════════════════════════════ -->
     <string name="nav_home">หน้าแรก</string>
-    <string name="nav_messages">ข้อความ</string>
+    <string name="nav_market">ตลาด</string>
     <string name="nav_orders">คำสั่งซื้อ</string>
     <string name="nav_cart">ตะกร้า</string>
     <string name="nav_profile">บัญชี</string>
@@ -55,9 +55,32 @@
     <string name="home_popular_subtitle">สินค้าที่คนเลือกมากที่สุด</string>
     <string name="home_new_title">มาใหม่ล่าสุด</string>
     <string name="home_see_all">ดูทั้งหมด</string>
+    <string name="home_trending_title">ยอดฮิต</string>
+    <string name="home_trending_subtitle">สินค้าที่กำลังแรงที่สุด</string>
+    <string name="home_bestsellers_title">ขายดีที่สุด</string>
+    <string name="home_bestsellers_subtitle">สินค้าที่ขายดีตลอดกาล</string>
+    <string name="home_recommended_title">แนะนำสำหรับคุณ</string>
+    <string name="home_recommended_subtitle">คัดสรรมาเพื่อคุณโดยเฉพาะ</string>
+    <string name="home_curated_title">คอลเลกชันพิเศษ</string>
+    <string name="home_curated_subtitle">ชุดสินค้าที่คัดสรรมาให้คุณ</string>
+    <string name="home_chat">แชท</string>
     <string name="home_quick_orders">คำสั่งซื้อ</string>
     <string name="home_quick_wishlist">รายการโปรด</string>
     <string name="home_quick_cart">ตะกร้า</string>
+
+    <!-- ═════════════════════════════ market ═════════════════════════════ -->
+    <string name="market_filter_title">ตัวกรองสินค้า</string>
+    <string name="market_filter_price_range">ช่วงราคา</string>
+    <string name="market_filter_min_price">ราคาต่ำสุด (บาท)</string>
+    <string name="market_filter_max_price">ราคาสูงสุด (บาท)</string>
+    <string name="market_filter_sort_by">เรียงลำดับ</string>
+    <string name="market_filter_clear">ล้างตัวกรอง</string>
+    <string name="market_filter_apply">ใช้ตัวกรอง</string>
+    <string name="market_sort_newest">ล่าสุด</string>
+    <string name="market_sort_popular">ยอดนิยม</string>
+    <string name="market_sort_price_low">ราคาต่ำไปสูง</string>
+    <string name="market_sort_price_high">ราคาสูงไปต่ำ</string>
+    <string name="market_sort_rating">คะแนนดีที่สุด</string>
 
     <!-- sample products (UI preview only) -->
     <string name="product_1_name">เสื้อตัวนอกโครงเบา</string>

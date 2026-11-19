@@ -77,10 +77,10 @@ object AccessPolicy {
      */
     fun isAllowed(state: SessionState): Boolean = state is SessionState.Authenticated
 
-    /** Public: Home. Everything else on the bottom bar is account-specific. */
+    /** Public: Home, Market. Everything else on the bottom bar is account-specific. */
     fun reasonForTab(tab: AppTab): LoginReason? = when (tab) {
         AppTab.Home -> null
-        AppTab.Messages -> LoginReason.Messages
+        AppTab.Market -> null
         AppTab.Orders -> LoginReason.Orders
         AppTab.Cart -> LoginReason.Cart
         AppTab.Profile -> LoginReason.Profile

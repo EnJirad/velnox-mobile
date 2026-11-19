@@ -58,6 +58,8 @@ import com.velnox.app.feature.catalog.ProductDetailScreen
 import com.velnox.app.feature.home.ALL_CATEGORY
 import com.velnox.app.feature.home.CategoryScreen
 import com.velnox.app.feature.home.HomeScreen
+import com.velnox.app.feature.market.MarketScreen
+import com.velnox.app.feature.messages.MessagesScreen
 import com.velnox.app.feature.messages.ConversationScreen
 import com.velnox.app.feature.messages.MessagesScreen
 import com.velnox.app.feature.orders.OrderDetailScreen
@@ -598,10 +600,18 @@ private fun VelnoxNavHost() {
                                     onBack = ::closeOverlay,
                                 )
                             } else if (overlay.startsWith("thread:")) {
-                                ConversationScreen(
-                                    threadId = overlay.removePrefix("thread:"),
-                                    onBack = ::closeOverlay,
-                                )
+                                val threadId = overlay.removePrefix("thread:")
+                                if (threadId == "new") {
+                                    MessagesScreen(
+                                        onOpenThread = { id -> onOpenOverlay("thread:$id") },
+                                        onBrowseProducts = { onOpenTab(AppTab.Home) },
+                                    )
+                                } else {
+                                    ConversationScreen(
+                                        threadId = threadId,
+                                        onBack = ::closeOverlay,
+                                    )
+                                }
                             } else {
                                 PlaceholderDestination(
                                     overlayKey = overlay,
@@ -734,11 +744,18 @@ private fun TabContent(
                 }
             },
             onOpenProduct = { onOpenOverlay("product:$it") },
+            onOpenChat = { onOpenOverlay("thread:new") },
         )
 
-        AppTab.Messages -> MessagesScreen(
-            onOpenThread = { onOpenOverlay("thread:$it") },
-            onBrowseProducts = { onOpenTab(AppTab.Home) },
+        AppTab.Market -> MarketScreen(
+            onOpenProduct = { onOpenOverlay("product:$it") },
+            onOpenCategory = { categoryId ->
+                if (categoryId == "all") {
+                    onOpenOverlay("category")
+                } else {
+                    onOpenOverlay("category:$categoryId")
+                }
+            },
         )
 
         AppTab.Orders -> OrdersScreen(
@@ -766,7 +783,7 @@ private fun TabContent(
                     onOpenAddresses = { onOpenOverlay(SettingsPage.Addresses.key) },
                     onOpenOrders = { onOpenTab(AppTab.Orders) },
                     onOpenWishlist = { onOpenOverlay("wishlist") },
-                    onOpenMessages = { onOpenTab(AppTab.Messages) },
+                    onOpenMessages = { onOpenOverlay("thread:new") },
                 )
             }
         }
