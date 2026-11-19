@@ -132,6 +132,7 @@ fun HomeScreen(
     onOpenCategoryHub: () -> Unit,
     onOpenListing: (String) -> Unit,
     onOpenProduct: (String) -> Unit,
+    onOpenMessages: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
@@ -265,6 +266,7 @@ fun HomeScreen(
             onQueryChange = { query = it },
             onClearQuery = { query = "" },
             notifications = HomeNotifications.items,
+            onOpenMessages = onOpenMessages,
         )
 
         BoxWithConstraints(
@@ -771,6 +773,7 @@ private fun HomeToolbar(
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
     notifications: List<HomeNotification>,
+    onOpenMessages: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -796,6 +799,8 @@ private fun HomeToolbar(
             )
             Spacer(Modifier.width(VelnoxSpacing.sm))
             NotificationBell(notifications = notifications)
+            Spacer(Modifier.width(VelnoxSpacing.sm))
+            MessageButton(onOpenMessages = onOpenMessages)
         }
         HorizontalDivider(
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -983,6 +988,26 @@ private fun NotificationBell(notifications: List<HomeNotification>) {
                 }
             }
         }
+    }
+}
+
+/** Messages icon button in the home toolbar header. */
+@Composable
+private fun MessageButton(onOpenMessages: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(Circle)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .velnoxClickable(role = Role.Button, onClick = onOpenMessages),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = VelnoxIcons.MessageCircle,
+            contentDescription = stringResource(R.string.nav_messages),
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(19.dp),
+        )
     }
 }
 

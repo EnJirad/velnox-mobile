@@ -17,7 +17,8 @@
     <string name="nav_market">ตลาด</string>
     <string name="nav_orders">คำสั่งซื้อ</string>
     <string name="nav_cart">ตะกร้า</string>
-    <string name="nav_profile">บัญชี</string>
+    <string name="nav_account">บัญชี</string>
+    <string name="nav_messages">ข้อความ</string>
 
     <!-- ═════════════════════════════ home ═════════════════════════════ -->
     <string name="home_greeting_morning">สวัสดีตอนเช้า</string>

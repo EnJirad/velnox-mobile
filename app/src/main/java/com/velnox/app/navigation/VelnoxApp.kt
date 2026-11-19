@@ -708,6 +708,7 @@ private fun TabContent(
                 }
             },
             onOpenProduct = { onOpenOverlay("product:$it") },
+            onOpenMessages = { onOpenOverlay("chat") },
         )
 
         AppTab.Market -> MarketScreen(
@@ -732,8 +733,8 @@ private fun TabContent(
             onBrowseProducts = { onOpenTab(AppTab.Home) },
         )
 
-        AppTab.Profile -> {
-            // The Profile tab is protected by AccessPolicy, so a missing user
+        AppTab.Account -> {
+            // The Account tab is protected by AccessPolicy, so a missing user
             // means the session ended between the tap and this frame. Render
             // nothing rather than an account that is not real.
             val user = sessionState.user

@@ -80,10 +80,9 @@ object AccessPolicy {
     /** Public: Home. Everything else on the bottom bar is account-specific. */
     fun reasonForTab(tab: AppTab): LoginReason? = when (tab) {
         AppTab.Home -> null
-        AppTab.Messages -> LoginReason.Messages
         AppTab.Orders -> LoginReason.Orders
         AppTab.Cart -> LoginReason.Cart
-        AppTab.Profile -> LoginReason.Profile
+        AppTab.Account -> LoginReason.Account
     }
 
     /**
