@@ -72,10 +72,11 @@ import com.velnox.app.ui.theme.VelnoxBrand
 @Composable
 fun CategoryScreen(
     initialCategoryId: String?,
-    onBack: () -> Unit,
     onOpenListing: (String) -> Unit,
     onOpenProduct: (String) -> Unit,
     modifier: Modifier = Modifier,
+    titleOverride: String? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
     val isThai = LocalConfiguration.current.locales[0].language == "th"
@@ -118,7 +119,7 @@ fun CategoryScreen(
         }
     }
 
-    val title = when {
+    val title = titleOverride ?: when {
         selected == null -> stringResource(R.string.home_categories_title)
         else -> categories.firstOrNull { it.slug == selected }
             ?.let { if (isThai) it.displayName ?: it.name else it.name }

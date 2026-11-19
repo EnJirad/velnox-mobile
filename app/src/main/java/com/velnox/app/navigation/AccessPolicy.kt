@@ -77,13 +77,13 @@ object AccessPolicy {
      */
     fun isAllowed(state: SessionState): Boolean = state is SessionState.Authenticated
 
-    /** Public: Home. Everything else on the bottom bar is account-specific. */
+    /** Public: Home, Market. Everything else on the bottom bar is account-specific. */
     fun reasonForTab(tab: AppTab): LoginReason? = when (tab) {
         AppTab.Home -> null
-        AppTab.Messages -> LoginReason.Messages
+        AppTab.Market -> null
         AppTab.Orders -> LoginReason.Orders
         AppTab.Cart -> LoginReason.Cart
-        AppTab.Profile -> LoginReason.Profile
+        AppTab.Account -> LoginReason.Account
     }
 
     /**
@@ -101,7 +101,7 @@ object AccessPolicy {
 
         key == "checkout" -> LoginReason.Checkout
         key.startsWith("order:") -> LoginReason.Orders
-        key.startsWith("thread:") -> LoginReason.Messages
+        key == "messages" || key.startsWith("thread:") -> LoginReason.Messages
         key == "settings" || key.startsWith("settings/") -> LoginReason.Account
         key == "wishlist" -> LoginReason.Account
 

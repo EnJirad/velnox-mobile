@@ -14,10 +14,12 @@
 
     <!-- ═════════════════════════════ navigation ═════════════════════════════ -->
     <string name="nav_home">ပင်မ</string>
+    <string name="nav_market">စျေးကွက်</string>
     <string name="nav_messages">စာများ</string>
     <string name="nav_orders">အမှာစာများ</string>
     <string name="nav_cart">ကုန်တောင်း</string>
     <string name="nav_profile">ပရိုဖိုင်</string>
+    <string name="nav_account">အကောင့်</string>
 
     <!-- ═════════════════════════════ home ═════════════════════════════ -->
     <string name="home_greeting_morning">မနက်ခင်း မင်္ဂလာပါ</string>

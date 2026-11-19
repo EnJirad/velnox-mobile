@@ -132,6 +132,7 @@ fun HomeScreen(
     onOpenListing: (String) -> Unit,
     onOpenProduct: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenMessages: () -> Unit = {},
 ) {
     val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
     val isThai = LocalConfiguration.current.locales[0].language == "th"
@@ -218,6 +219,7 @@ fun HomeScreen(
             onQueryChange = { query = it },
             onClearQuery = { query = "" },
             notifications = HomeNotifications.items,
+            onOpenMessages = onOpenMessages,
         )
 
         BoxWithConstraints(
@@ -448,6 +450,7 @@ private fun HomeToolbar(
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
     notifications: List<HomeNotification>,
+    onOpenMessages: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -460,23 +463,47 @@ private fun HomeToolbar(
             modifier = Modifier
                 .widthIn(max = ContentMaxWidth)
                 .fillMaxWidth()
-                .padding(horizontal = VelnoxSpacing.md, vertical = VelnoxSpacing.sm),
+                .padding(horizontal = VelnoxSpacing.sm, vertical = VelnoxSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             BrandMark(size = 40)
-            Spacer(Modifier.width(VelnoxSpacing.sm))
+            Spacer(Modifier.width(VelnoxSpacing.xs))
             HomeSearchField(
                 query = query,
                 onQueryChange = onQueryChange,
                 onClearQuery = onClearQuery,
                 modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(VelnoxSpacing.sm))
+            Spacer(Modifier.width(VelnoxSpacing.xs))
             NotificationBell(notifications = notifications)
+            Spacer(Modifier.width(VelnoxSpacing.xs))
+            HeaderMessagesButton(onClick = onOpenMessages)
         }
         HorizontalDivider(
             modifier = Modifier.align(Alignment.BottomCenter),
             color = MaterialTheme.colorScheme.outline,
+        )
+    }
+}
+
+@Composable
+private fun HeaderMessagesButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(44.dp)
+            .clip(Circle)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .velnoxClickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = VelnoxIcons.MessageCircle,
+            contentDescription = stringResource(R.string.nav_messages),
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(19.dp),
         )
     }
 }

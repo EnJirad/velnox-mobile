@@ -78,6 +78,7 @@ fun MessagesScreen(
     onOpenThread: (String) -> Unit,
     onBrowseProducts: () -> Unit,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     threads: List<DemoThread> = MessagesDemo.threads,
 ) {
     Column(
@@ -85,7 +86,10 @@ fun MessagesScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        TopBar(title = stringResource(R.string.messages_title))
+        TopBar(
+            title = stringResource(R.string.messages_title),
+            onBack = onBack,
+        )
 
         if (threads.isEmpty()) {
             EmptyState(

@@ -31,10 +31,20 @@ class AccessPolicyTest {
     fun `account destinations are protected`() {
         assertEquals(LoginReason.Checkout, AccessPolicy.reasonForOverlay("checkout"))
         assertEquals(LoginReason.Orders, AccessPolicy.reasonForOverlay("order:o-1"))
+        assertEquals(LoginReason.Messages, AccessPolicy.reasonForOverlay("messages"))
         assertEquals(LoginReason.Messages, AccessPolicy.reasonForOverlay("thread:t-1"))
         assertEquals(LoginReason.Account, AccessPolicy.reasonForOverlay("settings"))
         assertEquals(LoginReason.Account, AccessPolicy.reasonForOverlay("settings/password"))
         assertEquals(LoginReason.Account, AccessPolicy.reasonForOverlay("wishlist"))
+    }
+
+    @Test
+    fun `tab access policy enforces public vs account destinations`() {
+        assertNull(AccessPolicy.reasonForTab(AppTab.Home))
+        assertNull(AccessPolicy.reasonForTab(AppTab.Market))
+        assertEquals(LoginReason.Orders, AccessPolicy.reasonForTab(AppTab.Orders))
+        assertEquals(LoginReason.Cart, AccessPolicy.reasonForTab(AppTab.Cart))
+        assertEquals(LoginReason.Account, AccessPolicy.reasonForTab(AppTab.Account))
     }
 
     @Test

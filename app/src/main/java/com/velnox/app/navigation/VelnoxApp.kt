@@ -451,6 +451,7 @@ private fun VelnoxNavHost() {
             loginReason != null -> dismissLogin()
             current != null && current.startsWith("settings/") -> overlayKey = "settings"
             current != null && current.startsWith("category:") -> overlayKey = "category"
+            current != null && current.startsWith("thread:") -> overlayKey = "messages"
             current != null -> closeOverlay()
             tab != AppTab.Home -> openTab(AppTab.Home)
         }
@@ -531,6 +532,15 @@ private fun VelnoxNavHost() {
                         onSignOut = ::signOut,
                     )
 
+                    "messages" -> MessagesScreen(
+                        onOpenThread = { requestOverlay("thread:$it") },
+                        onBrowseProducts = {
+                            closeOverlay()
+                            requestTab(AppTab.Home)
+                        },
+                        onBack = ::closeOverlay,
+                    )
+
                     "category" -> CategoryScreen(
                         initialCategoryId = null,
                         onBack = ::closeOverlay,
@@ -568,7 +578,7 @@ private fun VelnoxNavHost() {
                             } else if (overlay.startsWith("thread:")) {
                                 ConversationScreen(
                                     threadId = overlay.removePrefix("thread:"),
-                                    onBack = ::closeOverlay,
+                                    onBack = { overlayKey = "messages" },
                                 )
                             } else {
                                 PlaceholderDestination(
@@ -702,11 +712,15 @@ private fun TabContent(
                 }
             },
             onOpenProduct = { onOpenOverlay("product:$it") },
+            onOpenMessages = { onOpenOverlay("messages") },
         )
 
-        AppTab.Messages -> MessagesScreen(
-            onOpenThread = { onOpenOverlay("thread:$it") },
-            onBrowseProducts = { onOpenTab(AppTab.Home) },
+        AppTab.Market -> CategoryScreen(
+            initialCategoryId = null,
+            onBack = null,
+            onOpenListing = { slug -> onOpenOverlay("category:$slug") },
+            onOpenProduct = { onOpenOverlay("product:$it") },
+            titleOverride = stringResource(R.string.nav_market),
         )
 
         AppTab.Orders -> OrdersScreen(
@@ -720,8 +734,8 @@ private fun TabContent(
             onBrowseProducts = { onOpenTab(AppTab.Home) },
         )
 
-        AppTab.Profile -> {
-            // The Profile tab is protected by AccessPolicy, so a missing user
+        AppTab.Account -> {
+            // The Account tab is protected by AccessPolicy, so a missing user
             // means the session ended between the tap and this frame. Render
             // nothing rather than an account that is not real.
             val user = sessionState.user
@@ -734,7 +748,7 @@ private fun TabContent(
                     onOpenAddresses = { onOpenOverlay(SettingsPage.Addresses.key) },
                     onOpenOrders = { onOpenTab(AppTab.Orders) },
                     onOpenWishlist = { onOpenOverlay("wishlist") },
-                    onOpenMessages = { onOpenTab(AppTab.Messages) },
+                    onOpenMessages = { onOpenOverlay("messages") },
                 )
             }
         }

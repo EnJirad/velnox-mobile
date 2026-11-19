@@ -41,13 +41,20 @@ enum class AppTab(
     val icon: ImageVector,
 ) {
     Home("home", R.string.nav_home, VelnoxIcons.Home),
-    Messages("messages", R.string.nav_messages, VelnoxIcons.MessageCircle),
+    Market("market", R.string.nav_market, VelnoxIcons.ShoppingBag),
     Orders("orders", R.string.nav_orders, VelnoxIcons.Package),
     Cart("cart", R.string.nav_cart, VelnoxIcons.ShoppingCart),
-    Profile("profile", R.string.nav_profile, VelnoxIcons.User);
+    Account("account", R.string.nav_account, VelnoxIcons.User);
 
     companion object {
-        fun fromKey(key: String?): AppTab = entries.firstOrNull { it.key == key } ?: Home
+        fun fromKey(key: String?): AppTab = when (key) {
+            "home" -> Home
+            "market" -> Market
+            "orders" -> Orders
+            "cart" -> Cart
+            "account", "profile" -> Account
+            else -> Home
+        }
     }
 }
 
