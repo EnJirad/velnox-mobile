@@ -344,7 +344,7 @@
     <string name="login_error_google_failed">Google sign-in did not complete. Please try again.</string>
     <string name="login_error_google_no_account">No Google account was found on this device. Add one in Settings.</string>
     <string name="login_error_google_link_required">This email already has an account. Sign in with your password first, then link Google.</string>
-    <string name="login_error_google_email_mismatch">That Google address is not this account's address, so it cannot be linked</string>
+    <string name="login_error_google_email_mismatch">That Google address does not match this account, so it cannot be linked</string>
     <string name="login_error_google_identity_conflict">That Google account is already linked to another account</string>
     <string name="login_error_google_link_failed">Google could not be linked. Please try again later.</string>
     <string name="google_link_success">Google account connected</string>
