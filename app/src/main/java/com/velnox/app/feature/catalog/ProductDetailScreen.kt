@@ -360,6 +360,7 @@ fun ProductDetailScreen(
         }
     }
 }
+}
 
 @Composable
 private fun Gallery(urls: List<String>) {

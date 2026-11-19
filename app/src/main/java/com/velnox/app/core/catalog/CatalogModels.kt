@@ -53,6 +53,8 @@ data class ProductVariant(
     val options: Map<String, String> = emptyMap(),
 ) {
     val title: String get() = name
+    val isAvailable: Boolean? get() = stock?.let { it > 0 }
+    val inventoryQuantity: Int? get() = stock
 }
 
 /** One image of a product, in the order the seller arranged it. */
