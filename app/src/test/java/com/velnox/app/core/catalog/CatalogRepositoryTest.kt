@@ -16,12 +16,34 @@ class CatalogRepositoryTest {
         var categoryCalls = 0
         var listCalls = 0
         var detailCalls = 0
+        var shopCalls = 0
+        var reviewsCalls = 0
 
         var categoriesResult: CatalogResult<List<CatalogCategory>> =
             CatalogResult.Ok(listOf(CatalogCategory("chargers-cables", "Chargers", null, 1)))
         var listResult: CatalogResult<CatalogPage> =
             CatalogResult.Ok(CatalogPage(listOf(sampleProduct("a")), hasMore = false))
         var detailResult: CatalogResult<ProductDetail> = CatalogResult.Ok(sampleDetail("a"))
+        var shopResult: CatalogResult<ShopDetail> = CatalogResult.Ok(
+            ShopDetail(
+                shop = SellerShop(
+                    id = "shop-a",
+                    sellerId = "seller-a",
+                    name = "Shop A",
+                    slug = "shop-a",
+                    description = "Description",
+                ),
+                products = emptyList(),
+            ),
+        )
+        var reviewsResult: CatalogResult<ProductReviewsData> = CatalogResult.Ok(
+            ProductReviewsData(
+                items = emptyList(),
+                total = 0,
+                avgRating = 0.0,
+                distribution = emptyMap(),
+            ),
+        )
 
         override suspend fun categories(): CatalogResult<List<CatalogCategory>> {
             categoryCalls++
@@ -36,6 +58,16 @@ class CatalogRepositoryTest {
         override suspend fun product(id: String): CatalogResult<ProductDetail> {
             detailCalls++
             return detailResult
+        }
+
+        override suspend fun shop(slugOrId: String): CatalogResult<ShopDetail> {
+            shopCalls++
+            return shopResult
+        }
+
+        override suspend fun reviews(productId: String): CatalogResult<ProductReviewsData> {
+            reviewsCalls++
+            return reviewsResult
         }
     }
 
@@ -145,6 +177,32 @@ class CatalogRepositoryTest {
 
         assertEquals(2, api.categoryCalls)
         assertEquals(CatalogResult.Ok(emptyList<CatalogCategory>()), second)
+    }
+
+    @Test
+    fun `shop requests are cached in memory`() = runBlocking {
+        val api = FakeApi()
+        val repository = CatalogRepository(api)
+
+        val first = repository.shop("shop-a")
+        val second = repository.shop("shop-a")
+
+        assertEquals(1, api.shopCalls)
+        assertTrue(first is CatalogResult.Ok)
+        assertTrue(second is CatalogResult.Ok)
+    }
+
+    @Test
+    fun `reviews requests are cached in memory`() = runBlocking {
+        val api = FakeApi()
+        val repository = CatalogRepository(api)
+
+        val first = repository.reviews("prod-a")
+        val second = repository.reviews("prod-a")
+
+        assertEquals(1, api.reviewsCalls)
+        assertTrue(first is CatalogResult.Ok)
+        assertTrue(second is CatalogResult.Ok)
     }
 }
 
