@@ -585,9 +585,9 @@ fun ProductOptionsBottomSheet(
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onBackground,
                         )
-                        effectiveStock?.let { stock ->
+                        if (activeStock != null) {
                             Text(
-                                text = stringResource(R.string.product_stock_left, stock),
+                                text = stringResource(R.string.product_stock_left, activeStock),
                                 style = Text2xs,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
