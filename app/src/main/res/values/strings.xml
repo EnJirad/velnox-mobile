@@ -341,6 +341,7 @@
     <string name="login_error_email_not_configured">ระบบยังไม่สามารถส่งอีเมลได้ กรุณาติดต่อฝ่ายสนับสนุน</string>
     <string name="login_error_invalid_reset_token">ลิงก์ตั้งรหัสผ่านไม่ถูกต้องหรือหมดอายุแล้ว</string>
     <string name="login_error_google_unavailable">ยังไม่ได้ตั้งค่า Google Sign-In สำหรับแอปนี้</string>
+    <string name="login_error_google_unreachable">ตรวจสอบสถานะ Google Sign-In ไม่ได้ กรุณาแตะเพื่อลองอีกครั้ง</string>
     <string name="login_error_google_failed">เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองอีกครั้ง</string>
     <string name="login_error_google_no_account">ไม่พบบัญชี Google ในเครื่องนี้ กรุณาเพิ่มบัญชีใน Settings</string>
     <string name="login_error_google_link_required">อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านก่อน แล้วจึงเชื่อม Google</string>

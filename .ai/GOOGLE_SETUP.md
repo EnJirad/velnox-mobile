@@ -35,9 +35,9 @@ Two OAuth clients are involved and they are **not interchangeable**:
 | Item | Value | Status |
 |---|---|---|
 | Package name | `com.velnox.app` | **Verified** (`app/build.gradle.kts`) |
-| Signing SHA-1 (CI debug) | **unstable** — `d8a33542…`, `ce53e36d…`, `ee55aa8b…` on three consecutive runs | **Verified unstable.** `ANDROID_DEBUG_KEYSTORE_BASE64` is not set: the CI step writes an ACTION REQUIRED summary instead of decoding a key |
+| Signing SHA-1 (CI debug) | **changed on every run before 2026-11-19** — `e4e27424…`, `de775039…`, `8fd49055…`, `11b6959a…`, `01670e75…` on five consecutive runs | **Root cause found.** The secret *was* set and decoded, but `keytool` could not open the result and the step hid the error (`2>/dev/null`, no `pipefail`), so Gradle regenerated its own key each run. CI is now fail-closed: the keystore is validated before building and the APK certificate is compared against it afterwards. Until a keystore this build can open is stored, the workflow **fails** instead of shipping a new fingerprint |
 | Signing SHA-256 (CI debug) | changes with it | same |
-| Web client id | — | **Unknown.** The backend has one (`config` → `google:true`) but its value is not exposed; PR #16 adds `googleClientId` to that endpoint |
+| Web client id | — | **Unknown value.** The backend has one (`config` → `google:true`) but the deployed build does not publish it; PR #16 adds `googleClientId`. The app also accepts it at build time via `-PvelnoxGoogleClientId`, which CI fills from the `GOOGLE_WEB_CLIENT_ID` repository **variable** (public, not a secret) |
 | Android OAuth client | — | **Unknown.** Google Cloud Console cannot be inspected from here. |
 | Backend `MOBILE_GOOGLE_CLIENT_ID` | present? | **Verified present** (`GET /api/auth/mobile/config` → `google: true`). The value is not returned by the deployed build yet. |
 | Backend verification code | `verifyGoogleToken()` | **Verified** — signature (via Google tokeninfo), `iss`, `aud`, `exp`, `azp`, `email_verified`, `sub`. |
@@ -74,12 +74,24 @@ previous runs (`ee55aa8b…` vs `d8a33542…`, `ce53e36d…`).
 ### 3.1 Pin the signing key first
 
 An Android OAuth client is bound to a SHA-1, so the SHA-1 has to stop changing
-first. It still changes on every run because `ANDROID_DEBUG_KEYSTORE_BASE64` is
-not set. The workflow supports the secret and will use it; nothing else is
-needed on the CI side.
+first.
+
+**What was actually wrong (found 2026-11-19):** `ANDROID_DEBUG_KEYSTORE_BASE64`
+*was* set, and the step *did* decode it and print "Using the pinned keystore".
+But `keytool` could not open the result — the step sent its stderr to `/dev/null`,
+piped through `grep`, and had no `pipefail`, so it exited 0 with no fingerprint and
+no warning. Gradle then found an unusable `~/.android/debug.keystore` and the
+Android plugin generated a fresh key on every runner. Five builds, five
+certificates.
+
+The workflow is now fail-closed. It validates the decoded store, requires the
+`androiddebugkey` alias, exports the store to the Gradle signing config, and
+compares the assembled APK's certificate against the keystore's. Any mismatch
+fails the job. It never generates a replacement key.
 
 Create one keystore and store it as the repository secret
-`ANDROID_DEBUG_KEYSTORE_BASE64`:
+`ANDROID_DEBUG_KEYSTORE_BASE64` (add `ANDROID_DEBUG_KEYSTORE_PASSWORD` only if the
+store password is not `android`):
 
 ```bash
 keytool -genkeypair -v -keystore debug.keystore -storepass android \
@@ -88,8 +100,10 @@ keytool -genkeypair -v -keystore debug.keystore -storepass android \
 base64 -w0 debug.keystore
 ```
 
-The workflow writes it to `~/.android/debug.keystore` before Gradle runs. From the
-next build on, the fingerprint printed in the run summary is the one to register.
+Paste only the base64 output: no PEM header, no quotes, no newlines. The workflow
+prints `Pinned signing certificate SHA-256: …` on success; that value is what the
+APK must carry, and it is the SHA-1 derived from it that goes into the Android
+OAuth client.
 
 A debug key with the well-known password is not a secret in any meaningful sense;
 it only needs to be stable.

@@ -39,16 +39,12 @@ sealed interface GoogleSignInOutcome {
  *
  * An interface so the flow can be exercised without Play services in tests;
  * [CredentialManagerGoogleSignIn] is the single production implementation.
+ *
+ * Whether the flow can be *offered* is not decided here: that belongs to
+ * [GoogleClientIdSource], which knows where a client id comes from and can say
+ * whether the answer was "none" or "could not ask".
  */
 interface GoogleSignInProvider {
-
-    /**
-     * Whether the flow can even be attempted.
-     *
-     * `false` when no client id is known, which is a deployment fact the UI shows
-     * honestly instead of letting the user tap into a guaranteed failure.
-     */
-    suspend fun isAvailable(): Boolean
 
     /** Open the Google account sheet and return the outcome. Never throws. */
     suspend fun signIn(): GoogleSignInOutcome

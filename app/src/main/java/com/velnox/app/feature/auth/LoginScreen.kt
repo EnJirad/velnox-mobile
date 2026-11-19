@@ -75,8 +75,10 @@ import com.velnox.app.ui.theme.VelnoxTheme
  *
  * Google Sign-In is real: the button asks the caller, which opens the Credential
  * Manager sheet and hands the ID token to the backend. It is disabled when the
- * deployment has no Google client configured. LINE is still an entry point only
- * and says so when tapped.
+ * deployment has no Google client configured, and [googleUnavailableRes] says
+ * which of the two reasons applies — a client id that is definitively absent, or
+ * a check that could not be completed and is worth retrying. LINE is still an
+ * entry point only and says so when tapped.
  */
 @Composable
 fun LoginScreen(
@@ -88,6 +90,8 @@ fun LoginScreen(
     onGoogleSignIn: () -> Unit,
     googleAvailable: Boolean,
     googleBusy: Boolean,
+    googleUnavailableRes: Int? = null,
+    onRetryGoogleCheck: () -> Unit = {},
     reason: LoginReason? = null,
     onDismiss: (() -> Unit)? = null,
     emailPrefill: String = "",
@@ -317,6 +321,22 @@ fun LoginScreen(
                 modifier = Modifier.weight(1f),
                 onClick = { showComingSoon = true },
             )
+        }
+
+        // Why Google cannot be offered, when it cannot. Tapping asks again: the
+        // common failure is an API that was asleep or a network that dropped, not a
+        // deployment that will never have a client id.
+        val googleReason = googleUnavailableRes
+        if (!googleAvailable && googleReason != null) {
+            Spacer(Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(Squircle)
+                    .velnoxClickable(role = Role.Button, onClick = onRetryGoogleCheck),
+            ) {
+                NoticeBanner(stringResource(googleReason))
+            }
         }
 
         if (onDismiss != null) {

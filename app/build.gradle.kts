@@ -32,7 +32,43 @@ android {
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleClientId\"")
     }
 
+    // ─── Signing ────────────────────────────────────────────────────────────
+    // The APK that reaches a phone has to keep one certificate. Two reasons:
+    // Android refuses to update an installed app whose signature differs (the user
+    // has to uninstall and lose the data), and Google Sign-In binds an OAuth client
+    // to (package name, signing SHA-1), so a moving key cannot be registered.
+    //
+    // CI decodes the pinned keystore and exports these four variables. When they
+    // are absent — a plain local `assembleDebug` — the Android plugin falls back to
+    // its own debug key, exactly as before this block existed.
+    //
+    // Nothing here creates, rotates or overwrites a keystore: a missing or invalid
+    // store fails the build at signing time rather than being silently replaced.
+    val pinnedStoreFile = System.getenv("VELNOX_DEBUG_STORE_FILE")?.trim().orEmpty()
+    val pinnedStorePassword = System.getenv("VELNOX_DEBUG_STORE_PASSWORD")
+    val pinnedKeyAlias = System.getenv("VELNOX_DEBUG_KEY_ALIAS")?.trim().orEmpty()
+    val pinnedKeyPassword = System.getenv("VELNOX_DEBUG_KEY_PASSWORD")
+    val hasPinnedDebugKey = pinnedStoreFile.isNotEmpty() &&
+        !pinnedStorePassword.isNullOrEmpty() &&
+        pinnedKeyAlias.isNotEmpty()
+
+    signingConfigs {
+        if (hasPinnedDebugKey) {
+            getByName("debug") {
+                storeFile = file(pinnedStoreFile)
+                storePassword = pinnedStorePassword
+                keyAlias = pinnedKeyAlias
+                keyPassword = pinnedKeyPassword ?: pinnedStorePassword
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // Explicit so the pinned key is used by every task that signs, not just
+            // `assembleDebug`.
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

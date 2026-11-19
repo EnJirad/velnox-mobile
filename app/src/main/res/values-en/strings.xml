@@ -341,6 +341,7 @@
     <string name="login_error_email_not_configured">Password email is not available yet. Please contact support.</string>
     <string name="login_error_invalid_reset_token">That reset link is invalid or has expired</string>
     <string name="login_error_google_unavailable">Google Sign-In is not configured for this build</string>
+    <string name="login_error_google_unreachable">Google Sign-In could not be checked. Tap to try again.</string>
     <string name="login_error_google_failed">Google sign-in did not complete. Please try again.</string>
     <string name="login_error_google_no_account">No Google account was found on this device. Add one in Settings.</string>
     <string name="login_error_google_link_required">This email already has an account. Sign in with your password first, then link Google.</string>

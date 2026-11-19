@@ -32,8 +32,6 @@ class CredentialManagerGoogleSignIn(
     private val clientId: suspend () -> String?,
 ) : GoogleSignInProvider {
 
-    override suspend fun isAvailable(): Boolean = clientId() != null
-
     override suspend fun signIn(): GoogleSignInOutcome {
         val serverClientId = clientId()
             ?: return GoogleSignInOutcome.NotConfigured(

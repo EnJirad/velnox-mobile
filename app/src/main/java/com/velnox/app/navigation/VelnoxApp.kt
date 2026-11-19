@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.velnox.app.R
 import com.velnox.app.core.auth.ApiResult
 import com.velnox.app.core.auth.CredentialManagerGoogleSignIn
+import com.velnox.app.core.auth.GoogleClientIdStatus
 import com.velnox.app.core.auth.GoogleSignInOutcome
 import com.velnox.app.core.auth.AuthError
 import com.velnox.app.core.auth.SignInResult
@@ -148,9 +149,16 @@ private fun VelnoxNavHost() {
     var forgotSent by rememberSaveable { mutableStateOf(false) }
 
     // Google Sign-In availability and progress. Availability is a deployment
-    // fact (is there a client id at all?), so it is resolved once per gate.
+    // fact (is there a client id at all?), resolved from the build or the API.
     var googleAvailable by remember { mutableStateOf(false) }
     var googleBusy by remember { mutableStateOf(false) }
+
+    // Why Google cannot be offered, when it cannot. `null` means it can.
+    var googleUnavailableRes by remember { mutableStateOf<Int?>(null) }
+
+    // Bumped by "try again" on that notice. A failed lookup is never cached, so
+    // re-running the effect is all a retry needs to be.
+    var googleCheckAttempt by remember { mutableStateOf(0) }
 
     // Holds the Google ID token only between LINK_REQUIRED and the password
     // sign-in that proves ownership of the account it collided with. Deliberately
@@ -263,10 +271,26 @@ private fun VelnoxNavHost() {
         }
     }
 
-    // Resolve whether Google can be offered whenever the gate opens. Cheap: the
-    // client id comes from the build or from one cached config request.
-    LaunchedEffect(loginReason) {
-        googleAvailable = if (loginReason == null) false else googleProvider.isAvailable()
+    // Resolve whether Google can be offered whenever the gate opens, or when the
+    // user asks again. Cheap: the client id comes from the build, or from one
+    // config request whose successful answer is cached. A failed request is not
+    // cached, so this is also the retry path — the API may simply have been asleep.
+    LaunchedEffect(loginReason, googleCheckAttempt) {
+        if (loginReason == null) {
+            googleAvailable = false
+            googleUnavailableRes = null
+        } else {
+            val lookup = application.googleClientId.lookup()
+            googleAvailable = lookup.id != null
+            googleUnavailableRes = when {
+                lookup.id != null -> null
+                // Not an answer: say so, and let the user try again.
+                lookup.status == GoogleClientIdStatus.UNREACHABLE ->
+                    R.string.login_error_google_unreachable
+                // A definitive "this deployment has none".
+                else -> R.string.login_error_google_unavailable
+            }
+        }
     }
 
     /**
@@ -479,6 +503,14 @@ private fun VelnoxNavHost() {
                         onGoogleSignIn = ::startGoogleSignIn,
                         googleAvailable = googleAvailable,
                         googleBusy = googleBusy,
+                        googleUnavailableRes = googleUnavailableRes,
+                        onRetryGoogleCheck = {
+                            // An explicit retry must also forget a *definitive* "none",
+                            // otherwise the deployment the owner just fixed would stay
+                            // invisible until the process restarts.
+                            application.googleClientId.invalidate()
+                            googleCheckAttempt++
+                        },
                         reason = reason,
                         onDismiss = ::dismissLogin,
                     )
