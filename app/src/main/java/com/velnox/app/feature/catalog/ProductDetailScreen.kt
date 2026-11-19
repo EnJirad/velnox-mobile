@@ -142,7 +142,7 @@ fun ProductDetailScreen(
                 val effectivePrice = selectedVariant?.price ?: current.product.displayPrice
                 val effectiveCompareAt = selectedVariant?.compareAtPrice ?: current.product.compareAtPrice
                 val effectiveDiscount: Int? = if (effectiveCompareAt != null && effectivePrice != null && effectiveCompareAt > effectivePrice) {
-                    roundToInt(((effectiveCompareAt - effectivePrice) / effectiveCompareAt) * 100)
+                    (((effectiveCompareAt - effectivePrice) / effectiveCompareAt) * 100).roundToInt()
                 } else {
                     current.product.discountPercent
                 }
