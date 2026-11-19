@@ -60,6 +60,9 @@ fun RegisterScreen(
     isSubmitting: Boolean,
     errorRes: Int?,
     onBackToLogin: () -> Unit,
+    onGoogleSignIn: () -> Unit,
+    googleAvailable: Boolean,
+    googleBusy: Boolean,
 ) {
     val focusManager = LocalFocusManager.current
 
@@ -321,9 +324,16 @@ fun RegisterScreen(
             SocialButton(
                 label = stringResource(R.string.login_continue_google),
                 glyph = "G",
-                enabled = !isSubmitting,
+                // Same real flow as the sign-in screen: Google either creates the
+                // account or returns the existing one, so this is not a separate
+                // registration path. Only LINE is still an entry point.
+                enabled = googleButtonEnabled(
+                    isSubmitting = isSubmitting,
+                    googleBusy = googleBusy,
+                    googleAvailable = googleAvailable,
+                ),
                 modifier = Modifier.weight(1f),
-                onClick = { showComingSoon = true },
+                onClick = onGoogleSignIn,
             )
             SocialButton(
                 label = stringResource(R.string.login_continue_line),
@@ -348,6 +358,9 @@ private fun RegisterScreenPreview() {
             isSubmitting = false,
             errorRes = null,
             onBackToLogin = {},
+            onGoogleSignIn = {},
+            googleAvailable = true,
+            googleBusy = false,
         )
     }
 }
