@@ -191,4 +191,62 @@ class MarketFilterTest {
         assertEquals(10, query.offset)
         assertEquals(20, query.limit)
     }
+
+    @Test
+    fun `saver preserves all filter state fields including nullables and numbers`() {
+        val original = MarketFilterState(
+            categorySlug = "electronics",
+            minPrice = 149.99,
+            maxPrice = 999.50,
+            inStockOnly = true,
+            discountOnly = true,
+            shopId = "shop-42",
+        )
+
+        val scope = object : androidx.compose.runtime.saveable.SaverScope {
+            override fun canBeSaved(value: Any): Boolean = true
+        }
+        val saved = with(MarketFilterState.Saver) { scope.save(original) }
+
+        val restored = MarketFilterState.Saver.restore(saved!!)
+
+        assertEquals(original, restored)
+        assertEquals("electronics", restored?.categorySlug)
+        assertEquals(149.99, restored?.minPrice!!, 0.0001)
+        assertEquals(999.50, restored?.maxPrice!!, 0.0001)
+        assertEquals(true, restored.inStockOnly)
+        assertEquals(true, restored.discountOnly)
+        assertEquals("shop-42", restored.shopId)
+    }
+
+    @Test
+    fun `saver restores empty filter state with nulls correctly`() {
+        val original = MarketFilterState()
+
+        val scope = object : androidx.compose.runtime.saveable.SaverScope {
+            override fun canBeSaved(value: Any): Boolean = true
+        }
+        val saved = with(MarketFilterState.Saver) { scope.save(original) }
+        val restored = MarketFilterState.Saver.restore(saved!!)
+
+        assertEquals(original, restored)
+        assertNull(restored?.categorySlug)
+        assertNull(restored?.minPrice)
+        assertNull(restored?.maxPrice)
+        assertEquals(false, restored?.inStockOnly)
+        assertEquals(false, restored?.discountOnly)
+        assertNull(restored?.shopId)
+    }
+
+    @Test
+    fun `market sort saver saves and restores all values`() {
+        val scope = object : androidx.compose.runtime.saveable.SaverScope {
+            override fun canBeSaved(value: Any): Boolean = true
+        }
+        for (sort in MarketSort.values()) {
+            val saved = with(MarketSort.Saver) { scope.save(sort) }
+            val restored = MarketSort.Saver.restore(saved!!)
+            assertEquals(sort, restored)
+        }
+    }
 }

@@ -45,6 +45,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -97,7 +99,14 @@ enum class MarketSort(val queryValue: String?, val labelRes: Int) {
     PriceAsc("price_asc", R.string.market_sort_price_asc),
     PriceDesc("price_desc", R.string.market_sort_price_desc),
     Newest("newest", R.string.market_sort_newest),
-    Popular("popular", R.string.market_sort_popular),
+    Popular("popular", R.string.market_sort_popular);
+
+    companion object {
+        val Saver: Saver<MarketSort, String> = Saver(
+            save = { it.name },
+            restore = { name -> values().firstOrNull { it.name == name } ?: Relevance },
+        )
+    }
 }
 
 data class MarketFilterState(
@@ -144,6 +153,31 @@ data class MarketFilterState(
             offset = offset,
             limit = limit,
         )
+
+    companion object {
+        val Saver: Saver<MarketFilterState, Any> = mapSaver(
+            save = { state ->
+                buildMap {
+                    state.categorySlug?.let { put("categorySlug", it) }
+                    state.minPrice?.let { put("minPrice", it) }
+                    state.maxPrice?.let { put("maxPrice", it) }
+                    put("inStockOnly", state.inStockOnly)
+                    put("discountOnly", state.discountOnly)
+                    state.shopId?.let { put("shopId", it) }
+                }
+            },
+            restore = { map ->
+                MarketFilterState(
+                    categorySlug = map["categorySlug"] as? String,
+                    minPrice = (map["minPrice"] as? Number)?.toDouble(),
+                    maxPrice = (map["maxPrice"] as? Number)?.toDouble(),
+                    inStockOnly = map["inStockOnly"] as? Boolean ?: false,
+                    discountOnly = map["discountOnly"] as? Boolean ?: false,
+                    shopId = map["shopId"] as? String,
+                )
+            },
+        )
+    }
 }
 
 fun List<CatalogProduct>.sortedByMode(sort: MarketSort): List<CatalogProduct> = when (sort) {
@@ -167,8 +201,13 @@ fun MarketScreen(
 
     var query by rememberSaveable { mutableStateOf("") }
     var debouncedQuery by remember { mutableStateOf("") }
-    var sort by rememberSaveable { mutableStateOf(MarketSort.Relevance) }
-    var filterState by rememberSaveable(initialCategorySlug) {
+    var sort by rememberSaveable(stateSaver = MarketSort.Saver) {
+        mutableStateOf(MarketSort.Relevance)
+    }
+    var filterState by rememberSaveable(
+        initialCategorySlug,
+        stateSaver = MarketFilterState.Saver,
+    ) {
         mutableStateOf(MarketFilterState(categorySlug = initialCategorySlug))
     }
 
