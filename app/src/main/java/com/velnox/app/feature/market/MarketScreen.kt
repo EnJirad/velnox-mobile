@@ -130,11 +130,12 @@ data class MarketFilterState(
 
     fun matches(product: CatalogProduct): Boolean {
         if (categorySlug != null && product.categorySlug != categorySlug) return false
-        if (minPrice != null && (product.price == null || product.price < minPrice)) return false
-        if (maxPrice != null && (product.price == null || product.price > maxPrice)) return false
+        val p = product.displayPrice
+        if (minPrice != null && (p == null || p < minPrice)) return false
+        if (maxPrice != null && (p == null || p > maxPrice)) return false
         if (inStockOnly && product.inStock == false) return false
         if (discountOnly) {
-            val hasDiscount = (product.compareAtPrice != null && product.price != null && product.compareAtPrice > product.price) ||
+            val hasDiscount = (product.compareAtPrice != null && p != null && product.compareAtPrice > p) ||
                     (product.discountPercent != null && product.discountPercent > 0)
             if (!hasDiscount) return false
         }
@@ -182,8 +183,8 @@ data class MarketFilterState(
 
 fun List<CatalogProduct>.sortedByMode(sort: MarketSort): List<CatalogProduct> = when (sort) {
     MarketSort.Relevance -> this
-    MarketSort.PriceAsc -> this.sortedWith(compareBy { it.price ?: Double.MAX_VALUE })
-    MarketSort.PriceDesc -> this.sortedWith(compareByDescending { it.price ?: 0.0 })
+    MarketSort.PriceAsc -> this.sortedWith(compareBy { it.displayPrice ?: Double.MAX_VALUE })
+    MarketSort.PriceDesc -> this.sortedWith(compareByDescending { it.displayPrice ?: 0.0 })
     MarketSort.Newest -> this
     MarketSort.Popular -> this.sortedWith(compareByDescending { it.soldCount })
 }

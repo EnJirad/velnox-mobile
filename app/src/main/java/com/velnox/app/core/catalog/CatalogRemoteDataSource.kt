@@ -170,6 +170,7 @@ class CatalogRemoteDataSource(
         val id = item.stringOrNull("id") ?: return null
         val name = item.stringOrNull("name") ?: return null
         val featuredVariant = item.optJSONObject("featuredVariant")
+        val featPrice = featuredVariant?.numberOrNull("price")
         val compareAt = featuredVariant?.numberOrNull("compareAtPrice")
             ?: item.numberOrNull("compareAtPrice")
         val discount = featuredVariant?.numberOrNull("discountPercent")?.toInt()
@@ -197,6 +198,7 @@ class CatalogRemoteDataSource(
             reviewCount = reviewCount,
             sellerId = sellerId,
             shopId = shopId,
+            variantPrice = featPrice,
         )
     }
 
@@ -219,6 +221,45 @@ class CatalogRemoteDataSource(
         val stock = (data.numberOrNull("totalAvailableStock")
             ?: data.optJSONObject("inventory")?.numberOrNull("available"))?.toInt()
 
+        val featVar = data.optJSONObject("featuredVariant")
+        val featPrice = featVar?.numberOrNull("price")
+        val featCompareAt = featVar?.numberOrNull("compareAtPrice")
+            ?: data.numberOrNull("compareAtPrice")
+        val featDiscount = featVar?.numberOrNull("discountPercent")?.toInt()
+            ?: data.numberOrNull("discountPercent")?.toInt()
+
+        val variantsList = ArrayList<ProductVariant>()
+        val variantsArray = data.optJSONArray("variants")
+        if (variantsArray != null) {
+            for (i in 0 until variantsArray.length()) {
+                val vObj = variantsArray.optJSONObject(i) ?: continue
+                val vId = vObj.stringOrNull("id") ?: continue
+                val vName = vObj.stringOrNull("name") ?: continue
+                val vPrice = vObj.numberOrNull("price")
+                val vCompareAt = vObj.numberOrNull("compareAtPrice")
+                val vDiscount = vObj.numberOrNull("discountPercent")?.toInt()
+                val vStock = vObj.numberOrNull("stock")?.toInt()
+                val optionsMap = LinkedHashMap<String, String>()
+                val optionsObj = vObj.optJSONObject("options")
+                if (optionsObj != null) {
+                    val keys = optionsObj.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        optionsObj.stringOrNull(key)?.let { optionsMap[key] = it }
+                    }
+                }
+                variantsList += ProductVariant(
+                    id = vId,
+                    name = vName,
+                    price = vPrice,
+                    compareAtPrice = vCompareAt,
+                    discountPercent = vDiscount,
+                    stock = vStock,
+                    options = optionsMap,
+                )
+            }
+        }
+
         return ProductDetail(
             id = id,
             name = name,
@@ -232,6 +273,10 @@ class CatalogRemoteDataSource(
             unit = data.stringOrNull("unit"),
             availableStock = stock,
             soldCount = data.optInt("soldCount", 0),
+            compareAtPrice = featCompareAt,
+            discountPercent = featDiscount,
+            variantPrice = featPrice,
+            variants = variantsList,
         )
     }
 

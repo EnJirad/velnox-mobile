@@ -1051,12 +1051,13 @@ internal fun ProductCard(
             )
         }
         Spacer(Modifier.height(6.dp))
+        val priceToDisplay = product.displayPrice
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                PriceFormat.format(product.price, product.currency, locale)?.let { price ->
+                PriceFormat.format(priceToDisplay, product.currency, locale)?.let { price ->
                     Text(
                         text = price,
                         style = TextXs.copy(fontWeight = FontWeight.SemiBold),
@@ -1064,7 +1065,7 @@ internal fun ProductCard(
                         maxLines = 1,
                     )
                 }
-                if (product.compareAtPrice != null && product.price != null && product.compareAtPrice > product.price) {
+                if (product.compareAtPrice != null && priceToDisplay != null && product.compareAtPrice > priceToDisplay) {
                     PriceFormat.format(product.compareAtPrice, product.currency, locale)?.let { original ->
                         Text(
                             text = original,

@@ -436,6 +436,7 @@
     <string name="product_stock_left">%1$d left</string>
     <string name="product_sold">%1$d sold</string>
     <string name="product_description_title">Product details</string>
+    <string name="product_variants_title">Product Variants</string>
     <string name="product_unavailable_title">This product isn\'t available</string>
     <string name="product_unavailable_body">It may have been removed or is no longer published</string>
 </resources>

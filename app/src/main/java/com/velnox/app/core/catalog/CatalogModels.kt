@@ -32,7 +32,28 @@ data class CatalogProduct(
     val reviewCount: Int = 0,
     val sellerId: String? = null,
     val shopId: String? = null,
-)
+    val variantPrice: Double? = null,
+) {
+    /** The actual selling price (featured variant price if present and product base price is 0 or compareAtPrice). */
+    val displayPrice: Double?
+        get() = when {
+            variantPrice != null && (price == null || price == 0.0 || (compareAtPrice != null && price == compareAtPrice)) -> variantPrice
+            else -> price ?: variantPrice
+        }
+}
+
+/** One variant of a product, with its own price, comparison price, stock, and attributes. */
+data class ProductVariant(
+    val id: String,
+    val name: String,
+    val price: Double?,
+    val compareAtPrice: Double? = null,
+    val discountPercent: Int? = null,
+    val stock: Int? = null,
+    val options: Map<String, String> = emptyMap(),
+) {
+    val title: String get() = name
+}
 
 /** One image of a product, in the order the seller arranged it. */
 data class CatalogImage(
@@ -56,8 +77,18 @@ data class ProductDetail(
     val unit: String?,
     val availableStock: Int?,
     val soldCount: Int,
+    val compareAtPrice: Double? = null,
+    val discountPercent: Int? = null,
+    val variantPrice: Double? = null,
+    val variants: List<ProductVariant> = emptyList(),
 ) {
     val isInStock: Boolean? get() = availableStock?.let { it > 0 }
+
+    val displayPrice: Double?
+        get() = when {
+            variantPrice != null && (price == null || price == 0.0 || (compareAtPrice != null && price == compareAtPrice)) -> variantPrice
+            else -> price ?: variantPrice
+        }
 }
 
 /**
