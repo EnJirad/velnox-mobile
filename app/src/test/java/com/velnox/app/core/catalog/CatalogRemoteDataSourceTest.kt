@@ -68,6 +68,10 @@ class CatalogRemoteDataSourceTest {
         assertEquals("chargers-cables", product.categorySlug)
         assertEquals("SUPER GADGET ZENE", product.shopName)
         assertEquals(true, product.inStock)
+        assertEquals(149.0, product.compareAtPrice!!, 0.0001)
+        assertEquals(3, product.discountPercent)
+        assertEquals("c7163869-84be-4ef7-9f97-ad774f87177d", product.sellerId)
+        assertEquals("2017a0fe-2086-49a7-a857-6d2086301270", product.shopId)
         assertTrue(product.imageUrl!!.startsWith("https://"))
     }
 
@@ -125,6 +129,33 @@ class CatalogRemoteDataSourceTest {
         assertTrue(url, url.contains("category=chargers-cables"))
         assertTrue(url, url.contains("limit=20"))
         assertTrue(url, url.contains("offset=0"))
+    }
+
+    @Test
+    fun `filters and sorting become query parameters`() = runBlocking {
+        val api = CatalogRemoteDataSource(
+            baseUrl = "https://example.test",
+            client = client(200, """{"success":true,"data":[]}"""),
+        )
+
+        api.products(
+            CatalogQuery(
+                search = "headphone",
+                category = "audio",
+                minPrice = 50.0,
+                maxPrice = 300.0,
+                sortBy = "price_asc",
+                shopId = "shop-123",
+            ),
+        )
+
+        val url = requested.single()
+        assertTrue(url, url.contains("q=headphone"))
+        assertTrue(url, url.contains("category=audio"))
+        assertTrue(url, url.contains("minPrice=50.0"))
+        assertTrue(url, url.contains("maxPrice=300.0"))
+        assertTrue(url, url.contains("sortBy=price_asc"))
+        assertTrue(url, url.contains("shopId=shop-123"))
     }
 
     @Test

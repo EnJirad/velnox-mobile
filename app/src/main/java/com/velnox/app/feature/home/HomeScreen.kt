@@ -1051,17 +1051,43 @@ internal fun ProductCard(
             )
         }
         Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PriceFormat.format(product.price, product.currency, locale)?.let { price ->
-                Text(
-                    text = price,
-                    style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                PriceFormat.format(product.price, product.currency, locale)?.let { price ->
+                    Text(
+                        text = price,
+                        style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                }
+                if (product.compareAtPrice != null && product.price != null && product.compareAtPrice > product.price) {
+                    PriceFormat.format(product.compareAtPrice, product.currency, locale)?.let { original ->
+                        Text(
+                            text = original,
+                            style = Text2xs.copy(
+                                textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.weight(1f))
-            Icon(
+            product.discountPercent?.takeIf { it > 0 }?.let { discount ->
+                Text(
+                    text = "-$discount%",
+                    style = Text2xs.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .clip(SquircleXs)
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                )
+            } ?: Icon(
                 imageVector = VelnoxIcons.ChevronRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

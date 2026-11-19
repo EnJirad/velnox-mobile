@@ -21,6 +21,39 @@
     <string name="nav_profile">ပရိုဖိုင်</string>
     <string name="nav_account">အကောင့်</string>
 
+    <!-- ═════════════════════════════ market ═════════════════════════════ -->
+    <string name="market_title">စျေးကွက်</string>
+    <string name="market_search_placeholder">ကုန်ပစ္စည်း၊ ကဏ္ဍ၊ ဆိုင်များကို ရှာဖွေပါ…</string>
+    <string name="market_featured_title">အကြံပြုထားသော ပစ္စည်းများ</string>
+    <string name="market_all_categories">အားလုံး</string>
+    <string name="market_all_products">ကုန်ပစ္စည်းအားလုံး</string>
+    <string name="market_filter_button">စစ်ထုတ်ရန်</string>
+    <string name="market_sort_button">စီစစ်ရန်</string>
+    <string name="market_sort_relevance">ပုံမှန် အကြံပြုချက်</string>
+    <string name="market_sort_price_asc">စျေးနှုန်း: အနိမ့်မှ အမြင့်</string>
+    <string name="market_sort_price_desc">စျေးနှုန်း: အမြင့်မှ အနိမ့်</string>
+    <string name="market_sort_newest">အသစ်ရောက်ရှိလာသော ပစ္စည်းများ</string>
+    <string name="market_sort_popular">လူကြိုက်အများဆုံး</string>
+    <string name="market_filter_title">ကုန်ပစ္စည်း စစ်ထုတ်မှုများ</string>
+    <string name="market_filter_price_range">စျေးနှုန်းအပိုင်းအခြား (ဘတ်)</string>
+    <string name="market_filter_min_price">အနည်းဆုံး</string>
+    <string name="market_filter_max_price">အများဆုံး</string>
+    <string name="market_filter_under_100">฿၁၀၀ အောက်</string>
+    <string name="market_filter_100_500">฿၁၀၀ - ฿၅၀၀</string>
+    <string name="market_filter_over_500">฿၅၀၀ အထက်</string>
+    <string name="market_filter_availability">ပစ္စည်းရရှိနိုင်မှု</string>
+    <string name="market_filter_in_stock_only">ပစ္စည်းရှိသည်များသာ</string>
+    <string name="market_filter_deals">အထူးကမ်းလှမ်းချက်များ</string>
+    <string name="market_filter_discount_only">လျော့စျေးရှိသော ပစ္စည်းများသာ</string>
+    <string name="market_filter_seller">ဆိုင်</string>
+    <string name="market_filter_all_sellers">ဆိုင်အားလုံး</string>
+    <string name="market_filter_apply">အတည်ပြုမည်</string>
+    <string name="market_filter_reset">ပြန်လည်သတ်မှတ်မည်</string>
+    <string name="market_filter_clear_all">အားလုံးရှင်းမည်</string>
+    <string name="market_empty_title">ကုန်ပစ္စည်းများ မတွေ့ရှိပါ</string>
+    <string name="market_empty_body">ရှာဖွေမှုစကားလုံး သို့မဟုတ် စစ်ထုတ်မှုများကို ပြောင်းလဲစမ်းသပ်ပါ</string>
+    <string name="market_results_count">ကုန်ပစ္စည်း %1$d ခု</string>
+
     <!-- ═════════════════════════════ home ═════════════════════════════ -->
     <string name="home_greeting_morning">မနက်ခင်း မင်္ဂလာပါ</string>
     <string name="home_greeting_afternoon">နေ့လယ်ခင်း မင်္ဂလာပါ</string>

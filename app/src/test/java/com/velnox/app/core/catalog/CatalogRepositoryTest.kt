@@ -77,6 +77,18 @@ class CatalogRepositoryTest {
     }
 
     @Test
+    fun `queries with different filters and sorts are cached separately`() = runBlocking {
+        val api = FakeApi()
+        val repository = CatalogRepository(api)
+
+        repository.products(CatalogQuery(category = "a", minPrice = 10.0))
+        repository.products(CatalogQuery(category = "a", minPrice = 20.0))
+        repository.products(CatalogQuery(category = "a", minPrice = 10.0))
+
+        assertEquals(2, api.listCalls)
+    }
+
+    @Test
     fun `a failure is never cached as data`() = runBlocking {
         val api = FakeApi()
         api.listResult = CatalogResult.Failed(CatalogError.Network)

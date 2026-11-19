@@ -98,7 +98,7 @@ class CatalogRepository(private val api: CatalogApi) {
     }
 
     private fun CatalogQuery.cacheKey(): String =
-        "${category.orEmpty()}|${search.orEmpty().trim().lowercase()}|$offset|$limit"
+        "${category.orEmpty()}|${search.orEmpty().trim().lowercase()}|$minPrice|$maxPrice|$sortBy|$shopId|$offset|$limit"
 
     private companion object {
         const val MAX_LIST_ENTRIES = 24

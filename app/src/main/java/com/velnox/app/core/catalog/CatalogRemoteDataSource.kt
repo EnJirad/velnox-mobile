@@ -63,6 +63,18 @@ class CatalogRemoteDataSource(
             query.search?.trim()?.takeIf { it.isNotEmpty() }?.let {
                 append("&q=").append(encode(it))
             }
+            query.minPrice?.let {
+                append("&minPrice=").append(it)
+            }
+            query.maxPrice?.let {
+                append("&maxPrice=").append(it)
+            }
+            query.sortBy?.takeIf { it.isNotBlank() }?.let {
+                append("&sortBy=").append(encode(it))
+            }
+            query.shopId?.takeIf { it.isNotBlank() }?.let {
+                append("&shopId=").append(encode(it))
+            }
         }
 
         return when (val raw = get(path)) {
@@ -157,6 +169,16 @@ class CatalogRemoteDataSource(
     private fun parseProduct(item: JSONObject): CatalogProduct? {
         val id = item.stringOrNull("id") ?: return null
         val name = item.stringOrNull("name") ?: return null
+        val featuredVariant = item.optJSONObject("featuredVariant")
+        val compareAt = featuredVariant?.numberOrNull("compareAtPrice")
+            ?: item.numberOrNull("compareAtPrice")
+        val discount = featuredVariant?.numberOrNull("discountPercent")?.toInt()
+            ?: item.numberOrNull("discountPercent")?.toInt()
+        val rating = item.numberOrNull("rating")
+        val reviewCount = item.optInt("reviewCount", 0)
+        val sellerId = item.stringOrNull("sellerId")
+        val shopId = item.stringOrNull("shopId")
+
         return CatalogProduct(
             id = id,
             name = name,
@@ -169,6 +191,12 @@ class CatalogRemoteDataSource(
             inStock = (item.numberOrNull("currentStock")
                 ?: item.numberOrNull("totalAvailableStock"))?.let { it > 0 },
             soldCount = item.optInt("soldCount", 0),
+            compareAtPrice = compareAt,
+            discountPercent = discount,
+            rating = rating,
+            reviewCount = reviewCount,
+            sellerId = sellerId,
+            shopId = shopId,
         )
     }
 

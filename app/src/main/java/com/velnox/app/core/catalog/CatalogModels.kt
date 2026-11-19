@@ -26,6 +26,12 @@ data class CatalogProduct(
     /** `null` when the response carries no stock information at all. */
     val inStock: Boolean?,
     val soldCount: Int,
+    val compareAtPrice: Double? = null,
+    val discountPercent: Int? = null,
+    val rating: Double? = null,
+    val reviewCount: Int = 0,
+    val sellerId: String? = null,
+    val shopId: String? = null,
 )
 
 /** One image of a product, in the order the seller arranged it. */
@@ -82,6 +88,10 @@ data class CatalogPage(
 data class CatalogQuery(
     val search: String? = null,
     val category: String? = null,
+    val minPrice: Double? = null,
+    val maxPrice: Double? = null,
+    val sortBy: String? = null,
+    val shopId: String? = null,
     val offset: Int = 0,
     val limit: Int = PAGE_SIZE,
 ) {

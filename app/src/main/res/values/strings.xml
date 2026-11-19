@@ -21,6 +21,39 @@
     <string name="nav_profile">บัญชี</string>
     <string name="nav_account">บัญชี</string>
 
+    <!-- ═════════════════════════════ market ═════════════════════════════ -->
+    <string name="market_title">ตลาด</string>
+    <string name="market_search_placeholder">ค้นหาสินค้า หมวดหมู่ ร้านค้า...</string>
+    <string name="market_featured_title">สินค้าแนะนำ</string>
+    <string name="market_all_categories">ทั้งหมด</string>
+    <string name="market_all_products">สินค้าทั้งหมด</string>
+    <string name="market_filter_button">ตัวกรอง</string>
+    <string name="market_sort_button">เรียงตาม</string>
+    <string name="market_sort_relevance">ความเกี่ยวข้อง</string>
+    <string name="market_sort_price_asc">ราคา: ต่ำไปสูง</string>
+    <string name="market_sort_price_desc">ราคา: สูงไปต่ำ</string>
+    <string name="market_sort_newest">สินค้าใหม่ล่าสุด</string>
+    <string name="market_sort_popular">ยอดนิยม</string>
+    <string name="market_filter_title">ตัวกรองสินค้า</string>
+    <string name="market_filter_price_range">ช่วงราคา (บาท)</string>
+    <string name="market_filter_min_price">ต่ำสุด</string>
+    <string name="market_filter_max_price">สูงสุด</string>
+    <string name="market_filter_under_100">ต่ำกว่า ฿100</string>
+    <string name="market_filter_100_500">฿100 - ฿500</string>
+    <string name="market_filter_over_500">มากกว่า ฿500</string>
+    <string name="market_filter_availability">สถานะสินค้า</string>
+    <string name="market_filter_in_stock_only">มีสินค้าพร้อมส่งเท่านั้น</string>
+    <string name="market_filter_deals">ข้อเสนอพิเศษ</string>
+    <string name="market_filter_discount_only">สินค้าลดราคาเท่านั้น</string>
+    <string name="market_filter_seller">ร้านค้า</string>
+    <string name="market_filter_all_sellers">ร้านค้าทั้งหมด</string>
+    <string name="market_filter_apply">ใช้ตัวกรอง</string>
+    <string name="market_filter_reset">รีเซ็ต</string>
+    <string name="market_filter_clear_all">ล้างทั้งหมด</string>
+    <string name="market_empty_title">ไม่พบสินค้า</string>
+    <string name="market_empty_body">ลองเปลี่ยนคำค้นหาหรือตัวกรองใหม่อีกครั้ง</string>
+    <string name="market_results_count">%1$d รายการ</string>
+
     <!-- ═════════════════════════════ home ═════════════════════════════ -->
     <string name="home_greeting_morning">สวัสดีตอนเช้า</string>
     <string name="home_greeting_afternoon">สวัสดีตอนบ่าย</string>

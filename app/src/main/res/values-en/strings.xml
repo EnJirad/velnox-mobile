@@ -21,6 +21,39 @@
     <string name="nav_profile">Account</string>
     <string name="nav_account">Account</string>
 
+    <!-- ═════════════════════════════ market ═════════════════════════════ -->
+    <string name="market_title">Market</string>
+    <string name="market_search_placeholder">Search products, categories, shops…</string>
+    <string name="market_featured_title">Featured Products</string>
+    <string name="market_all_categories">All</string>
+    <string name="market_all_products">All Products</string>
+    <string name="market_filter_button">Filters</string>
+    <string name="market_sort_button">Sort by</string>
+    <string name="market_sort_relevance">Relevance</string>
+    <string name="market_sort_price_asc">Price: Low to High</string>
+    <string name="market_sort_price_desc">Price: High to Low</string>
+    <string name="market_sort_newest">Newest</string>
+    <string name="market_sort_popular">Popular</string>
+    <string name="market_filter_title">Filter Products</string>
+    <string name="market_filter_price_range">Price Range (THB)</string>
+    <string name="market_filter_min_price">Min</string>
+    <string name="market_filter_max_price">Max</string>
+    <string name="market_filter_under_100">Under ฿100</string>
+    <string name="market_filter_100_500">฿100 - ฿500</string>
+    <string name="market_filter_over_500">Over ฿500</string>
+    <string name="market_filter_availability">Availability</string>
+    <string name="market_filter_in_stock_only">In stock only</string>
+    <string name="market_filter_deals">Deals &amp; Offers</string>
+    <string name="market_filter_discount_only">Discounted items only</string>
+    <string name="market_filter_seller">Seller / Shop</string>
+    <string name="market_filter_all_sellers">All Shops</string>
+    <string name="market_filter_apply">Apply Filters</string>
+    <string name="market_filter_reset">Reset</string>
+    <string name="market_filter_clear_all">Clear All</string>
+    <string name="market_empty_title">No products found</string>
+    <string name="market_empty_body">Try adjusting your search terms or filters</string>
+    <string name="market_results_count">%1$d products</string>
+
     <!-- ═════════════════════════════ home ═════════════════════════════ -->
     <string name="home_greeting_morning">Good morning</string>
     <string name="home_greeting_afternoon">Good afternoon</string>

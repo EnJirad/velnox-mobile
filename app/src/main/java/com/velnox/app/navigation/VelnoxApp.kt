@@ -57,6 +57,7 @@ import com.velnox.app.feature.catalog.ProductDetailScreen
 import com.velnox.app.feature.home.ALL_CATEGORY
 import com.velnox.app.feature.home.CategoryScreen
 import com.velnox.app.feature.home.HomeScreen
+import com.velnox.app.feature.market.MarketScreen
 import com.velnox.app.feature.messages.ConversationScreen
 import com.velnox.app.feature.messages.MessagesScreen
 import com.velnox.app.feature.orders.OrderDetailScreen
@@ -541,20 +542,20 @@ private fun VelnoxNavHost() {
                         onBack = ::closeOverlay,
                     )
 
-                    "category" -> CategoryScreen(
-                        initialCategoryId = null,
+                    "category" -> MarketScreen(
+                        initialCategorySlug = null,
                         onBack = ::closeOverlay,
-                        onOpenListing = { slug -> requestOverlay("category:$slug") },
                         onOpenProduct = ::requestOverlay,
+                        onOpenCategory = { slug -> requestOverlay("category:$slug") },
                     )
 
                     else -> {
                         if (overlay.startsWith("category:")) {
-                            CategoryScreen(
-                                initialCategoryId = overlay.removePrefix("category:"),
+                            MarketScreen(
+                                initialCategorySlug = overlay.removePrefix("category:"),
                                 onBack = { overlayKey = "category" },
-                                onOpenListing = { slug -> requestOverlay("category:$slug") },
                                 onOpenProduct = ::requestOverlay,
+                                onOpenCategory = { slug -> requestOverlay("category:$slug") },
                             )
                         } else if (overlay.startsWith("product:")) {
                             ProductDetailScreen(
@@ -715,12 +716,11 @@ private fun TabContent(
             onOpenMessages = { onOpenOverlay("messages") },
         )
 
-        AppTab.Market -> CategoryScreen(
-            initialCategoryId = null,
+        AppTab.Market -> MarketScreen(
+            initialCategorySlug = null,
             onBack = null,
-            onOpenListing = { slug -> onOpenOverlay("category:$slug") },
             onOpenProduct = { onOpenOverlay("product:$it") },
-            titleOverride = stringResource(R.string.nav_market),
+            onOpenCategory = { slug -> onOpenOverlay("category:$slug") },
         )
 
         AppTab.Orders -> OrdersScreen(
