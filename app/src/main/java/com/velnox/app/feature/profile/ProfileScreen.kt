@@ -240,19 +240,19 @@ fun ProfileScreen(
                                 cacheBustVersion = System.currentTimeMillis()
 
                                 // 3. Re-sync latest customer profile from backend to verify DB persistence
-                                customerRepository.call { api, token ->
-                                    val res = api.profile(token)
-                                    if (res is CustomerResult.Ok) {
-                                        val p = res.value
-                                        session.updateProfile(
-                                            name = p.name,
-                                            avatar = p.avatarUrl,
-                                            coverUrl = p.coverUrl,
-                                        )
-                                        if (!p.avatarUrl.isNullOrBlank()) preferences.setAvatarUri(p.avatarUrl)
-                                        if (!p.coverUrl.isNullOrBlank()) preferences.setCoverUri(p.coverUrl)
-                                        cacheBustVersion = System.currentTimeMillis()
-                                    }
+                                val refreshResult = customerRepository.call { api, token ->
+                                    api.profile(token)
+                                }
+                                if (refreshResult is CustomerResult.Ok) {
+                                    val p = refreshResult.value
+                                    session.updateProfile(
+                                        name = p.name,
+                                        avatar = p.avatarUrl,
+                                        coverUrl = p.coverUrl,
+                                    )
+                                    if (!p.avatarUrl.isNullOrBlank()) preferences.setAvatarUri(p.avatarUrl)
+                                    if (!p.coverUrl.isNullOrBlank()) preferences.setCoverUri(p.coverUrl)
+                                    cacheBustVersion = System.currentTimeMillis()
                                 }
 
                                 snackbarHostState.showSnackbar(
