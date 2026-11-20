@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -347,31 +348,44 @@ private fun CategoryListing(
                 body = stringResource(R.string.home_category_empty_body),
             )
 
-            else -> LazyColumn(
+            else -> BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(
-                    start = PageGutter,
-                    end = PageGutter,
-                    bottom = VelnoxSpacing.xxl,
-                ),
             ) {
-                items(products.chunked(2), key = { row -> row.joinToString("|") { it.id } }) { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
-                    ) {
-                        row.forEach { product ->
-                            ProductCard(
-                                product = product,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onOpenProduct(product.id) },
-                            )
+                val columns = when {
+                    maxWidth < 400.dp -> 2
+                    maxWidth < 600.dp -> 3
+                    else -> 4
+                }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = PageGutter,
+                        end = PageGutter,
+                        bottom = VelnoxSpacing.xxl,
+                    ),
+                ) {
+                    items(
+                        items = products.chunked(columns),
+                        key = { row -> row.joinToString("|") { it.id } },
+                        contentType = { "productRow" },
+                    ) { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
+                        ) {
+                            row.forEach { product ->
+                                ProductCard(
+                                    product = product,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onOpenProduct(product.id) },
+                                )
+                            }
+                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                         }
-                        repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
+                        Spacer(Modifier.height(VelnoxSpacing.sm))
                     }
-                    Spacer(Modifier.height(VelnoxSpacing.sm))
                 }
             }
         }
