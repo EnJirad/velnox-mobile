@@ -123,9 +123,12 @@ fun WishlistScreen(
                                 name = item.name,
                                 storeName = item.shopName,
                                 imageUrl = item.imageUrl,
+                                variantId = null,
+                                variantName = null,
                                 price = item.price,
                                 currency = item.currency,
                                 quantity = 1,
+                                maxStock = null,
                             )
                             actionNotice = "เพิ่ม ${item.name} ลงตะกร้าแล้ว"
                             scope.launch {

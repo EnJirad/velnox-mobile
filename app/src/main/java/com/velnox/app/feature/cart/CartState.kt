@@ -88,12 +88,12 @@ class CartState {
         name: String,
         storeName: String?,
         imageUrl: String?,
-        variantId: String?,
-        variantName: String?,
+        variantId: String? = null,
+        variantName: String? = null,
         price: Double?,
-        currency: String,
-        quantity: Int,
-        maxStock: Int?,
+        currency: String = "THB",
+        quantity: Int = 1,
+        maxStock: Int? = null,
     ) {
         val key = when {
             !variantId.isNullOrBlank() -> "${productId}_${variantId}"
