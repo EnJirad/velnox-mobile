@@ -539,4 +539,20 @@
     <string name="address_save">บันทึกที่อยู่</string>
     <string name="address_validation_error">กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง</string>
     <string name="address_select_title">เลือกที่อยู่จัดส่ง</string>
+    <string name="settings_password_confirm">ยืนยันรหัสผ่านใหม่</string>
+    <string name="settings_password_strength_weak">ความปลอดภัย: ต่ำ</string>
+    <string name="settings_password_strength_medium">ความปลอดภัย: ปานกลาง</string>
+    <string name="settings_password_strength_strong">ความปลอดภัย: สูง</string>
+    <string name="settings_password_success">เปลี่ยนรหัสผ่านสำเร็จแล้ว</string>
+    <string name="settings_password_err_mismatch">รหัสผ่านใหม่ไม่ตรงกัน</string>
+    <string name="settings_password_err_length">รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร และมีทั้งตัวอักษรและตัวเลข</string>
+    <string name="settings_password_err_current">กรุณากรอกรหัสผ่านปัจจุบัน</string>
+    <string name="settings_security_sessions_active_title">เซสชันที่ใช้งานอยู่</string>
+    <string name="settings_security_session_current">อุปกรณ์นี้ · กรุงเทพฯ, ไทย · กำลังใช้งาน</string>
+    <string name="settings_security_session_other">Chrome (Windows) · กรุงเทพฯ, ไทย · 2 วันที่แล้ว</string>
+    <string name="settings_security_logout_others">ออกจากระบบอุปกรณ์อื่นทั้งหมด</string>
+    <string name="settings_security_logged_out_others">ออกจากระบบอุปกรณ์อื่นเรียบร้อยแล้ว</string>
+    <string name="settings_help_search_hint">ค้นหาคำถามหรือหัวข้อช่วยเหลือ...</string>
+    <string name="settings_contact_live_agent">แชทสดกับเจ้าหน้าที่ฝ่ายบริการ</string>
+    <string name="settings_contact_live_agent_status">เจ้าหน้าที่พร้อมให้บริการ 24 ชม.</string>
 </resources>

@@ -24,6 +24,9 @@ Transform the static address and profile pages into an interactive, functional u
    - GitHub Actions CI verification.
 
 ## Implementation Summary
+- **Commit:** `fc2936f`
+- **GitHub Actions Run:** [Run #44704517564](https://github.com/EnJirad/velnox-mobile/actions/runs/44704517564) (PASS)
+- **APK Artifact:** `velnox-debug-apk` (ID: 14613989689, 12.4 MB)
 - **Address State & Data Model:** Implemented `UserAddress` and `AddressBookState` (`mutableStateListOf`) with methods for `add`, `update`, `delete`, and `setDefault`.
 - **Addresses Page & Form Dialog:** Created `AddressFormDialog` in `SettingsDetailScreen.kt` supporting full address fields (recipient name, phone, address line, sub-district, district, province, postal code, default toggle) and validation.
 - **Profile Edit Sync:** Connected `EditProfilePage` to `LocalSession.current` with real-time `session.updateProfile(name, email)` syncing with `ProfileScreen`.

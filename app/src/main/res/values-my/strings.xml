@@ -539,4 +539,20 @@
     <string name="address_save">လိပ်စာသိမ်းမည်</string>
     <string name="address_validation_error">အချက်အလက်များ ပြည့်စုံစွာ ဖြည့်ပါ</string>
     <string name="address_select_title">ပို့ဆောင်မည့်လိပ်စာ ရွေးပါ</string>
+    <string name="settings_password_confirm">လျှို့ဝှက်နံပါတ်အသစ် အတည်ပြုပါ</string>
+    <string name="settings_password_strength_weak">လုံခြုံရေး: အားနည်း</string>
+    <string name="settings_password_strength_medium">လုံခြုံရေး: အလယ်အလတ်</string>
+    <string name="settings_password_strength_strong">လုံခြုံရေး: အားကောင်း</string>
+    <string name="settings_password_success">လျှို့ဝှက်နံပါတ် ပြောင်းလဲပြီးပါပြီ</string>
+    <string name="settings_password_err_mismatch">လျှို့ဝှက်နံပါတ်များ မတူညီပါ</string>
+    <string name="settings_password_err_length">လျှို့ဝှက်နံပါတ် အနည်းဆုံး ၈ လုံး ရှိပြီး စာလုံးနှင့် ဂဏန်း ပါရပါမည်</string>
+    <string name="settings_password_err_current">လက်ရှိ လျှို့ဝှက်နံပါတ် ဖြည့်ပါ</string>
+    <string name="settings_security_sessions_active_title">လက်ရှိ အသုံးပြုနေသော စက်များ</string>
+    <string name="settings_security_session_current">ဤစက် · ဘန်ကောက်၊ ထိုင်း · ယခု အသုံးပြုနေသည်</string>
+    <string name="settings_security_session_other">Chrome (Windows) · ဘန်ကောက်၊ ထိုင်း · ၂ ရက်အလို</string>
+    <string name="settings_security_logout_others">အခြားစက်အားလုံးမှ ထွက်မည်</string>
+    <string name="settings_security_logged_out_others">အခြားစက်များမှ ထွက်ပြီးပါပြီ</string>
+    <string name="settings_help_search_hint">မေးခွန်းများ ရှာဖွေပါ...</string>
+    <string name="settings_contact_live_agent">ဝန်ဆောင်မှု အဖွဲ့နှင့် တိုက်ရိုက်စကားပြောပါ</string>
+    <string name="settings_contact_live_agent_status">၂၄ နာရီ ဝန်ဆောင်မှု ပေးနေပါသည်</string>
 </resources>

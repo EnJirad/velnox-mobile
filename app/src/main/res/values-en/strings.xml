@@ -539,4 +539,20 @@
     <string name="address_save">Save Address</string>
     <string name="address_validation_error">Please fill in all required fields accurately</string>
     <string name="address_select_title">Select Delivery Address</string>
+    <string name="settings_password_confirm">Confirm New Password</string>
+    <string name="settings_password_strength_weak">Strength: Weak</string>
+    <string name="settings_password_strength_medium">Strength: Medium</string>
+    <string name="settings_password_strength_strong">Strength: Strong</string>
+    <string name="settings_password_success">Password changed successfully</string>
+    <string name="settings_password_err_mismatch">New passwords do not match</string>
+    <string name="settings_password_err_length">Password must be at least 8 characters with letters and numbers</string>
+    <string name="settings_password_err_current">Please enter current password</string>
+    <string name="settings_security_sessions_active_title">Active Sessions</string>
+    <string name="settings_security_session_current">This device · Bangkok, TH · Active now</string>
+    <string name="settings_security_session_other">Chrome (Windows) · Bangkok, TH · 2 days ago</string>
+    <string name="settings_security_logout_others">Log out of all other devices</string>
+    <string name="settings_security_logged_out_others">Logged out of all other devices</string>
+    <string name="settings_help_search_hint">Search questions or topics...</string>
+    <string name="settings_contact_live_agent">Live Support Chat</string>
+    <string name="settings_contact_live_agent_status">Support agents available 24/7</string>
 </resources>

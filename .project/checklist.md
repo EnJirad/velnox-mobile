@@ -3,7 +3,7 @@
 ## Progress Overview
 - [x] **Round 1 (Parts 1–16):** Full UI/UX Overhaul & Remote Verification Completed.
 - [ ] **Round 2 (Parts 01–10):** E-Commerce Engine, Flow Completeness, RAM Efficiency & Polish.
-  - Completed: 5 / 10 Parts (50%)
+  - Completed: 6 / 10 Parts (60%)
 
 ---
 
@@ -80,6 +80,8 @@
 
 ### [x] Part 05: Interactive Address Book & User Profile Management
 - **Document:** `.project/part-05-address-book-profile-management.md`
+- **Commit:** `fc2936f`
+- **CI Run:** [Run #44704517564](https://github.com/EnJirad/velnox-mobile/actions/runs/44704517564) (PASS)
 - **Target Files:**
   - `SettingsDetailScreen.kt` (AddressesPage & EditProfilePage)
   - `ProfileScreen.kt`
@@ -97,17 +99,18 @@
 
 ---
 
-### [ ] Part 06: Settings Hub Refinement, Security & Help Center
+### [x] Part 06: Settings Hub Refinement, Security & Help Center
 - **Document:** `.project/part-06-settings-security-help-center.md`
 - **Target Files:**
   - `SettingsScreen.kt`
   - `SettingsDetailScreen.kt`
+  - `SettingsSecurityTest.kt`
 - **Key Objectives:**
-  - [ ] Functional Change Password dialog with strength validation and error handling.
-  - [ ] Two-Factor Authentication (2FA) toggle with persistent state.
-  - [ ] Active login sessions list with remote logout simulation.
-  - [ ] Expandable FAQ accordion in Help Center with search filtering.
-  - [ ] Clickable contact support actions (email, phone, live chat).
+  - [x] Functional Change Password dialog with strength validation and error handling.
+  - [x] Two-Factor Authentication (2FA) toggle with persistent state.
+  - [x] Active login sessions list with remote logout simulation.
+  - [x] Expandable FAQ accordion in Help Center with search filtering.
+  - [x] Clickable contact support actions (email, phone, live chat).
 
 ---
 
