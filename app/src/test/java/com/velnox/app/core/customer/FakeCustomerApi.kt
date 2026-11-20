@@ -11,6 +11,13 @@ open class FakeCustomerApi : CustomerApi {
 
     override suspend fun profile(token: String): CustomerResult<CustomerProfile> = unexpected()
     override suspend fun updateProfile(token: String, update: ProfileUpdate): CustomerResult<CustomerProfile> = unexpected()
+    override suspend fun uploadProfileImage(
+        token: String,
+        kind: String,
+        bytes: ByteArray,
+        mimeType: String,
+        filename: String,
+    ): CustomerResult<String> = unexpected()
     override suspend fun addresses(token: String): CustomerResult<List<CustomerAddress>> = unexpected()
     override suspend fun saveAddress(token: String, addressId: String?, input: AddressInput): CustomerResult<String> = unexpected()
     override suspend fun deleteAddress(token: String, id: String): CustomerResult<Unit> = unexpected()
