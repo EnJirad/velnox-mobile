@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -49,6 +52,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
+import com.velnox.app.core.preferences.AppLanguage
+import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.navigation.LoginReason
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.BrandMark
@@ -58,6 +63,7 @@ import com.velnox.app.ui.components.velnoxToggleable
 import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.SquircleLg
+import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.SquircleXs
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
@@ -91,8 +97,12 @@ fun LoginScreen(
     reason: LoginReason? = null,
     onDismiss: (() -> Unit)? = null,
     emailPrefill: String = "",
+    currentLanguage: AppLanguage? = null,
+    onLanguageSelected: ((AppLanguage) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val showBrandBadge = screenWidth >= 360
 
     var email by rememberSaveable(emailPrefill) { mutableStateOf(emailPrefill) }
     var password by rememberSaveable { mutableStateOf("") }
@@ -121,7 +131,15 @@ fun LoginScreen(
     }
 
     AuthScreenFrame {
-        AuthBrandHeader()
+        AuthBrandHeader(
+            showBadge = showBrandBadge,
+            trailing = {
+                LoginLanguageSelector(
+                    currentLanguage = currentLanguage,
+                    onLanguageSelected = onLanguageSelected,
+                )
+            },
+        )
 
         Spacer(Modifier.height(28.dp))
         Text(
@@ -380,7 +398,10 @@ fun AuthScreenFrame(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun AuthBrandHeader() {
+fun AuthBrandHeader(
+    showBadge: Boolean = true,
+    trailing: (@Composable () -> Unit)? = null,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -393,7 +414,125 @@ fun AuthBrandHeader() {
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
         )
-        BrandBadge(text = stringResource(R.string.login_brand_badge))
+        if (showBadge) {
+            BrandBadge(text = stringResource(R.string.login_brand_badge))
+        }
+        if (trailing != null) {
+            if (showBadge) {
+                Spacer(Modifier.width(8.dp))
+            }
+            trailing()
+        }
+    }
+}
+
+/**
+ * Compact language selector located near the top-right corner of the Login screen.
+ *
+ * Provides immediate switching between Thai and English via the app's [VelnoxPreferencesProvider]
+ * and [VelnoxLocaleProvider] architecture, persisting the selection to [PreferencesRepository]
+ * while preserving all typed fields in the login form.
+ */
+@Composable
+fun LoginLanguageSelector(
+    modifier: Modifier = Modifier,
+    currentLanguage: AppLanguage? = null,
+    onLanguageSelected: ((AppLanguage) -> Unit)? = null,
+) {
+    val preferences = try {
+        LocalPreferences.current
+    } catch (_: IllegalStateException) {
+        null
+    }
+    val activeLanguage = currentLanguage ?: preferences?.current?.language ?: AppLanguage.TH
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .clip(SquircleSm)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, SquircleSm)
+                .velnoxClickable(role = Role.Button) { expanded = true }
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = VelnoxIcons.Globe,
+                contentDescription = stringResource(R.string.settings_language_title),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                text = when (activeLanguage) {
+                    AppLanguage.TH -> "ไทย"
+                    AppLanguage.EN -> "EN"
+                    else -> activeLanguage.tag.uppercase()
+                },
+                style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Icon(
+                imageVector = VelnoxIcons.ChevronDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, SquircleLg),
+            shape = SquircleLg,
+        ) {
+            val supportedLanguages = listOf(AppLanguage.TH, AppLanguage.EN)
+            supportedLanguages.forEach { lang ->
+                val isSelected = lang == activeLanguage
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = stringResource(lang.nativeLabelRes),
+                                style = TextXs.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                ),
+                                color = if (isSelected) VelnoxBrand else MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "(${lang.tag.uppercase()})",
+                                style = Text2xs,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    trailingIcon = if (isSelected) {
+                        {
+                            Icon(
+                                imageVector = VelnoxIcons.Check,
+                                contentDescription = null,
+                                tint = VelnoxBrand,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    } else null,
+                    onClick = {
+                        if (onLanguageSelected != null) {
+                            onLanguageSelected(lang)
+                        } else {
+                            preferences?.setLanguage?.invoke(lang)
+                        }
+                        expanded = false
+                    },
+                )
+            }
+        }
     }
 }
 
