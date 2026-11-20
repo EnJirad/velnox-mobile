@@ -96,8 +96,11 @@ interface CustomerApi {
     suspend fun startConversation(
         token: String,
         shopId: String,
-        message: String?,
+        productId: String? = null,
     ): CustomerResult<CustomerConversation>
+
+    /** `POST /api/customer/support/conversation` — opens (or reuses) the Velnox Support thread. */
+    suspend fun startSupportConversation(token: String): CustomerResult<CustomerConversation>
 
     /** `GET /api/customer/conversations/:id/messages` */
     suspend fun messages(token: String, conversationId: String): CustomerResult<List<CustomerMessage>>
@@ -107,5 +110,12 @@ interface CustomerApi {
         token: String,
         conversationId: String,
         text: String,
+        clientId: String? = null,
     ): CustomerResult<CustomerMessage>
+
+    /** `POST /api/customer/conversations/:id/read` */
+    suspend fun markConversationRead(
+        token: String,
+        conversationId: String,
+    ): CustomerResult<Unit>
 }

@@ -64,6 +64,7 @@ import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.preferences.ThemeMode
 import com.velnox.app.core.session.LocalSession
 import com.velnox.app.core.session.SessionState
+import com.velnox.app.feature.messages.MessagesState
 import com.velnox.app.feature.profile.AddressBookState
 import com.velnox.app.feature.profile.UserAddress
 import com.velnox.app.ui.components.BrandBadge
@@ -93,6 +94,7 @@ import kotlinx.coroutines.launch
 fun SettingsDetailScreen(
     page: SettingsPage,
     onBack: () -> Unit,
+    onOpenSupportChat: ((String) -> Unit)? = null,
 ) {
     val title = when (page) {
         SettingsPage.EditProfile -> stringResource(R.string.settings_edit_profile_title)
@@ -121,7 +123,7 @@ fun SettingsDetailScreen(
             SettingsPage.Password -> PasswordPage()
             SettingsPage.Security -> SecurityPage()
             SettingsPage.HelpCenter -> HelpCenterPage()
-            SettingsPage.ContactSupport -> ContactSupportPage()
+            SettingsPage.ContactSupport -> ContactSupportPage(onOpenSupportChat = onOpenSupportChat)
             SettingsPage.Terms -> TextPage(
                 body = stringResource(R.string.settings_terms_body),
                 icon = VelnoxIcons.FileText,
@@ -722,7 +724,7 @@ private fun AddressFormDialog(
                 LabeledField(
                     label = stringResource(R.string.address_recipient_name),
                     value = recipientName,
-                    placeholder = stringResource(R.string.profile_demo_name),
+                    placeholder = stringResource(R.string.address_recipient_name),
                     onValueChange = { recipientName = it; errorMessage = null },
                 )
                 LabeledField(
@@ -1305,9 +1307,12 @@ private fun HelpCenterPage() {
 // ------------------------------------------------------------ contact support
 
 @Composable
-private fun ContactSupportPage() {
+private fun ContactSupportPage(onOpenSupportChat: ((String) -> Unit)? = null) {
     val context = LocalContext.current
-    var showChatDialog by remember { mutableStateOf(false) }
+    val repository = rememberCustomerRepository()
+    val scope = rememberCoroutineScope()
+    var openingChat by remember { mutableStateOf(false) }
+    var chatError by remember { mutableStateOf<String?>(null) }
 
     Text(
         text = stringResource(R.string.settings_contact_body),
@@ -1332,8 +1337,20 @@ private fun ContactSupportPage() {
         SettingRow(
             icon = VelnoxIcons.MessageCircle,
             title = stringResource(R.string.settings_contact_chat),
-            value = "Live 24/7",
-            onClick = { showChatDialog = true },
+            value = if (openingChat) stringResource(R.string.customer_loading) else stringResource(R.string.messages_contact_support),
+            onClick = {
+                if (!openingChat) {
+                    openingChat = true
+                    chatError = null
+                    scope.launch {
+                        when (val res = MessagesState.openSupportConversation(repository)) {
+                            is CustomerResult.Ok -> onOpenSupportChat?.invoke(res.value.id)
+                            is CustomerResult.Failed -> chatError = res.userMessage(context)
+                        }
+                        openingChat = false
+                    }
+                }
+            },
         )
         CardDivider()
         SettingRow(
@@ -1346,131 +1363,12 @@ private fun ContactSupportPage() {
             },
         )
     }
-    Spacer(Modifier.height(10.dp))
-    Text(
-        text = stringResource(R.string.common_preview_notice),
-        style = Text2xs,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-
-    if (showChatDialog) {
-        var inputMessage by remember { mutableStateOf("") }
-        var chatLog by remember {
-            mutableStateOf(
-                listOf(
-                    "เจ้าหน้าที่ Velnox" to "สวัสดีครับ ยินดีต้อนรับสู่ฝ่ายสนับสนุนลูกค้า Velnox มีสิ่งใดให้เราช่วยเหลือเรื่องคำสั่งซื้อหรือสินค้าวันนี้ครับ?",
-                )
-            )
-        }
-
-        AlertDialog(
-            onDismissRequest = { showChatDialog = false },
-            shape = SquircleLg,
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(Squircle)
-                            .background(MaterialTheme.colorScheme.secondary),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.settings_contact_live_agent),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    )
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 280.dp),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        chatLog.forEach { (sender, msg) ->
-                            val isAgent = sender.contains("เจ้าหน้าที่")
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(Squircle)
-                                    .background(
-                                        if (isAgent) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                    )
-                                    .padding(8.dp),
-                            ) {
-                                Text(
-                                    text = sender,
-                                    style = Text2xs.copy(fontWeight = FontWeight.Bold),
-                                    color = if (isAgent) MaterialTheme.colorScheme.secondary else VelnoxBrand,
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = msg,
-                                    style = TextXs,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 40.dp)
-                                .clip(Squircle)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, Squircle)
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            if (inputMessage.isEmpty()) {
-                                Text(
-                                    text = "พิมพ์ข้อความที่นี่...",
-                                    style = TextXs,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            BasicTextField(
-                                value = inputMessage,
-                                onValueChange = { inputMessage = it },
-                                singleLine = true,
-                                textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
-                                cursorBrush = SolidColor(VelnoxBrand),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        TextButton(
-                            onClick = {
-                                if (inputMessage.isNotBlank()) {
-                                    val sent = inputMessage.trim()
-                                    inputMessage = ""
-                                    chatLog = chatLog + ("คุณ" to sent) + ("เจ้าหน้าที่ Velnox" to "ได้รับข้อความ '$sent' เรียบร้อยแล้วครับ เจ้าหน้าที่กำลังตรวจสอบข้อมูลคำสั่งซื้อให้สักครู่ครับ")
-                                }
-                            },
-                        ) {
-                            Text(text = "ส่ง", color = VelnoxBrand, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showChatDialog = false }) {
-                    Text(text = stringResource(R.string.common_close), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
+    if (chatError != null) {
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = chatError.orEmpty(),
+            style = Text2xs,
+            color = MaterialTheme.colorScheme.error,
         )
     }
 }

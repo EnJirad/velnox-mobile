@@ -64,6 +64,7 @@ import com.velnox.app.feature.home.HomeScreen
 import com.velnox.app.feature.market.MarketScreen
 import com.velnox.app.feature.messages.ConversationScreen
 import com.velnox.app.feature.messages.MessagesScreen
+import com.velnox.app.feature.messages.MessagesState
 import com.velnox.app.feature.notifications.NotificationCenterScreen
 import com.velnox.app.feature.notifications.NotificationsState
 import com.velnox.app.feature.orders.OrderDetailScreen
@@ -207,12 +208,14 @@ private fun VelnoxNavHost() {
             OrdersState.load(customer)
             WishlistState.load(customer)
             notifications.load(customer)
+            MessagesState.loadConversations(customer)
         } else {
             AddressBookState.clear()
             cart.clear()
             OrdersState.clear()
             WishlistState.clear()
             notifications.clearAll()
+            MessagesState.clear()
         }
     }
 
@@ -725,6 +728,7 @@ private fun VelnoxNavHost() {
                                     SettingsDetailScreen(
                                         page = page,
                                         onBack = { overlayKey = "settings" },
+                                        onOpenSupportChat = { threadId -> overlayKey = "thread:$threadId" },
                                     )
                                 } else if (overlay.startsWith("order:")) {
                                     OrderDetailScreen(
@@ -739,6 +743,7 @@ private fun VelnoxNavHost() {
                                 } else if (overlay.startsWith("thread:")) {
                                     ConversationScreen(
                                         threadId = overlay.removePrefix("thread:"),
+                                        onOpenProduct = ::requestOverlay,
                                         onBack = { overlayKey = "messages" },
                                     )
                                 } else {

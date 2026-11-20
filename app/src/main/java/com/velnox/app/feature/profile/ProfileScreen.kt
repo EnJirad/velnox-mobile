@@ -44,6 +44,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
 import com.velnox.app.core.auth.AuthUser
+import com.velnox.app.feature.messages.MessagesState
 import com.velnox.app.feature.orders.OrdersFilter
 import com.velnox.app.feature.orders.OrdersState
 import com.velnox.app.feature.orders.OrderStatus
@@ -223,15 +224,6 @@ fun ProfileScreen(
                     )
                 }
             }
-
-            item {
-                Text(
-                    text = stringResource(R.string.common_preview_notice),
-                    style = Text2xs,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-                )
-            }
         }
     }
 
@@ -311,9 +303,11 @@ private fun ProfileHeaderCard(user: AuthUser, onOpenEditProfile: () -> Unit) {
                     }
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = stringResource(R.string.profile_demo_handle),
+                        text = user.email,
                         style = Text2xs,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Text(
@@ -361,16 +355,16 @@ private fun StatsRow(
             onClick = onOpenWishlist,
         )
         StatTile(
-            value = "3",
+            value = MessagesState.conversations.size.toString(),
             label = stringResource(R.string.profile_stats_messages),
             modifier = Modifier.weight(1f),
             onClick = onOpenMessages,
         )
         StatTile(
-            value = "5",
-            label = stringResource(R.string.profile_stats_vouchers),
+            value = AddressBookState.addresses.size.toString(),
+            label = stringResource(R.string.profile_section_addresses),
             modifier = Modifier.weight(1f),
-            onClick = {},
+            onClick = onOpenOrders,
         )
     }
 }

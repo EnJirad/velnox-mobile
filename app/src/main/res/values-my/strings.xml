@@ -615,6 +615,10 @@
     <string name="orders_reordering">ဈေးဝယ်ခြင်းထဲ ထည့်နေသည်…</string>
     <string name="wishlist_load_failed">အကြိုက်ဆုံးစာရင်းကို မဖွင့်နိုင်ပါ</string>
     <string name="notifications_load_failed">အသိပေးချက်များကို မဖွင့်နိုင်ပါ</string>
+    <string name="messages_load_failed">မက်ဆေ့ချ်များကို မဖွင့်နိုင်ပါ</string>
+    <string name="messages_support_title">Velnox ပံ့ပိုးမှု</string>
+    <string name="messages_contact_support">ပံ့ပိုးမှု</string>
+    <string name="messages_empty_chat">စကားစပြောနိုင်ပါပြီ</string>
     <string name="settings_saved">သိမ်းဆည်းပြီးပါပြီ</string>
     <string name="settings_saving">သိမ်းဆည်းနေသည်…</string>
 </resources>

@@ -299,14 +299,26 @@ class CustomerRemoteDataSourceTest {
         messages as CustomerResult.Ok
         assertEquals(listOf(false, true), messages.value.map { it.fromCustomer })
 
-        val sent = api(200 to """{"success":true,"data":{"id":"m3","content":"Thanks"}}""")
-            .sendMessage("tok", "t1", "Thanks")
+        val sent = api(200 to """{"success":true,"data":{"message":{"id":"m3","body":"Thanks","senderRole":"customer"}}}""")
+            .sendMessage("tok", "t1", "Thanks", clientId = "cid-1")
         sent as CustomerResult.Ok
         assertTrue(sent.value.fromCustomer)
         val posted = requests.last()
         assertEquals("POST", posted.method)
         assertEquals("https://example.test/api/customer/conversations/t1/messages", posted.url)
-        assertEquals("Thanks", JSONObject(posted.body).getString("text"))
+        assertEquals("Thanks", JSONObject(posted.body).getString("body"))
+        assertEquals("cid-1", JSONObject(posted.body).getString("clientId"))
+
+        val support = api(
+            200 to """{"success":true,"data":{"id":"sup-1","type":"CUSTOMER_COMPANY","isSupport":true,"participantOnline":null}}""",
+        ).startSupportConversation("tok")
+        support as CustomerResult.Ok
+        assertTrue(support.value.isSupport)
+        assertNull(support.value.participantOnline)
+        assertEquals("https://example.test/api/customer/support/conversation", requests.last().url)
+
+        assertTrue(api(200 to """{"success":true}""").markConversationRead("tok", "t1") is CustomerResult.Ok)
+        assertEquals("https://example.test/api/customer/conversations/t1/read", requests.last().url)
     }
 
     @Test

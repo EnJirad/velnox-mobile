@@ -615,6 +615,10 @@
     <string name="orders_reordering">กำลังเพิ่มลงตะกร้า…</string>
     <string name="wishlist_load_failed">โหลดรายการโปรดไม่สำเร็จ</string>
     <string name="notifications_load_failed">โหลดการแจ้งเตือนไม่สำเร็จ</string>
+    <string name="messages_load_failed">โหลดข้อความไม่สำเร็จ</string>
+    <string name="messages_support_title">ฝ่ายสนับสนุน Velnox</string>
+    <string name="messages_contact_support">ติดต่อซัพพอร์ต</string>
+    <string name="messages_empty_chat">เริ่มต้นการสนทนาได้เลย</string>
     <string name="settings_saved">บันทึกข้อมูลเรียบร้อยแล้ว</string>
     <string name="settings_saving">กำลังบันทึก…</string>
 </resources>

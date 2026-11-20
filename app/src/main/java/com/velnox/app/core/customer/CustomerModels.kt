@@ -195,14 +195,22 @@ data class CustomerConversation(
     val lastMessage: String?,
     val lastMessageAt: Long?,
     val unreadCount: Int,
+    val isSupport: Boolean = false,
+    val participantName: String? = null,
+    val participantOnline: Boolean? = null,
+    val productId: String? = null,
+    val productName: String? = null,
+    val productPrice: Double? = null,
+    val productImageUrl: String? = null,
 )
 
 data class CustomerMessage(
     val id: String,
     val text: String,
-    /** True when the customer wrote it; false for the shop's replies. */
+    /** True when the customer wrote it; false for the shop's or system's replies. */
     val fromCustomer: Boolean,
     val createdAt: Long?,
+    val isSystem: Boolean = false,
 )
 
 sealed interface CustomerResult<out T> {

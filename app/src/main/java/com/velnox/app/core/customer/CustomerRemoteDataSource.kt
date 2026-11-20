@@ -251,14 +251,19 @@ class CustomerRemoteDataSource(
     override suspend fun startConversation(
         token: String,
         shopId: String,
-        message: String?,
+        productId: String?,
     ): CustomerResult<CustomerConversation> {
         val body = JSONObject().put("shopId", shopId)
-        message?.let { body.put("message", it) }
+        productId?.takeIf { it.isNotBlank() }?.let { body.put("productId", it) }
         return send(token, "POST", "/api/customer/conversations", body).map { data ->
             data.asObject("conversation")?.let(::parseConversation)
         }
     }
+
+    override suspend fun startSupportConversation(token: String): CustomerResult<CustomerConversation> =
+        send(token, "POST", "/api/customer/support/conversation").map { data ->
+            data.asObject("conversation")?.let(::parseConversation)
+        }
 
     override suspend fun messages(
         token: String,
@@ -272,15 +277,25 @@ class CustomerRemoteDataSource(
         token: String,
         conversationId: String,
         text: String,
-    ): CustomerResult<CustomerMessage> =
-        send(
+        clientId: String?,
+    ): CustomerResult<CustomerMessage> {
+        val payload = JSONObject().put("body", text)
+        clientId?.takeIf { it.isNotBlank() }?.let { payload.put("clientId", it) }
+        return send(
             token,
             "POST",
             "/api/customer/conversations/${encode(conversationId)}/messages",
-            JSONObject().put("text", text).put("content", text),
+            payload,
         ).map { data ->
             data.asObject("message")?.let { parseMessage(it, true) }
         }
+    }
+
+    override suspend fun markConversationRead(
+        token: String,
+        conversationId: String,
+    ): CustomerResult<Unit> =
+        send(token, "POST", "/api/customer/conversations/${encode(conversationId)}/read").toUnit()
 
     // -------------------------------------------------------------- transport
 
@@ -587,12 +602,15 @@ class CustomerRemoteDataSource(
     private fun parseConversation(obj: JSONObject): CustomerConversation? {
         val id = obj.str("id", "conversationId") ?: return null
         val shop = obj.optJSONObject("shop")
+        val product = obj.optJSONObject("product")
         val last = obj.opt("lastMessage") ?: obj.opt("last_message")
         val lastText = when (last) {
             is String -> last.trim().takeIf { it.isNotEmpty() }
-            is JSONObject -> last.str("text", "content", "body")
+            is JSONObject -> last.str("body", "text", "content")
             else -> null
         }
+        val convType = obj.str("type")?.uppercase()
+        val isSupport = obj.flag("isSupport", "is_support") ?: (convType == "CUSTOMER_COMPANY")
         return CustomerConversation(
             id = id,
             shopId = obj.str("shopId", "shop_id") ?: shop?.str("id"),
@@ -601,22 +619,33 @@ class CustomerRemoteDataSource(
             lastMessageAt = obj.time("lastMessageAt", "last_message_at", "updatedAt", "updated_at")
                 ?: (last as? JSONObject)?.time("createdAt", "created_at"),
             unreadCount = obj.num("unreadCount", "unread_count", "unread")?.toInt() ?: 0,
+            isSupport = isSupport,
+            participantName = obj.str("participantName", "participant_name"),
+            participantOnline = obj.flag("participantOnline", "participant_online"),
+            productId = obj.str("productId", "product_id") ?: product?.str("id"),
+            productName = product?.str("name"),
+            productPrice = product?.num("price"),
+            productImageUrl = product?.let(::imageOf),
         )
     }
 
     private fun parseMessage(obj: JSONObject, knownFromCustomer: Boolean): CustomerMessage? {
         val id = obj.str("id", "messageId") ?: return null
-        val text = obj.str("text", "content", "body", "message") ?: return null
+        val text = obj.str("body", "text", "content", "message") ?: return null
         val sender = obj.str("senderRole", "sender_role", "senderType", "sender_type", "sender")
             ?.lowercase()
-        val fromCustomer = knownFromCustomer ||
-            (obj.flag("isMine", "fromCustomer", "isOwn", "is_mine")
-                ?: (sender in CUSTOMER_SENDERS))
+        val isSystem = obj.flag("isSystem", "is_system") ?: (sender == "system")
+        val fromCustomer = !isSystem && (
+            knownFromCustomer ||
+                (obj.flag("isMine", "fromCustomer", "isOwn", "is_mine")
+                    ?: (sender in CUSTOMER_SENDERS))
+            )
         return CustomerMessage(
             id = id,
             text = text,
             fromCustomer = fromCustomer,
             createdAt = obj.time("createdAt", "created_at", "sentAt"),
+            isSystem = isSystem,
         )
     }
 

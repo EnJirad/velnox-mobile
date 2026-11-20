@@ -615,6 +615,10 @@
     <string name="orders_reordering">Adding to cart…</string>
     <string name="wishlist_load_failed">Couldn\'t load your wishlist</string>
     <string name="notifications_load_failed">Couldn\'t load notifications</string>
+    <string name="messages_load_failed">Couldn\'t load messages</string>
+    <string name="messages_support_title">Velnox Support</string>
+    <string name="messages_contact_support">Support</string>
+    <string name="messages_empty_chat">Start a conversation</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_saving">Saving…</string>
 </resources>

@@ -2,9 +2,6 @@
 
 package com.velnox.app.feature.messages
 
-import com.velnox.app.ui.components.velnoxClickable
-
-import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -27,6 +24,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -36,10 +34,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +48,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
@@ -56,14 +59,23 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.velnox.app.R
+import com.velnox.app.VelnoxApplication
+import com.velnox.app.core.catalog.PriceFormat
+import com.velnox.app.core.customer.CustomerConversation
+import com.velnox.app.core.customer.CustomerMessage
+import com.velnox.app.core.customer.CustomerRepository
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.customer.userMessage
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.IconActionButton
 import com.velnox.app.ui.components.InitialsAvatar
 import com.velnox.app.ui.components.PageGutter
-import com.velnox.app.ui.components.PreviewNotice
 import com.velnox.app.ui.components.TopBar
+import com.velnox.app.ui.components.velnoxClickable
 import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.Circle
 import com.velnox.app.ui.theme.Squircle
@@ -73,36 +85,15 @@ import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
-
-/** One sample conversation. Preview content only. */
-data class DemoThread(
-    val id: String,
-    @StringRes val sellerRes: Int,
-    @StringRes val previewRes: Int,
-    val timeLabel: ThreadTime,
-    val unread: Boolean,
-)
-
-data class ChatMessage(
-    val id: String,
-    val text: String,
-    val isIncoming: Boolean,
-    val timestamp: String,
-)
-
-enum class ThreadTime { Today, Yesterday }
-
-object MessagesDemo {
-    val threads = listOf(
-        DemoThread("t1", R.string.messages_seller_1, R.string.messages_preview_1, ThreadTime.Today, true),
-        DemoThread("t2", R.string.messages_seller_2, R.string.messages_preview_2, ThreadTime.Today, false),
-        DemoThread("t3", R.string.messages_seller_3, R.string.messages_preview_3, ThreadTime.Yesterday, false),
-    )
-}
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
 
 /**
- * Messages tab: conversation list plus an intentional empty presentation.
- * Supports filtering threads by store name and message preview.
+ * Messages inbox backed by `GET /api/customer/conversations` and
+ * `POST /api/customer/support/conversation`.
  */
 @Composable
 fun MessagesScreen(
@@ -110,20 +101,47 @@ fun MessagesScreen(
     onBrowseProducts: () -> Unit,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
-    threads: List<DemoThread> = MessagesDemo.threads,
 ) {
-    var searchQuery by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
+    val repository: CustomerRepository? = remember(context) {
+        (context.applicationContext as? VelnoxApplication)?.customer
+    }
+    val scope = rememberCoroutineScope()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var actionError by remember { mutableStateOf<String?>(null) }
+    var openingSupport by remember { mutableStateOf(false) }
 
-    val filteredThreads = remember(threads, searchQuery, context) {
+    LaunchedEffect(repository) {
+        if (repository != null) {
+            MessagesState.loadConversations(repository)
+        }
+    }
+
+    val supportLabel = stringResource(R.string.messages_support_title)
+    val threads = MessagesState.conversations
+    val filteredThreads = remember(threads.toList(), searchQuery, supportLabel) {
         if (searchQuery.isBlank()) {
-            threads
+            threads.toList()
         } else {
-            val query = searchQuery.trim().lowercase()
-            threads.filter { thread ->
-                context.getString(thread.sellerRes).lowercase().contains(query) ||
-                    context.getString(thread.previewRes).lowercase().contains(query)
+            val q = searchQuery.trim().lowercase()
+            threads.filter { conv ->
+                val title = conv.displayTitle(supportLabel).lowercase()
+                val preview = conv.lastMessage.orEmpty().lowercase()
+                title.contains(q) || preview.contains(q)
             }
+        }
+    }
+
+    fun openSupport() {
+        if (repository == null || openingSupport) return
+        openingSupport = true
+        actionError = null
+        scope.launch {
+            when (val res = MessagesState.openSupportConversation(repository)) {
+                is CustomerResult.Ok -> onOpenThread(res.value.id)
+                is CustomerResult.Failed -> actionError = res.userMessage(context)
+            }
+            openingSupport = false
         }
     }
 
@@ -135,20 +153,82 @@ fun MessagesScreen(
         TopBar(
             title = stringResource(R.string.messages_title),
             onBack = onBack,
+            actions = {
+                if (repository != null) {
+                    Text(
+                        text = stringResource(R.string.messages_contact_support),
+                        style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                        color = VelnoxBrand,
+                        modifier = Modifier
+                            .clip(SquircleSm)
+                            .velnoxClickable(role = Role.Button, enabled = !openingSupport) { openSupport() }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                }
+            },
         )
 
+        if (actionError != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PageGutter, vertical = 4.dp)
+                    .clip(Squircle)
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = actionError.orEmpty(),
+                    style = Text2xs,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        }
+
         if (threads.isEmpty()) {
-            EmptyState(
-                icon = VelnoxIcons.MessageCircle,
-                title = stringResource(R.string.messages_empty_title),
-                body = stringResource(R.string.messages_empty_body),
-                actionLabel = stringResource(R.string.messages_empty_action),
-                onAction = onBrowseProducts,
-            )
+            when (MessagesState.status) {
+                LoadStatus.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.customer_loading),
+                            style = TextXs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                LoadStatus.Failed -> {
+                    EmptyState(
+                        icon = VelnoxIcons.MessageCircle,
+                        title = stringResource(R.string.messages_load_failed),
+                        body = stringResource(R.string.customer_error_network),
+                        actionLabel = stringResource(R.string.common_retry),
+                        onAction = {
+                            if (repository != null) {
+                                scope.launch { MessagesState.loadConversations(repository) }
+                            }
+                        },
+                    )
+                }
+
+                LoadStatus.Idle, LoadStatus.Ready -> {
+                    EmptyState(
+                        icon = VelnoxIcons.MessageCircle,
+                        title = stringResource(R.string.messages_empty_title),
+                        body = stringResource(R.string.messages_empty_body),
+                        actionLabel = stringResource(R.string.messages_contact_support),
+                        onAction = {
+                            if (repository != null) openSupport() else onBrowseProducts()
+                        },
+                    )
+                }
+            }
             return@Column
         }
 
-        // Search Bar
         MessagesSearchField(
             query = searchQuery,
             onQueryChange = { searchQuery = it },
@@ -161,12 +241,12 @@ fun MessagesScreen(
             contentPadding = PaddingValues(horizontal = PageGutter, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item {
-                PreviewNotice(text = stringResource(R.string.messages_demo_notice))
-                Spacer(Modifier.height(4.dp))
-            }
             items(filteredThreads, key = { it.id }) { thread ->
-                ThreadRow(thread = thread, onClick = { onOpenThread(thread.id) })
+                ThreadRow(
+                    thread = thread,
+                    supportLabel = supportLabel,
+                    onClick = { onOpenThread(thread.id) },
+                )
             }
         }
     }
@@ -239,11 +319,18 @@ private fun MessagesSearchField(
 }
 
 @Composable
-private fun ThreadRow(thread: DemoThread, onClick: () -> Unit) {
-    val sellerName = stringResource(thread.sellerRes)
-    val initials = remember(sellerName) {
-        sellerName.trim().split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
+private fun ThreadRow(
+    thread: CustomerConversation,
+    supportLabel: String,
+    onClick: () -> Unit,
+) {
+    val title = thread.displayTitle(supportLabel)
+    val initials = remember(title) { initialsOf(title) }
+    val locale = LocalConfiguration.current.locales[0]
+    val timeText = remember(thread.lastMessageAt, locale) {
+        formatChatTimestamp(thread.lastMessageAt, locale)
     }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -254,48 +341,56 @@ private fun ThreadRow(thread: DemoThread, onClick: () -> Unit) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        InitialsAvatar(initials = initials, size = 44, brand = thread.unread)
+        InitialsAvatar(initials = initials, size = 44, brand = thread.unreadCount > 0 || thread.isSupport)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = sellerName,
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                Spacer(Modifier.width(4.dp))
-                BrandBadge(text = stringResource(R.string.profile_verified_badge))
+                if (thread.isSupport) {
+                    Spacer(Modifier.width(4.dp))
+                    BrandBadge(text = stringResource(R.string.profile_verified_badge))
+                }
                 Spacer(Modifier.weight(1f))
-                Text(
-                    text = stringResource(
-                        when (thread.timeLabel) {
-                            ThreadTime.Today -> R.string.messages_today
-                            ThreadTime.Yesterday -> R.string.messages_yesterday
-                        }
-                    ),
-                    style = Text2xs,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (timeText.isNotEmpty()) {
+                    Text(
+                        text = timeText,
+                        style = Text2xs,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Spacer(Modifier.height(3.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(thread.previewRes),
+                    text = thread.lastMessage ?: stringResource(R.string.messages_empty_chat),
                     style = TextXs,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (thread.unread) {
+                if (thread.unreadCount > 0) {
                     Spacer(Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
                             .clip(Circle)
-                            .background(VelnoxBrand),
-                    )
+                            .background(VelnoxBrand)
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = if (thread.unreadCount > 99) "99+" else thread.unreadCount.toString(),
+                            style = Text2xs.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White,
+                        )
+                    }
                 }
             }
         }
@@ -303,41 +398,99 @@ private fun ThreadRow(thread: DemoThread, onClick: () -> Unit) {
 }
 
 /**
- * Conversation detail with enriched seller header, pinned product reference card,
- * and responsive chat input with software keyboard safety (`imePadding`).
+ * Real server-backed conversation screen (`GET/POST /api/customer/conversations/:id/messages`).
  */
 @Composable
 fun ConversationScreen(
     threadId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenProduct: ((String) -> Unit)? = null,
 ) {
-    val thread = MessagesDemo.threads.firstOrNull { it.id == threadId } ?: MessagesDemo.threads.first()
-    val sellerName = stringResource(thread.sellerRes)
-    val initials = remember(sellerName) {
-        sellerName.trim().split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
+    val context = LocalContext.current
+    val repository: CustomerRepository? = remember(context) {
+        (context.applicationContext as? VelnoxApplication)?.customer
     }
+    val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val locale = LocalConfiguration.current.locales[0]
+    val listState = rememberLazyListState()
 
-    val initialSellerMsg = stringResource(thread.previewRes)
-    val initialUserMsg = stringResource(R.string.messages_preview_2)
+    val supportLabel = stringResource(R.string.messages_support_title)
+    val thread = MessagesState.conversations.firstOrNull { it.id == threadId }
+    val title = thread?.displayTitle(supportLabel) ?: supportLabel
+    val initials = remember(title) { initialsOf(title) }
 
-    val messages = remember(threadId) {
-        mutableStateListOf(
-            ChatMessage("1", initialSellerMsg, isIncoming = true, timestamp = "10:30 AM"),
-            ChatMessage("2", initialUserMsg, isIncoming = false, timestamp = "10:32 AM"),
-            ChatMessage("3", "Yes, we currently have this item in stock and ready to ship!", isIncoming = true, timestamp = "10:35 AM"),
-        )
-    }
+    val messages = remember(threadId) { mutableStateListOf<CustomerMessage>() }
+    var loading by remember(threadId) { mutableStateOf(true) }
+    var loadError by remember(threadId) { mutableStateOf<String?>(null) }
+    var reloadTick by remember { mutableIntStateOf(0) }
 
     var inputText by rememberSaveable { mutableStateOf("") }
-    val focusManager = LocalFocusManager.current
+    var sending by remember { mutableStateOf(false) }
+    var sendError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(threadId, repository, reloadTick) {
+        if (repository == null) {
+            loading = false
+            return@LaunchedEffect
+        }
+        loading = messages.isEmpty()
+        loadError = null
+        if (MessagesState.conversations.none { it.id == threadId }) {
+            MessagesState.loadConversations(repository)
+        }
+        when (val res = MessagesState.loadMessages(repository, threadId)) {
+            is CustomerResult.Ok -> {
+                messages.clear()
+                messages.addAll(res.value)
+                loadError = null
+                MessagesState.markRead(repository, threadId)
+            }
+
+            is CustomerResult.Failed -> {
+                loadError = res.userMessage(context)
+            }
+        }
+        loading = false
+    }
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.lastIndex)
+        }
+    }
+
+    fun submitMessage() {
+        val text = inputText.trim()
+        if (text.isEmpty() || sending || repository == null) return
+        sending = true
+        sendError = null
+        val clientId = UUID.randomUUID().toString()
+        scope.launch {
+            when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
+                is CustomerResult.Ok -> {
+                    if (messages.none { it.id == res.value.id }) {
+                        messages.add(res.value)
+                    }
+                    inputText = ""
+                    focusManager.clearFocus()
+                }
+
+                is CustomerResult.Failed -> {
+                    sendError = res.userMessage(context)
+                }
+            }
+            sending = false
+        }
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // Enriched Top Bar
+        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -357,62 +510,129 @@ fun ConversationScreen(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = sellerName,
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.width(4.dp))
-                    BrandBadge(text = stringResource(R.string.profile_verified_badge))
+                    if (thread?.isSupport == true) {
+                        Spacer(Modifier.width(4.dp))
+                        BrandBadge(text = stringResource(R.string.profile_verified_badge))
+                    }
                 }
-                Spacer(Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Only show an online dot when the server explicitly reports participantOnline == true.
+                if (thread?.participantOnline == true) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(Circle)
+                                .background(Color(0xFF10B981)),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.messages_online),
+                            style = Text2xs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        // Pinned Product Card — only shown when the server returned a real linked product.
+        if (thread?.productId != null && !thread.productName.isNullOrBlank()) {
+            PinnedProductCard(
+                name = thread.productName,
+                price = thread.productPrice,
+                imageUrl = thread.productImageUrl,
+                locale = locale,
+                onClick = { onOpenProduct?.invoke("product:${thread.productId}") },
+                modifier = Modifier.padding(horizontal = PageGutter, vertical = 8.dp),
+            )
+        }
+
+        // Chat Messages Area
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when {
+                loading && messages.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.customer_loading),
+                            style = TextXs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                loadError != null && messages.isEmpty() -> {
+                    EmptyState(
+                        icon = VelnoxIcons.MessageCircle,
+                        title = stringResource(R.string.messages_load_failed),
+                        body = loadError.orEmpty(),
+                        actionLabel = stringResource(R.string.common_retry),
+                        onAction = { reloadTick++ },
+                    )
+                }
+
+                messages.isEmpty() -> {
                     Box(
                         modifier = Modifier
-                            .size(6.dp)
-                            .clip(Circle)
-                            .background(Color(0xFF10B981)),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.messages_online),
-                        style = Text2xs,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                            .fillMaxSize()
+                            .padding(PageGutter),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.messages_empty_chat),
+                            style = TextXs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = PageGutter),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(vertical = 10.dp),
+                    ) {
+                        items(messages, key = { it.id }) { msg ->
+                            val timeLabel = formatChatTimestamp(msg.createdAt, locale)
+                            if (msg.isSystem) {
+                                SystemBubble(text = msg.text)
+                            } else {
+                                Bubble(
+                                    text = msg.text,
+                                    incoming = !msg.fromCustomer,
+                                    timestamp = timeLabel,
+                                    sellerInitials = initials,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        // Pinned Product Reference Snippet
-        PinnedProductCard(
-            modifier = Modifier.padding(horizontal = PageGutter, vertical = 8.dp),
-        )
-
-        // Chat messages
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = PageGutter),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(vertical = 10.dp),
-        ) {
-            item {
-                PreviewNotice(text = stringResource(R.string.messages_demo_notice))
-                Spacer(Modifier.height(4.dp))
-            }
-            items(messages, key = { it.id }) { msg ->
-                Bubble(
-                    text = msg.text,
-                    incoming = msg.isIncoming,
-                    timestamp = msg.timestamp,
-                    sellerInitials = initials,
-                )
-            }
+        if (sendError != null) {
+            Text(
+                text = sendError.orEmpty(),
+                style = Text2xs,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = PageGutter, vertical = 4.dp),
+            )
         }
 
-        // Message Input Bar with imePadding and navigationBarsPadding
+        // Message Input Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -422,23 +642,6 @@ fun ConversationScreen(
                 .padding(horizontal = PageGutter, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(SquircleSm)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = VelnoxIcons.Plus,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-
-            Spacer(Modifier.width(8.dp))
-
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -457,35 +660,24 @@ fun ConversationScreen(
                 }
                 BasicTextField(
                     value = inputText,
-                    onValueChange = { inputText = it },
+                    onValueChange = {
+                        inputText = it
+                        sendError = null
+                    },
+                    enabled = !sending,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
                     cursorBrush = SolidColor(VelnoxBrand),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            if (inputText.isNotBlank()) {
-                                messages.add(
-                                    ChatMessage(
-                                        id = System.currentTimeMillis().toString(),
-                                        text = inputText.trim(),
-                                        isIncoming = false,
-                                        timestamp = "Just now",
-                                    )
-                                )
-                                inputText = ""
-                                focusManager.clearFocus()
-                            }
-                        }
-                    ),
+                    keyboardActions = KeyboardActions(onSend = { submitMessage() }),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
             Spacer(Modifier.width(8.dp))
 
-            val canSend = inputText.isNotBlank()
+            val canSend = inputText.isNotBlank() && !sending && repository != null
             Box(
                 modifier = Modifier
                     .size(42.dp)
@@ -494,20 +686,7 @@ fun ConversationScreen(
                     .velnoxClickable(
                         role = Role.Button,
                         enabled = canSend,
-                        onClick = {
-                            if (canSend) {
-                                messages.add(
-                                    ChatMessage(
-                                        id = System.currentTimeMillis().toString(),
-                                        text = inputText.trim(),
-                                        isIncoming = false,
-                                        timestamp = "Just now",
-                                    )
-                                )
-                                inputText = ""
-                                focusManager.clearFocus()
-                            }
-                        },
+                        onClick = { submitMessage() },
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -523,29 +702,46 @@ fun ConversationScreen(
 }
 
 @Composable
-private fun PinnedProductCard(modifier: Modifier = Modifier) {
+private fun PinnedProductCard(
+    name: String,
+    price: Double?,
+    imageUrl: String?,
+    locale: Locale,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(Squircle)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, Squircle)
+            .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(36.dp)
+                .size(40.dp)
                 .clip(SquircleSm)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = VelnoxIcons.ShoppingBag,
-                contentDescription = null,
-                tint = VelnoxBrand,
-                modifier = Modifier.size(18.dp),
-            )
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Icon(
+                    imageVector = VelnoxIcons.ShoppingBag,
+                    contentDescription = null,
+                    tint = VelnoxBrand,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -555,17 +751,19 @@ private fun PinnedProductCard(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = stringResource(R.string.messages_pinned_product_name),
+                text = name,
                 style = TextXs.copy(fontWeight = FontWeight.Medium),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = stringResource(R.string.messages_pinned_product_price),
-                style = TextXs.copy(fontWeight = FontWeight.Bold),
-                color = VelnoxBrand,
-            )
+            if (price != null) {
+                Text(
+                    text = PriceFormat.format(price, "THB", locale) ?: "฿$price",
+                    style = TextXs.copy(fontWeight = FontWeight.Bold),
+                    color = VelnoxBrand,
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         Box(
@@ -578,6 +776,27 @@ private fun PinnedProductCard(modifier: Modifier = Modifier) {
                 text = stringResource(R.string.messages_view_product),
                 style = Text2xs.copy(fontWeight = FontWeight.Medium),
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SystemBubble(text: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(Squircle)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = text,
+                style = Text2xs,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -611,7 +830,7 @@ private fun Bubble(
                             MaterialTheme.colorScheme.surfaceVariant
                         } else {
                             VelnoxBrand
-                        }
+                        },
                     )
                     .padding(horizontal = 14.dp, vertical = 10.dp),
             ) {
@@ -628,14 +847,37 @@ private fun Bubble(
                 )
             }
         }
-        Spacer(Modifier.height(3.dp))
-        Text(
-            text = timestamp,
-            style = Text2xs,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = if (incoming) 34.dp else 0.dp, end = 4.dp),
-        )
+        if (timestamp.isNotEmpty()) {
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = timestamp,
+                style = Text2xs,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = if (incoming) 34.dp else 0.dp, end = 4.dp),
+            )
+        }
     }
+}
+
+private fun CustomerConversation.displayTitle(supportLabel: String): String = when {
+    isSupport -> supportLabel
+    !shopName.isNullOrBlank() -> shopName
+    !participantName.isNullOrBlank() -> participantName
+    else -> supportLabel
+}
+
+private fun initialsOf(name: String): String =
+    name.trim()
+        .split(" ")
+        .filter { it.isNotBlank() }
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercase() }
+        .joinToString("")
+        .ifEmpty { "V" }
+
+private fun formatChatTimestamp(millis: Long?, locale: Locale): String {
+    if (millis == null || millis <= 0L) return ""
+    return SimpleDateFormat("HH:mm", locale).format(Date(millis))
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
@@ -646,34 +888,10 @@ private fun MessagesPreview() {
     }
 }
 
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun MessagesEmptyPreview() {
-    VelnoxTheme(darkTheme = false) {
-        MessagesScreen(onOpenThread = {}, onBrowseProducts = {}, threads = emptyList())
-    }
-}
-
-@Preview(name = "Messages 320dp", showBackground = true, widthDp = 320, heightDp = 720)
-@Composable
-private fun MessagesCompactPreview() {
-    VelnoxTheme(darkTheme = false) {
-        MessagesScreen(onOpenThread = {}, onBrowseProducts = {})
-    }
-}
-
 @Preview(name = "Messages dark", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun MessagesDarkPreview() {
     VelnoxTheme(darkTheme = true) {
         MessagesScreen(onOpenThread = {}, onBrowseProducts = {})
-    }
-}
-
-@Preview(name = "Conversation Preview", showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun ConversationPreview() {
-    VelnoxTheme(darkTheme = false) {
-        ConversationScreen(threadId = "t1", onBack = {})
     }
 }
