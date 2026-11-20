@@ -613,6 +613,8 @@
     <string name="orders_not_found">Order not found</string>
     <string name="orders_cancelling">Cancelling…</string>
     <string name="orders_reordering">Adding to cart…</string>
+    <string name="wishlist_load_failed">Couldn\'t load your wishlist</string>
+    <string name="notifications_load_failed">Couldn\'t load notifications</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_saving">Saving…</string>
 </resources>

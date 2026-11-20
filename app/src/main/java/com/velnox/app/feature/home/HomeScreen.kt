@@ -99,6 +99,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import coil.compose.AsyncImage
 import com.velnox.app.VelnoxApplication
+import com.velnox.app.core.session.LocalSession
 import com.velnox.app.core.catalog.CatalogCategory
 import com.velnox.app.core.catalog.CatalogPage
 import com.velnox.app.core.catalog.CatalogProduct
@@ -960,6 +961,9 @@ internal fun ProductCard(
                 modifier = Modifier.aspectRatio(1f),
             )
             val isFav = WishlistState.isFavorite(product.id)
+            val cardScope = rememberCoroutineScope()
+            val session = LocalSession.current
+            val customerRepo = (LocalContext.current.applicationContext as? VelnoxApplication)?.customer
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -968,18 +972,21 @@ internal fun ProductCard(
                     .clip(Circle)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                     .velnoxClickable(role = Role.Button) {
-                        WishlistState.toggle(
-                            WishlistItem(
-                                productId = product.id,
-                                name = product.name,
-                                price = product.displayPrice,
-                                currency = product.currency,
-                                imageUrl = product.imageUrl,
-                                shopName = product.shopName,
-                                inStock = product.inStock ?: true,
-                                rating = product.rating,
-                            )
+                        val wishItem = WishlistItem(
+                            productId = product.id,
+                            name = product.name,
+                            price = product.displayPrice,
+                            currency = product.currency,
+                            imageUrl = product.imageUrl,
+                            shopName = product.shopName,
+                            inStock = product.inStock ?: true,
+                            rating = product.rating,
                         )
+                        if (session.state.isAuthenticated && customerRepo != null) {
+                            cardScope.launch { WishlistState.toggleRemote(customerRepo, wishItem) }
+                        } else {
+                            WishlistState.toggle(wishItem)
+                        }
                     },
                 contentAlignment = Alignment.Center,
             ) {

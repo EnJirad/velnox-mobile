@@ -71,6 +71,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.velnox.app.R
 import com.velnox.app.VelnoxApplication
+import com.velnox.app.core.session.LocalSession
 import com.velnox.app.core.catalog.CatalogError
 import com.velnox.app.core.catalog.CatalogProduct
 import com.velnox.app.core.catalog.CatalogQuery
@@ -212,24 +213,29 @@ fun ProductDetailScreen(
             actions = {
                 val isFav = WishlistState.isFavorite(productId)
                 val detail = (state as? ProductState.Content)?.product
+                val session = LocalSession.current
+                val customerRepo = (LocalContext.current.applicationContext as? VelnoxApplication)?.customer
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
                         .velnoxClickable(role = Role.Button) {
                             if (detail != null) {
-                                WishlistState.toggle(
-                                    WishlistItem(
-                                        productId = detail.id,
-                                        name = detail.name,
-                                        price = detail.displayPrice,
-                                        currency = detail.currency,
-                                        imageUrl = detail.images.firstOrNull()?.url,
-                                        shopName = detail.shopName,
-                                        inStock = detail.isInStock ?: true,
-                                        rating = detail.rating,
-                                    )
+                                val wishItem = WishlistItem(
+                                    productId = detail.id,
+                                    name = detail.name,
+                                    price = detail.displayPrice,
+                                    currency = detail.currency,
+                                    imageUrl = detail.images.firstOrNull()?.url,
+                                    shopName = detail.shopName,
+                                    inStock = detail.isInStock ?: true,
+                                    rating = detail.rating,
                                 )
+                                if (session.state.isAuthenticated && customerRepo != null) {
+                                    scope.launch { WishlistState.toggleRemote(customerRepo, wishItem) }
+                                } else {
+                                    WishlistState.toggle(wishItem)
+                                }
                             }
                         },
                     contentAlignment = Alignment.Center,

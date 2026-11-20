@@ -1,6 +1,13 @@
 package com.velnox.app.feature.notifications
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.velnox.app.core.customer.CustomerNotification
+import com.velnox.app.core.customer.CustomerRepository
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.LoadStatus
 
 /**
  * Categories of user notifications.
@@ -26,14 +33,19 @@ data class AppNotification(
 )
 
 /**
- * Observable in-memory state holder for notifications with category filtering and unread management.
+ * Observable state holder for notifications mirrored from `/api/customer/notifications`.
+ *
+ * Starts empty (zero mock notifications).
  */
 class NotificationsState(
-    initialItems: List<AppNotification> = defaultNotifications(),
+    initialItems: List<AppNotification> = emptyList(),
 ) {
     private val _items = mutableStateListOf<AppNotification>().apply {
         addAll(initialItems)
     }
+
+    var status by mutableStateOf(if (initialItems.isEmpty()) LoadStatus.Idle else LoadStatus.Ready)
+        private set
 
     val items: List<AppNotification>
         get() = _items
@@ -47,6 +59,51 @@ class NotificationsState(
         } else {
             _items.count { it.category == category && it.unread }
         }
+    }
+
+    /** Fetch notifications from `GET /api/customer/notifications`. */
+    suspend fun load(
+        repository: CustomerRepository,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): CustomerResult<Unit> {
+        status = LoadStatus.Loading
+        return when (val result = repository.call { api, token -> api.notifications(token) }) {
+            is CustomerResult.Ok -> {
+                _items.clear()
+                _items.addAll(result.value.map { it.toAppNotification(nowMillis) })
+                status = LoadStatus.Ready
+                CustomerResult.Ok(Unit)
+            }
+
+            is CustomerResult.Failed -> {
+                status = LoadStatus.Failed
+                result
+            }
+        }
+    }
+
+    /** Mark one notification read via `PATCH /api/customer/notifications/:id/read`. */
+    suspend fun markAsReadRemote(
+        repository: CustomerRepository,
+        id: String,
+    ): CustomerResult<Unit> {
+        val current = _items.firstOrNull { it.id == id }
+        if (current != null && !current.unread) return CustomerResult.Ok(Unit)
+        val result = repository.call { api, token -> api.markNotificationRead(token, id) }
+        if (result is CustomerResult.Ok) {
+            markAsRead(id)
+        }
+        return result
+    }
+
+    /** Mark all notifications read via `PUT /api/customer/notifications/read-all`. */
+    suspend fun markAllAsReadRemote(repository: CustomerRepository): CustomerResult<Unit> {
+        if (unreadCount == 0) return CustomerResult.Ok(Unit)
+        val result = repository.call { api, token -> api.markAllNotificationsRead(token) }
+        if (result is CustomerResult.Ok) {
+            markAllAsRead()
+        }
+        return result
     }
 
     fun markAsRead(id: String) {
@@ -73,6 +130,7 @@ class NotificationsState(
 
     fun clearAll() {
         _items.clear()
+        status = LoadStatus.Idle
     }
 
     fun addNotification(notification: AppNotification) {
@@ -88,61 +146,37 @@ class NotificationsState(
     }
 
     companion object {
-        fun defaultNotifications(): List<AppNotification> = listOf(
-            AppNotification(
-                id = "notif_ord_1",
-                category = NotificationCategory.ORDERS,
-                title = "Order Shipped / พัสดุถูกจัดส่งแล้ว",
-                body = "Order #VLX-2401 is on its way with Flash Express. Tracking: TH01928374.",
-                timeAgo = "10m ago",
-                unread = true,
-                targetRoute = "order:VLX-2401",
-            ),
-            AppNotification(
-                id = "notif_promo_1",
-                category = NotificationCategory.PROMOTIONS,
-                title = "Flash Sale Drop! 🔥",
-                body = "Save up to 50% on Premium Electronics & Audio accessories. Limited quantities!",
-                timeAgo = "1h ago",
-                unread = true,
-                targetRoute = "category:electronics",
-            ),
-            AppNotification(
-                id = "notif_ord_2",
-                category = NotificationCategory.ORDERS,
-                title = "Order Confirmed / ยืนยันคำสั่งซื้อ",
-                body = "Order #VLX-8820 is packed and ready for carrier pickup.",
-                timeAgo = "3h ago",
-                unread = true,
-                targetRoute = "order:VLX-8820",
-            ),
-            AppNotification(
-                id = "notif_promo_2",
-                category = NotificationCategory.PROMOTIONS,
-                title = "Exclusive Voucher: ฿150 Off",
-                body = "Claim your weekend shopping voucher now. Valid across all verified stores.",
-                timeAgo = "1d ago",
-                unread = false,
-                targetRoute = "category",
-            ),
-            AppNotification(
-                id = "notif_sys_1",
-                category = NotificationCategory.SYSTEM,
-                title = "Security Alert: Active Session",
-                body = "New login from Pixel 8 Pro (Bangkok, TH). Tap to review your authorized devices.",
-                timeAgo = "2d ago",
-                unread = false,
-                targetRoute = "settings/security",
-            ),
-            AppNotification(
-                id = "notif_sys_2",
-                category = NotificationCategory.SYSTEM,
-                title = "Velnox App Updated to v2.4.0",
-                body = "Ultra-fast image engine, optimized memory cache, and redesigned checkout are live.",
-                timeAgo = "3d ago",
-                unread = false,
-                targetRoute = null,
-            ),
-        )
+        fun categoryFor(rawType: String): NotificationCategory = when {
+            rawType.contains("order") ||
+                rawType.contains("ship") ||
+                rawType.contains("payment") ||
+                rawType.contains("deliver") -> NotificationCategory.ORDERS
+            rawType.contains("promo") ||
+                rawType.contains("voucher") ||
+                rawType.contains("deal") ||
+                rawType.contains("sale") -> NotificationCategory.PROMOTIONS
+            else -> NotificationCategory.SYSTEM
+        }
+
+        fun formatTimeAgo(createdAtMillis: Long?, nowMillis: Long): String {
+            if (createdAtMillis == null || createdAtMillis <= 0L) return ""
+            val diffSec = ((nowMillis - createdAtMillis) / 1000L).coerceAtLeast(0L)
+            return when {
+                diffSec < 60L -> "now"
+                diffSec < 3600L -> "${diffSec / 60L}m"
+                diffSec < 86400L -> "${diffSec / 3600L}h"
+                else -> "${diffSec / 86400L}d"
+            }
+        }
     }
 }
+
+private fun CustomerNotification.toAppNotification(nowMillis: Long): AppNotification = AppNotification(
+    id = id,
+    category = NotificationsState.categoryFor(type),
+    title = title,
+    body = body,
+    timeAgo = NotificationsState.formatTimeAgo(createdAt, nowMillis),
+    unread = !read,
+    targetRoute = link,
+)

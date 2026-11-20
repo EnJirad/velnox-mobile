@@ -613,6 +613,8 @@
     <string name="orders_not_found">ไม่พบคำสั่งซื้อนี้</string>
     <string name="orders_cancelling">กำลังยกเลิก…</string>
     <string name="orders_reordering">กำลังเพิ่มลงตะกร้า…</string>
+    <string name="wishlist_load_failed">โหลดรายการโปรดไม่สำเร็จ</string>
+    <string name="notifications_load_failed">โหลดการแจ้งเตือนไม่สำเร็จ</string>
     <string name="settings_saved">บันทึกข้อมูลเรียบร้อยแล้ว</string>
     <string name="settings_saving">กำลังบันทึก…</string>
 </resources>

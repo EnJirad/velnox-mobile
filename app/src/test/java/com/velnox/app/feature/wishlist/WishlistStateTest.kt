@@ -1,5 +1,12 @@
 package com.velnox.app.feature.wishlist
 
+import com.velnox.app.core.customer.CustomerError
+import com.velnox.app.core.customer.CustomerRepository
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.FakeCustomerApi
+import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.customer.WishlistEntry
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,74 +16,96 @@ import org.junit.Test
 
 class WishlistStateTest {
 
-    @Before
-    fun setUp() {
-        WishlistState.reset()
+    private class ServerWishlist(initial: List<WishlistEntry> = emptyList()) : FakeCustomerApi() {
+        val entries = initial.toMutableList()
+        var failNext: CustomerError? = null
+
+        override suspend fun wishlist(token: String): CustomerResult<List<WishlistEntry>> {
+            failNext?.let { failNext = null; return CustomerResult.Failed(it) }
+            return CustomerResult.Ok(entries.toList())
+        }
+
+        override suspend fun toggleWishlist(token: String, productId: String): CustomerResult<Boolean> {
+            failNext?.let { failNext = null; return CustomerResult.Failed(it) }
+            val existing = entries.indexOfFirst { it.productId == productId }
+            return if (existing >= 0) {
+                entries.removeAt(existing)
+                CustomerResult.Ok(false)
+            } else {
+                entries.add(0, WishlistEntry(productId, "Prod $productId", 100.0, "THB", null, "Shop", true, 4.9))
+                CustomerResult.Ok(true)
+            }
+        }
     }
+
+    private fun repo(api: FakeCustomerApi) = CustomerRepository(api, token = { "tok" })
+
+    @Before
+    fun setUp() = WishlistState.reset()
 
     @After
-    fun tearDown() {
-        WishlistState.reset()
-    }
+    fun tearDown() = WishlistState.reset()
 
     @Test
-    fun initialWishlist_containsDefaultItems() {
-        assertTrue(WishlistState.items.isNotEmpty())
-        assertTrue(WishlistState.isFavorite("prod-1"))
-        assertTrue(WishlistState.isFavorite("prod-2"))
-        assertFalse(WishlistState.isFavorite("prod-unknown"))
-    }
-
-    @Test
-    fun add_addsNewItem_andAvoidsDuplicates() {
-        val newItem = WishlistItem(
-            productId = "prod-test",
-            name = "Test Product",
-            price = 999.0,
-        )
-        WishlistState.add(newItem)
-
-        assertTrue(WishlistState.isFavorite("prod-test"))
-        val count = WishlistState.items.size
-
-        // Adding again should not duplicate
-        WishlistState.add(newItem)
-        assertEquals(count, WishlistState.items.size)
-    }
-
-    @Test
-    fun remove_removesExistingItem() {
-        assertTrue(WishlistState.isFavorite("prod-1"))
-        val removed = WishlistState.remove("prod-1")
-
-        assertTrue(removed)
+    fun `wishlist starts empty with zero mock items`() {
+        assertTrue(WishlistState.items.isEmpty())
+        assertEquals(LoadStatus.Idle, WishlistState.status)
         assertFalse(WishlistState.isFavorite("prod-1"))
     }
 
     @Test
-    fun toggle_addsWhenMissing_removesWhenPresent() {
-        val testItem = WishlistItem(
-            productId = "prod-toggle",
-            name = "Toggle Item",
-            price = 100.0,
+    fun `load mirrors server wishlist`() = runBlocking {
+        val server = ServerWishlist(
+            listOf(WishlistEntry("p1", "Lamp", 390.0, "THB", null, "Lumen", true, 4.8)),
         )
 
-        assertFalse(WishlistState.isFavorite("prod-toggle"))
+        val res = WishlistState.load(repo(server))
 
-        // First toggle: should add
-        val added = WishlistState.toggle(testItem)
-        assertTrue(added)
-        assertTrue(WishlistState.isFavorite("prod-toggle"))
-
-        // Second toggle: should remove
-        val toggledOff = WishlistState.toggle(testItem)
-        assertFalse(toggledOff)
-        assertFalse(WishlistState.isFavorite("prod-toggle"))
+        assertTrue(res is CustomerResult.Ok)
+        assertEquals(LoadStatus.Ready, WishlistState.status)
+        assertTrue(WishlistState.isFavorite("p1"))
+        assertEquals("Lamp", WishlistState.items.single().name)
     }
 
     @Test
-    fun clear_emptiesWishlist() {
-        assertTrue(WishlistState.items.isNotEmpty())
+    fun `toggleRemote adds when server returns true and removes when false`() = runBlocking {
+        val server = ServerWishlist()
+        val r = repo(server)
+        val item = WishlistItem("p9", "Keyboard", 1990.0)
+
+        val added = WishlistState.toggleRemote(r, item)
+        assertEquals(CustomerResult.Ok(true), added)
+        assertTrue(WishlistState.isFavorite("p9"))
+
+        val removed = WishlistState.toggleRemote(r, item)
+        assertEquals(CustomerResult.Ok(false), removed)
+        assertFalse(WishlistState.isFavorite("p9"))
+    }
+
+    @Test
+    fun `failed toggleRemote leaves local state unchanged`() = runBlocking {
+        val server = ServerWishlist()
+        server.failNext = CustomerError.Network
+
+        val res = WishlistState.toggleRemote(repo(server), WishlistItem("p9", "Keyboard", 1990.0))
+
+        assertEquals(CustomerResult.Failed(CustomerError.Network), res)
+        assertFalse(WishlistState.isFavorite("p9"))
+    }
+
+    @Test
+    fun `local add, remove, toggle and clear work for guest fallback`() {
+        val item = WishlistItem(productId = "prod-local", name = "Test Product", price = 999.0)
+        assertTrue(WishlistState.toggle(item))
+        assertTrue(WishlistState.isFavorite("prod-local"))
+
+        WishlistState.add(item)
+        assertEquals(1, WishlistState.items.size)
+
+        assertFalse(WishlistState.toggle(item))
+        assertFalse(WishlistState.isFavorite("prod-local"))
+
+        WishlistState.add(item)
         WishlistState.clear()
         assertTrue(WishlistState.items.isEmpty())
     }

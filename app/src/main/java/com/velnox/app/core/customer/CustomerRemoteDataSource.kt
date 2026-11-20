@@ -447,7 +447,7 @@ class CustomerRemoteDataSource(
             currency = product.str("currency") ?: DEFAULT_CURRENCY,
             imageUrl = imageOf(product),
             shopName = product.str("shopName", "shop_name") ?: product.optJSONObject("shop")?.str("name"),
-            inStock = product.num("currentStock", "totalAvailableStock", "stock")?.let { it > 0 }
+            inStock = product.num("availableStock", "currentStock", "totalAvailableStock", "stock")?.let { it > 0 }
                 ?: product.flag("inStock") ?: true,
             rating = product.num("rating"),
         )
@@ -570,6 +570,8 @@ class CustomerRemoteDataSource(
     private fun parseNotification(obj: JSONObject): CustomerNotification? {
         val id = obj.str("id", "notificationId") ?: return null
         val title = obj.str("title") ?: return null
+        val link = obj.str("link", "url", "targetRoute", "actionUrl")
+            ?: obj.optJSONObject("data")?.str("orderId", "order_id")?.let { "order:$it" }
         return CustomerNotification(
             id = id,
             type = (obj.str("type", "category") ?: "system").lowercase(),
@@ -578,7 +580,7 @@ class CustomerRemoteDataSource(
             createdAt = obj.time("createdAt", "created_at"),
             read = obj.flag("isRead", "is_read", "read")
                 ?: (obj.str("readAt", "read_at") != null),
-            link = obj.str("link", "url", "targetRoute", "actionUrl"),
+            link = link,
         )
     }
 

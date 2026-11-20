@@ -77,6 +77,7 @@ import com.velnox.app.feature.settings.SettingsDetailScreen
 import com.velnox.app.feature.settings.SettingsPage
 import com.velnox.app.feature.settings.SettingsScreen
 import com.velnox.app.feature.wishlist.WishlistScreen
+import com.velnox.app.feature.wishlist.WishlistState
 import com.velnox.app.ui.components.PageGutter
 import com.velnox.app.ui.components.VelnoxSpacing
 import com.velnox.app.ui.components.velnoxClickable
@@ -204,10 +205,14 @@ private fun VelnoxNavHost() {
             AddressBookState.load(customer)
             cart.syncLocalAndLoad(customer)
             OrdersState.load(customer)
+            WishlistState.load(customer)
+            notifications.load(customer)
         } else {
             AddressBookState.clear()
             cart.clear()
             OrdersState.clear()
+            WishlistState.clear()
+            notifications.clearAll()
         }
     }
 

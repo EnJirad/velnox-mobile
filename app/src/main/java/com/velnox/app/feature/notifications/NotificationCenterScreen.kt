@@ -30,15 +30,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -46,8 +49,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.velnox.app.R
+import com.velnox.app.VelnoxApplication
+import com.velnox.app.core.customer.CustomerRepository
+import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.session.LocalSession
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.ContentMaxWidth
+import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.PageGutter
 import com.velnox.app.ui.components.VelnoxSpacing
 import com.velnox.app.ui.components.velnoxClickable
@@ -59,6 +67,7 @@ import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
+import kotlinx.coroutines.launch
 
 @Composable
 fun NotificationCenterScreen(
@@ -67,10 +76,21 @@ fun NotificationCenterScreen(
     onOpenRoute: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val repository: CustomerRepository? = remember(context) {
+        (context.applicationContext as? VelnoxApplication)?.customer
+    }
+    val session = LocalSession.current
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(repository, session.state.isAuthenticated) {
+        if (repository != null && session.state.isAuthenticated) {
+            state.load(repository)
+        }
+    }
+
     var selectedCategory by remember { mutableStateOf(NotificationCategory.ALL) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
-
-    val filteredList = state.filterByCategory(selectedCategory)
 
     if (showClearConfirmDialog) {
         AlertDialog(
@@ -120,7 +140,13 @@ fun NotificationCenterScreen(
             unreadCount = state.unreadCount,
             hasItems = state.items.isNotEmpty(),
             onBack = onBack,
-            onMarkAllAsRead = { state.markAllAsRead() },
+            onMarkAllAsRead = {
+                if (repository != null && session.state.isAuthenticated) {
+                    scope.launch { state.markAllAsReadRemote(repository) }
+                } else {
+                    state.markAllAsRead()
+                }
+            },
             onClearAll = { showClearConfirmDialog = true },
         )
 
@@ -141,7 +167,36 @@ fun NotificationCenterScreen(
             val itemsForCategory = state.filterByCategory(category)
 
             if (itemsForCategory.isEmpty()) {
-                NotificationEmptyState(category = category)
+                when {
+                    state.items.isEmpty() && state.status == LoadStatus.Loading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.customer_loading),
+                                style = TextXs,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    state.items.isEmpty() && state.status == LoadStatus.Failed -> {
+                        EmptyState(
+                            icon = VelnoxIcons.Bell,
+                            title = stringResource(R.string.notifications_load_failed),
+                            body = stringResource(R.string.customer_error_network),
+                            actionLabel = stringResource(R.string.common_retry),
+                            onAction = {
+                                if (repository != null) {
+                                    scope.launch { state.load(repository) }
+                                }
+                            },
+                        )
+                    }
+
+                    else -> NotificationEmptyState(category = category)
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -157,7 +212,11 @@ fun NotificationCenterScreen(
                         NotificationItemCard(
                             notification = notification,
                             onClick = {
-                                state.markAsRead(notification.id)
+                                if (repository != null && session.state.isAuthenticated) {
+                                    scope.launch { state.markAsReadRemote(repository, notification.id) }
+                                } else {
+                                    state.markAsRead(notification.id)
+                                }
                                 notification.targetRoute?.let { onOpenRoute(it) }
                             },
                             onDelete = { state.deleteNotification(notification.id) },

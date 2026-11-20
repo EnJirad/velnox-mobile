@@ -1,6 +1,13 @@
 package com.velnox.app.feature.wishlist
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.velnox.app.core.customer.CustomerRepository
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.customer.WishlistEntry
 
 /**
  * A bookmarked / favorited product item.
@@ -16,35 +23,70 @@ data class WishlistItem(
     val rating: Double? = null,
 )
 
+fun WishlistEntry.toWishlistItem(): WishlistItem = WishlistItem(
+    productId = productId,
+    name = name,
+    price = price,
+    currency = currency,
+    imageUrl = imageUrl,
+    shopName = shopName,
+    inStock = inStock,
+    rating = rating,
+)
+
 /**
- * Global reactive wishlist state accessible throughout the app.
+ * Global reactive wishlist state mirrored from `/api/customer/wishlist`.
+ *
+ * Starts empty (zero mock items). Signed-in toggles persist through
+ * `POST /api/customer/wishlist/toggle`; signed-out users keep local fallback
+ * state that is cleared on session change.
  */
 object WishlistState {
 
-    val items = mutableStateListOf(
-        WishlistItem(
-            productId = "prod-1",
-            name = "Velnox Signature Minimalist Oversized Hoodie",
-            price = 1290.0,
-            currency = "THB",
-            imageUrl = "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=600&auto=format&fit=crop&q=80",
-            shopName = "Velnox Studio",
-            inStock = true,
-            rating = 4.9,
-        ),
-        WishlistItem(
-            productId = "prod-2",
-            name = "Ergonomic Ceramic Coffee Mug (Handcrafted)",
-            price = 450.0,
-            currency = "THB",
-            imageUrl = "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80",
-            shopName = "Artisan Clay Lab",
-            inStock = true,
-            rating = 4.8,
-        ),
-    )
+    val items = mutableStateListOf<WishlistItem>()
+
+    var status by mutableStateOf(LoadStatus.Idle)
+        private set
 
     fun isFavorite(productId: String): Boolean = items.any { it.productId == productId }
+
+    /** Fetch the real wishlist from `GET /api/customer/wishlist`. */
+    suspend fun load(repository: CustomerRepository): CustomerResult<Unit> {
+        status = LoadStatus.Loading
+        return when (val result = repository.call { api, token -> api.wishlist(token) }) {
+            is CustomerResult.Ok -> {
+                items.clear()
+                items.addAll(result.value.map { it.toWishlistItem() })
+                status = LoadStatus.Ready
+                CustomerResult.Ok(Unit)
+            }
+
+            is CustomerResult.Failed -> {
+                status = LoadStatus.Failed
+                result
+            }
+        }
+    }
+
+    /**
+     * Toggle a product via `POST /api/customer/wishlist/toggle` and update local
+     * state to match the server's authoritative answer.
+     */
+    suspend fun toggleRemote(
+        repository: CustomerRepository,
+        item: WishlistItem,
+    ): CustomerResult<Boolean> {
+        val result = repository.call { api, token -> api.toggleWishlist(token, item.productId) }
+        if (result is CustomerResult.Ok) {
+            if (result.value) {
+                add(item)
+            } else {
+                remove(item.productId)
+            }
+            status = LoadStatus.Ready
+        }
+        return result
+    }
 
     fun add(item: WishlistItem) {
         if (!isFavorite(item.productId)) {
@@ -68,37 +110,13 @@ object WishlistState {
 
     fun clear() {
         items.clear()
+        status = LoadStatus.Idle
     }
 
-    fun reset(initialItems: List<WishlistItem>? = null) {
+    /** Test seam: put the wishlist into a known state without the network. */
+    fun reset(initialItems: List<WishlistItem> = emptyList()) {
         items.clear()
-        if (initialItems != null) {
-            items.addAll(initialItems)
-        } else {
-            items.addAll(
-                listOf(
-                    WishlistItem(
-                        productId = "prod-1",
-                        name = "Velnox Signature Minimalist Oversized Hoodie",
-                        price = 1290.0,
-                        currency = "THB",
-                        imageUrl = "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=600&auto=format&fit=crop&q=80",
-                        shopName = "Velnox Studio",
-                        inStock = true,
-                        rating = 4.9,
-                    ),
-                    WishlistItem(
-                        productId = "prod-2",
-                        name = "Ergonomic Ceramic Coffee Mug (Handcrafted)",
-                        price = 450.0,
-                        currency = "THB",
-                        imageUrl = "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80",
-                        shopName = "Artisan Clay Lab",
-                        inStock = true,
-                        rating = 4.8,
-                    ),
-                )
-            )
-        }
+        items.addAll(initialItems)
+        status = if (initialItems.isEmpty()) LoadStatus.Idle else LoadStatus.Ready
     }
 }

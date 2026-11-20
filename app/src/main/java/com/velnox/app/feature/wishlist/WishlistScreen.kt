@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +48,7 @@ import coil.compose.AsyncImage
 import com.velnox.app.R
 import com.velnox.app.core.catalog.PriceFormat
 import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.LoadStatus
 import com.velnox.app.core.customer.rememberCustomerRepository
 import com.velnox.app.core.customer.userMessage
 import com.velnox.app.feature.cart.CartState
@@ -80,10 +82,15 @@ fun WishlistScreen(
     modifier: Modifier = Modifier,
 ) {
     val items = WishlistState.items
+    val status = WishlistState.status
     val locale = LocalConfiguration.current.locales[0]
     val context = LocalContext.current
     val repository = rememberCustomerRepository()
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        WishlistState.load(repository)
+    }
 
     var recentlyRemoved by remember { mutableStateOf<WishlistItem?>(null) }
     var actionNotice by remember { mutableStateOf<String?>(null) }
@@ -94,13 +101,40 @@ fun WishlistScreen(
         modifier = modifier.fillMaxSize(),
     ) {
         if (items.isEmpty()) {
-            EmptyState(
-                icon = VelnoxIcons.Heart,
-                title = stringResource(R.string.wishlist_empty_title),
-                body = stringResource(R.string.wishlist_empty_body),
-                actionLabel = stringResource(R.string.wishlist_explore),
-                onAction = onExplore,
-            )
+            when (status) {
+                LoadStatus.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.customer_loading),
+                            style = TextXs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                LoadStatus.Failed -> {
+                    EmptyState(
+                        icon = VelnoxIcons.Heart,
+                        title = stringResource(R.string.wishlist_load_failed),
+                        body = stringResource(R.string.customer_error_network),
+                        actionLabel = stringResource(R.string.common_retry),
+                        onAction = { scope.launch { WishlistState.load(repository) } },
+                    )
+                }
+
+                LoadStatus.Idle, LoadStatus.Ready -> {
+                    EmptyState(
+                        icon = VelnoxIcons.Heart,
+                        title = stringResource(R.string.wishlist_empty_title),
+                        body = stringResource(R.string.wishlist_empty_body),
+                        actionLabel = stringResource(R.string.wishlist_explore),
+                        onAction = onExplore,
+                    )
+                }
+            }
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -140,14 +174,24 @@ fun WishlistScreen(
                             }
                         },
                         onRemove = {
-                            recentlyRemoved = item
-                            WishlistState.remove(item.productId)
-                            actionNotice = "นำออกจากรายการโปรดแล้ว"
                             scope.launch {
-                                delay(4000)
-                                if (recentlyRemoved == item) {
-                                    recentlyRemoved = null
-                                    actionNotice = null
+                                when (val res = WishlistState.toggleRemote(repository, item)) {
+                                    is CustomerResult.Ok -> {
+                                        recentlyRemoved = item
+                                        actionNotice = "นำออกจากรายการโปรดแล้ว"
+                                        delay(4000)
+                                        if (recentlyRemoved == item) {
+                                            recentlyRemoved = null
+                                            actionNotice = null
+                                        }
+                                    }
+
+                                    is CustomerResult.Failed -> {
+                                        recentlyRemoved = null
+                                        actionNotice = res.userMessage(context)
+                                        delay(3000)
+                                        actionNotice = null
+                                    }
                                 }
                             }
                         },
@@ -188,9 +232,14 @@ fun WishlistScreen(
                         color = VelnoxBrand,
                         modifier = Modifier
                             .velnoxClickable(role = Role.Button) {
-                                recentlyRemoved?.let { WishlistState.add(it) }
+                                val target = recentlyRemoved
                                 recentlyRemoved = null
                                 actionNotice = null
+                                if (target != null) {
+                                    scope.launch {
+                                        WishlistState.toggleRemote(repository, target)
+                                    }
+                                }
                             }
                             .padding(4.dp),
                     )
