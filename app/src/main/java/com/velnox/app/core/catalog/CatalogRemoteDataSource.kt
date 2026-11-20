@@ -325,6 +325,52 @@ class CatalogRemoteDataSource(
         val sSlug = shopObj?.stringOrNull("slug") ?: data.stringOrNull("shopSlug")
         val sellerId = data.stringOrNull("sellerId") ?: shopObj?.stringOrNull("sellerId")
 
+        val rating = data.numberOrNull("rating")
+        val reviewCount = data.optInt("reviewCount", 0)
+
+        val descBlocksList = ArrayList<DescriptionBlock>()
+        val descBlocksArray = data.optJSONArray("descriptionBlocks")
+        if (descBlocksArray != null) {
+            for (i in 0 until descBlocksArray.length()) {
+                val blockObj = descBlocksArray.optJSONObject(i) ?: continue
+                val bId = blockObj.stringOrNull("id") ?: "block_$i"
+                val bType = blockObj.stringOrNull("type")
+                when (bType) {
+                    "image" -> {
+                        val imgUrl = blockObj.stringOrNull("imageUrl")
+                            ?: blockObj.stringOrNull("url")
+                            ?: blockObj.displayUrl()
+                        if (!imgUrl.isNullOrBlank()) {
+                            descBlocksList += DescriptionBlock.Image(id = bId, imageUrl = imgUrl)
+                        }
+                    }
+                    "text" -> {
+                        val text = blockObj.stringOrNull("text")
+                        if (!text.isNullOrBlank()) {
+                            descBlocksList += DescriptionBlock.Text(id = bId, text = text)
+                        }
+                    }
+                }
+            }
+        }
+
+        val detailImagesList = ArrayList<String>()
+        val detailImagesArray = data.optJSONArray("detailImages")
+        if (detailImagesArray != null) {
+            for (i in 0 until detailImagesArray.length()) {
+                val str = detailImagesArray.optString(i).trim()
+                if (str.isNotEmpty()) {
+                    detailImagesList += str
+                } else {
+                    val dObj = detailImagesArray.optJSONObject(i)
+                    val dUrl = dObj?.displayUrl() ?: dObj?.stringOrNull("url")
+                    if (!dUrl.isNullOrBlank()) {
+                        detailImagesList += dUrl
+                    }
+                }
+            }
+        }
+
         return ProductDetail(
             id = id,
             name = name,
@@ -346,6 +392,10 @@ class CatalogRemoteDataSource(
             shopId = sId,
             shopSlug = sSlug,
             sellerId = sellerId,
+            rating = rating,
+            reviewCount = reviewCount,
+            descriptionBlocks = descBlocksList,
+            detailImages = detailImagesList,
         )
     }
 

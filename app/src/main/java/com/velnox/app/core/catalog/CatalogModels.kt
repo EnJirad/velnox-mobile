@@ -88,6 +88,21 @@ data class ProductAttribute(
     val value: String,
 )
 
+/** One structured description block configured by the seller (text or detail image). */
+sealed interface DescriptionBlock {
+    val id: String
+
+    data class Text(
+        override val id: String,
+        val text: String,
+    ) : DescriptionBlock
+
+    data class Image(
+        override val id: String,
+        val imageUrl: String,
+    ) : DescriptionBlock
+}
+
 /** One seller shop profile from `GET /api/shops/:idOrSlug`. */
 data class SellerShop(
     val id: String,
@@ -154,6 +169,10 @@ data class ProductDetail(
     val shopId: String? = null,
     val shopSlug: String? = null,
     val sellerId: String? = null,
+    val rating: Double? = null,
+    val reviewCount: Int = 0,
+    val descriptionBlocks: List<DescriptionBlock> = emptyList(),
+    val detailImages: List<String> = emptyList(),
 ) {
     val isInStock: Boolean? get() = availableStock?.let { it > 0 }
 

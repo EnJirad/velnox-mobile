@@ -75,6 +75,7 @@ import com.velnox.app.core.catalog.CatalogError
 import com.velnox.app.core.catalog.CatalogProduct
 import com.velnox.app.core.catalog.CatalogQuery
 import com.velnox.app.core.catalog.CatalogResult
+import com.velnox.app.core.catalog.DescriptionBlock
 import com.velnox.app.core.catalog.PriceFormat
 import com.velnox.app.core.catalog.ProductDetail
 import com.velnox.app.core.catalog.ProductReviewsData
@@ -256,6 +257,7 @@ fun ProductDetailScreen(
                 val product = current.product
                 val selectedVariant = product.variants.firstOrNull { it.id == selectedVariantId }
                     ?: product.variants.firstOrNull()
+                var detailZoomImageUrl by remember { mutableStateOf<String?>(null) }
 
                 val effectivePrice = selectedVariant?.price ?: product.displayPrice
                 val effectiveCompareAt = selectedVariant?.compareAtPrice ?: product.compareAtPrice
@@ -296,12 +298,106 @@ fun ProductDetailScreen(
                             )
                         }
 
-                        // 2. Pricing & Stock overview
-                        item(key = "pricing_overview", contentType = "overview") {
+                        // 2. Product Title & Trust row (Rating, Review count, Sold count)
+                        item(key = "title_section", contentType = "title") {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = PageGutter),
+                            ) {
+                                // Product Title
+                                Text(
+                                    text = product.name,
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                )
+
+                                // Category & Trust row (Rating, Reviews, Sold count)
+                                val hasRating = product.rating != null && product.rating > 0.0
+                                val hasReviews = product.reviewCount > 0
+                                val hasSoldCount = product.soldCount > 0
+                                val hasCategory = !product.categorySlug.isNullOrBlank()
+
+                                if (hasRating || hasReviews || hasSoldCount || hasCategory) {
+                                    Row(
+                                        modifier = Modifier.padding(top = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        product.categorySlug?.let { category ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(SquircleXs)
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                            ) {
+                                                Text(
+                                                    text = category,
+                                                    style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+
+                                        if (hasRating) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = VelnoxIcons.Star,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFF59E0B),
+                                                    modifier = Modifier.size(13.dp),
+                                                )
+                                                Text(
+                                                    text = String.format(java.util.Locale.US, "%.1f", product.rating),
+                                                    style = TextXs.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                )
+                                                if (hasReviews) {
+                                                    Text(
+                                                        text = "(${product.reviewCount})",
+                                                        style = Text2xs,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                            }
+                                        } else if (hasReviews) {
+                                            Text(
+                                                text = stringResource(R.string.product_reviews_count, product.reviewCount),
+                                                style = Text2xs,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+
+                                        if ((hasRating || hasReviews) && hasSoldCount) {
+                                            Text(
+                                                text = "•",
+                                                style = Text2xs,
+                                                color = MaterialTheme.colorScheme.outline,
+                                            )
+                                        }
+
+                                        if (hasSoldCount) {
+                                            Text(
+                                                text = stringResource(R.string.product_sold, product.soldCount),
+                                                style = Text2xs,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. Pricing, Discount badge, and Stock overview
+                        item(key = "pricing_overview", contentType = "overview") {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = PageGutter)
+                                    .padding(top = VelnoxSpacing.md),
                             ) {
                                 // Price line
                                 Row(
@@ -316,7 +412,7 @@ fun ProductDetailScreen(
                                         Text(
                                             text = price,
                                             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.onBackground,
+                                            color = Color(0xFFE11D48),
                                         )
                                     }
 
@@ -339,13 +435,13 @@ fun ProductDetailScreen(
                                         Box(
                                             modifier = Modifier
                                                 .clip(SquircleXs)
-                                                .background(Color(0xFF10B981).copy(alpha = 0.15f))
+                                                .background(Color(0xFFE11D48).copy(alpha = 0.12f))
                                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                                         ) {
                                             Text(
                                                 text = "-$effectiveDiscount%",
                                                 style = Text2xs.copy(fontWeight = FontWeight.Bold),
-                                                color = Color(0xFF059669),
+                                                color = Color(0xFFE11D48),
                                             )
                                         }
                                     }
@@ -377,51 +473,19 @@ fun ProductDetailScreen(
                                         )
                                     }
                                 }
-
-                                Spacer(Modifier.height(VelnoxSpacing.sm))
-
-                                // Product Title
-                                Text(
-                                    text = product.name,
-                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                )
-
-                                // Category & Sold Count
-                                Row(
-                                    modifier = Modifier.padding(top = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    product.categorySlug?.let { category ->
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(SquircleXs)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                                        ) {
-                                            Text(
-                                                text = category,
-                                                style = Text2xs.copy(fontWeight = FontWeight.Medium),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
-
-                                    if (product.soldCount > 0) {
-                                        Text(
-                                            text = stringResource(R.string.product_sold, product.soldCount),
-                                            style = Text2xs,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
                             }
                         }
 
-                        // 3. Product Options Selection Entry Point (Replaces old horizontal selector)
+                        // 4. Product Options Selection Entry Point (Visual variant card, replaces horizontal chips)
                         if (product.optionGroups.isNotEmpty() || product.variants.size > 1) {
                             item(key = "options_entry", contentType = "options") {
+                                val selectedOptionThumbnail = remember(selectedVariant, product.optionGroups, product.images) {
+                                    val optionImg = selectedVariant?.options?.values?.firstNotNullOfOrNull { optVal ->
+                                        product.optionGroups.flatMap { it.values }.firstOrNull { it.value == optVal && !it.imageUrl.isNullOrBlank() }?.imageUrl
+                                    }
+                                    optionImg ?: product.images.firstOrNull()?.url
+                                }
+
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -438,16 +502,55 @@ fun ProductDetailScreen(
                                                 optionsPopupIntent = ProductSelectionIntent.SELECT_OPTIONS
                                                 showOptionsSheet = true
                                             }
-                                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
                                         verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     ) {
+                                        // Visual variant thumbnail
+                                        Box(
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .clip(SquircleSm)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, SquircleSm),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            if (!selectedOptionThumbnail.isNullOrBlank()) {
+                                                AsyncImage(
+                                                    model = selectedOptionThumbnail,
+                                                    contentDescription = null,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = VelnoxIcons.ProductVariants,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(22.dp),
+                                                )
+                                            }
+                                        }
+
+                                        // Summary and title
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = stringResource(R.string.product_select_options),
-                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                            )
-                                            Spacer(Modifier.height(4.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = VelnoxIcons.ProductVariants,
+                                                    contentDescription = null,
+                                                    tint = VelnoxBrand,
+                                                    modifier = Modifier.size(15.dp),
+                                                )
+                                                Text(
+                                                    text = stringResource(R.string.product_select_options),
+                                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                )
+                                            }
+                                            Spacer(Modifier.height(2.dp))
                                             val summaryText = selectedVariant?.title
                                                 ?: product.optionGroups.joinToString(", ") { it.name }
                                             if (summaryText.isNotBlank()) {
@@ -466,6 +569,7 @@ fun ProductDetailScreen(
                                                 )
                                             }
                                         }
+
                                         Icon(
                                             imageVector = VelnoxIcons.ChevronRight,
                                             contentDescription = null,
@@ -473,50 +577,6 @@ fun ProductDetailScreen(
                                             modifier = Modifier.size(20.dp),
                                         )
                                     }
-                                }
-                            }
-                        }
-
-                        // 5. Quantity Selector Section
-                        item(key = "quantity_section", contentType = "quantity") {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = PageGutter)
-                                    .padding(top = VelnoxSpacing.lg),
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = stringResource(R.string.product_quantity_label),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = MaterialTheme.colorScheme.onBackground,
-                                        )
-                                        effectiveStock?.let { stock ->
-                                            Text(
-                                                text = stringResource(R.string.product_stock_left, stock),
-                                                style = Text2xs,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
-
-                                    QuantityStepper(
-                                        value = quantity,
-                                        onDecrease = {
-                                            if (quantity > 1) quantity--
-                                        },
-                                        onIncrease = {
-                                            val maxLimit = effectiveStock ?: 99
-                                            if (quantity < maxLimit) quantity++
-                                        },
-                                        decreaseEnabled = quantity > 1 && !isOutOfStock,
-                                        increaseEnabled = !isOutOfStock && quantity < (effectiveStock ?: 99),
-                                    )
                                 }
                             }
                         }
@@ -754,8 +814,54 @@ fun ProductDetailScreen(
                                         }
                                     }
 
-                                    // Product Description Card
-                                    product.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                                    // 2. Seller-uploaded Description Blocks (Text & Images preserved in seller's order)
+                                    if (product.descriptionBlocks.isNotEmpty()) {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
+                                        ) {
+                                            product.descriptionBlocks.forEach { block ->
+                                                when (block) {
+                                                    is DescriptionBlock.Text -> {
+                                                        Column(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clip(SquircleLg)
+                                                                .background(MaterialTheme.colorScheme.surface)
+                                                                .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                                                                .padding(VelnoxSpacing.md),
+                                                        ) {
+                                                            Text(
+                                                                text = block.text,
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                color = MaterialTheme.colorScheme.onSurface,
+                                                            )
+                                                        }
+                                                    }
+                                                    is DescriptionBlock.Image -> {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clip(SquircleLg)
+                                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                                .velnoxClickable(role = Role.Image) {
+                                                                    detailZoomImageUrl = block.imageUrl
+                                                                },
+                                                            contentAlignment = Alignment.Center,
+                                                        ) {
+                                                            AsyncImage(
+                                                                model = block.imageUrl,
+                                                                contentDescription = null,
+                                                                contentScale = ContentScale.FillWidth,
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else if (!product.description.isNullOrBlank()) {
+                                        // Fallback to plain description if no structured description blocks
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -771,10 +877,47 @@ fun ProductDetailScreen(
                                             )
                                             Spacer(Modifier.height(VelnoxSpacing.xs))
                                             Text(
-                                                text = desc,
+                                                text = product.description,
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
+                                        }
+                                    }
+
+                                    // 3. Additional Seller Detail Images (detailImages not already in descriptionBlocks or main gallery)
+                                    val blockImageUrls = remember(product.descriptionBlocks) {
+                                        product.descriptionBlocks.filterIsInstance<DescriptionBlock.Image>().map { it.imageUrl }.toSet()
+                                    }
+                                    val galleryImageUrls = remember(product.images) {
+                                        product.images.map { it.url }.toSet()
+                                    }
+                                    val extraDetailImages = remember(product.detailImages, blockImageUrls, galleryImageUrls) {
+                                        product.detailImages.filter { it !in blockImageUrls && it !in galleryImageUrls }
+                                    }
+                                    if (extraDetailImages.isNotEmpty()) {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(VelnoxSpacing.sm),
+                                        ) {
+                                            extraDetailImages.forEach { imgUrl ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(SquircleLg)
+                                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                        .velnoxClickable(role = Role.Image) {
+                                                            detailZoomImageUrl = imgUrl
+                                                        },
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    AsyncImage(
+                                                        model = imgUrl,
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.FillWidth,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1077,6 +1220,15 @@ fun ProductDetailScreen(
                         }
                     },
                 )
+
+                // Full-screen zoom viewer for seller detail images
+                detailZoomImageUrl?.let { zoomUrl ->
+                    FullScreenImageDialog(
+                        urls = listOf(zoomUrl),
+                        initialIndex = 0,
+                        onDismiss = { detailZoomImageUrl = null },
+                    )
+                }
             }
         }
     }
@@ -1136,8 +1288,8 @@ private fun ProductGallery(
             .padding(horizontal = PageGutter),
     ) {
         val totalWidth = maxWidth
-        val thumbWidth = if (totalWidth < 340.dp) 48.dp else 60.dp
-        val galleryHeight = (totalWidth * 0.88f).coerceIn(260.dp, 360.dp)
+        val thumbWidth = if (totalWidth < 340.dp) 52.dp else 64.dp
+        val galleryHeight = (totalWidth * 1.05f).coerceIn(340.dp, 440.dp)
 
         if (urls.isEmpty()) {
             Box(
@@ -1169,7 +1321,7 @@ private fun ProductGallery(
                 AsyncImage(
                     model = urls[0],
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Box(
@@ -1229,7 +1381,7 @@ private fun ProductGallery(
                         AsyncImage(
                             model = currentUrl,
                             contentDescription = null,
-                            contentScale = ContentScale.Crop,
+                            contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

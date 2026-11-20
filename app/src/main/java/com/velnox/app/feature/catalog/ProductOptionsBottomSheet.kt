@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -110,7 +111,6 @@ fun ProductOptionsBottomSheet(
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-    val targetSheetHeight = (screenHeight * 0.82f).coerceAtLeast(460.dp)
 
     // Option thumbnail size preference (persisted while interacting with options)
     var thumbnailSizeDp by rememberSaveable { mutableFloatStateOf(48f) }
@@ -195,7 +195,7 @@ fun ProductOptionsBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(targetSheetHeight)
+                .heightIn(max = screenHeight * 0.85f)
                 .navigationBarsPadding(),
         ) {
             // Header: Drag Handle & Close Button
@@ -355,7 +355,7 @@ fun ProductOptionsBottomSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = PageGutter, vertical = VelnoxSpacing.xs),
             ) {

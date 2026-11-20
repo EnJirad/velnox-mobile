@@ -101,6 +101,18 @@ class CatalogRemoteDataSourceTest {
         // The primary image is pulled to the front, everything else keeps its order.
         assertTrue(detail.images.first().isPrimary)
         assertTrue(detail.images.all { it.url.startsWith("https://") })
+
+        // Description blocks and metrics
+        assertEquals(3, detail.descriptionBlocks.size)
+        assertTrue(detail.descriptionBlocks[0] is DescriptionBlock.Image)
+        assertTrue((detail.descriptionBlocks[0] as DescriptionBlock.Image).imageUrl.startsWith("https://"))
+        assertTrue(detail.descriptionBlocks[1] is DescriptionBlock.Image)
+        assertTrue(detail.descriptionBlocks[2] is DescriptionBlock.Text)
+        assertEquals("ชาร์จเร็วทันใจไว้ใจผมได้", (detail.descriptionBlocks[2] as DescriptionBlock.Text).text)
+        assertNull(detail.rating)
+        assertEquals(0, detail.reviewCount)
+        assertEquals(1, detail.soldCount)
+        assertTrue(detail.detailImages.isEmpty())
     }
 
     @Test
