@@ -97,12 +97,33 @@ data class CheckoutLine(
     val quantity: Int,
 )
 
+data class ShopShippingQuote(
+    val shopId: String?,
+    val shopName: String?,
+    val subtotal: Double,
+    val shippingFee: Double,
+)
+
+/** Authoritative server-priced shipping breakdown from `POST /api/customer/shipping/quote`. */
+data class ShippingQuote(
+    val quoteId: String,
+    val currency: String,
+    val subtotal: Double,
+    val discount: Double,
+    val shippingTotal: Double,
+    val total: Double,
+    val itemCount: Int,
+    val shops: List<ShopShippingQuote>,
+)
+
 data class CheckoutRequest(
     val shippingAddressId: String,
-    val items: List<CheckoutLine>,
-    /** Wire value, e.g. `promptpay`, `credit_card`, `truemoney`, `cod`. */
+    val items: List<CheckoutLine> = emptyList(),
+    /** Wire value: `PROMPTPAY`, `CARD`, or `COD`. */
     val paymentMethod: String,
-    val shippingMethod: String? = null,
+    val cartItemIds: List<String>? = null,
+    val shippingQuoteId: String? = null,
+    val requestId: String? = null,
     val note: String? = null,
 )
 
@@ -112,7 +133,10 @@ data class CheckoutOutcome(
     val orderNumbers: List<String>,
     val total: Double?,
     val currency: String,
-)
+) {
+    val primaryOrderId: String get() = orderIds.first()
+    val primaryOrderNumber: String get() = orderNumbers.firstOrNull() ?: primaryOrderId
+}
 
 data class OrderLine(
     val productId: String?,

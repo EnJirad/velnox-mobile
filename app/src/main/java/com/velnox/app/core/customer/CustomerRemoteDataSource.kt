@@ -163,22 +163,46 @@ class CustomerRemoteDataSource(
 
     // -------------------------------------------------------- checkout & orders
 
+    override suspend fun shippingQuote(
+        token: String,
+        addressId: String,
+        cartItemIds: List<String>?,
+    ): CustomerResult<ShippingQuote> {
+        val body = JSONObject().put("shippingAddressId", addressId)
+        if (!cartItemIds.isNullOrEmpty()) {
+            val ids = JSONArray()
+            cartItemIds.forEach { ids.put(it) }
+            body.put("cartItemIds", ids)
+        }
+        return send(token, "POST", "/api/customer/shipping/quote", body).map { data ->
+            (data as? JSONObject)?.let(::parseShippingQuote)
+        }
+    }
+
     override suspend fun checkout(
         token: String,
         request: CheckoutRequest,
     ): CustomerResult<CheckoutOutcome> {
-        val items = JSONArray()
-        for (line in request.items) {
-            val obj = JSONObject().put("productId", line.productId).put("quantity", line.quantity)
-            line.variantId?.let { obj.put("variantId", it) }
-            items.put(obj)
-        }
         val body = JSONObject()
             .put("shippingAddressId", request.shippingAddressId)
-            .put("items", items)
             .put("paymentMethod", request.paymentMethod)
-        request.shippingMethod?.let { body.put("shippingMethod", it) }
-        request.note?.let { body.put("note", it) }
+        if (!request.cartItemIds.isNullOrEmpty()) {
+            val ids = JSONArray()
+            request.cartItemIds.forEach { ids.put(it) }
+            body.put("cartItemIds", ids)
+        }
+        if (request.items.isNotEmpty()) {
+            val items = JSONArray()
+            for (line in request.items) {
+                val obj = JSONObject().put("productId", line.productId).put("quantity", line.quantity)
+                line.variantId?.let { obj.put("variantId", it) }
+                items.put(obj)
+            }
+            body.put("items", items)
+        }
+        request.shippingQuoteId?.takeIf { it.isNotBlank() }?.let { body.put("shippingQuoteId", it) }
+        request.requestId?.takeIf { it.isNotBlank() }?.let { body.put("requestId", it) }
+        request.note?.takeIf { it.isNotBlank() }?.let { body.put("notes", it) }
 
         return send(token, "POST", "/api/customer/checkout", body).map { data ->
             (data as? JSONObject)?.let(::parseCheckout)
@@ -429,6 +453,28 @@ class CustomerRemoteDataSource(
         )
     }
 
+    private fun parseShippingQuote(obj: JSONObject): ShippingQuote? {
+        val quoteId = obj.str("quoteId", "id") ?: return null
+        val shops = obj.optJSONArray("shops")?.objects().orEmpty().map { s ->
+            ShopShippingQuote(
+                shopId = s.str("shopId", "shop_id"),
+                shopName = s.str("shopName", "shop_name"),
+                subtotal = s.num("subtotal") ?: 0.0,
+                shippingFee = s.num("shippingFee", "shipping_fee") ?: 0.0,
+            )
+        }
+        return ShippingQuote(
+            quoteId = quoteId,
+            currency = obj.str("currency") ?: DEFAULT_CURRENCY,
+            subtotal = obj.num("subtotal") ?: 0.0,
+            discount = obj.num("discount") ?: 0.0,
+            shippingTotal = obj.num("shippingTotal", "shipping_total") ?: 0.0,
+            total = obj.num("total") ?: 0.0,
+            itemCount = obj.num("itemCount", "item_count")?.toInt() ?: 0,
+            shops = shops,
+        )
+    }
+
     private fun parseCheckout(obj: JSONObject): CheckoutOutcome? {
         val ids = ArrayList<String>()
         val numbers = ArrayList<String>()
@@ -444,6 +490,12 @@ class CustomerRemoteDataSource(
             }
         } else {
             collect(obj.optJSONObject("order") ?: obj)
+        }
+        if (ids.isEmpty()) {
+            obj.str("parentOrderId", "parent_order_id")?.let(ids::add)
+        }
+        if (numbers.isEmpty()) {
+            obj.str("parentOrderNumber", "parent_order_number")?.let(numbers::add)
         }
         if (ids.isEmpty()) return null
         return CheckoutOutcome(

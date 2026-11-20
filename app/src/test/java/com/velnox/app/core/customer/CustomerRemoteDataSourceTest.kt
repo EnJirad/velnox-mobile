@@ -391,4 +391,56 @@ class CustomerRemoteDataSourceTest {
         assertEquals(7, item.maxStock)
         assertEquals("https://img.test/l.jpg", item.imageUrl)
     }
+
+    @Test
+    fun `shipping quote posts address and cart item ids and parses server totals`() = runBlocking {
+        val body = """{"success":true,"data":{
+            "quoteId":"q-1","currency":"THB","subtotal":"450.00","discount":"0.00",
+            "shippingTotal":"35.00","total":"485.00","itemCount":2,
+            "shops":[{"shopId":"s1","shopName":"Lumen","subtotal":"450.00","shippingFee":"35.00"}]}}"""
+
+        val api = api(200 to body)
+        val result = api.shippingQuote("tok", addressId = "a1", cartItemIds = listOf("ci-1", "ci-2"))
+
+        result as CustomerResult.Ok
+        assertEquals("q-1", result.value.quoteId)
+        assertEquals(450.0, result.value.subtotal, 0.0)
+        assertEquals(35.0, result.value.shippingTotal, 0.0)
+        assertEquals(485.0, result.value.total, 0.0)
+        assertEquals(1, result.value.shops.size)
+        assertEquals("Lumen", result.value.shops.single().shopName)
+
+        val sent = JSONObject(requests.single().body)
+        assertEquals("https://example.test/api/customer/shipping/quote", requests.single().url)
+        assertEquals("a1", sent.getString("shippingAddressId"))
+        assertEquals(2, sent.getJSONArray("cartItemIds").length())
+    }
+
+    @Test
+    fun `checkout sends cartItemIds, quoteId and requestId without client money fields`() = runBlocking {
+        val api = api(
+            200 to """{"success":true,"data":{"parentOrderId":"ord-1","parentOrderNumber":"202611200000000001","total":485.0}}""",
+        )
+
+        val result = api.checkout(
+            "tok",
+            CheckoutRequest(
+                shippingAddressId = "a1",
+                paymentMethod = "PROMPTPAY",
+                cartItemIds = listOf("ci-1"),
+                shippingQuoteId = "q-1",
+                requestId = "req-123",
+            ),
+        )
+
+        result as CustomerResult.Ok
+        assertEquals("ord-1", result.value.primaryOrderId)
+        assertEquals("202611200000000001", result.value.primaryOrderNumber)
+        val sent = JSONObject(requests.single().body)
+        assertEquals("PROMPTPAY", sent.getString("paymentMethod"))
+        assertEquals("q-1", sent.getString("shippingQuoteId"))
+        assertEquals("req-123", sent.getString("requestId"))
+        assertFalse(sent.has("total"))
+        assertFalse(sent.has("shippingFee"))
+    }
 }

@@ -590,6 +590,7 @@ private fun VelnoxNavHost() {
                         "checkout" -> CheckoutScreen(
                             cartState = cart,
                             onBack = ::closeOverlay,
+                            onManageAddresses = { overlayKey = SettingsPage.Addresses.key },
                             onViewOrder = { orderId ->
                                 overlayKey = "order:$orderId"
                             },

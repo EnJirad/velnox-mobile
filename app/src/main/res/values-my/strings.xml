@@ -605,6 +605,10 @@
     <string name="address_load_failed">လိပ်စာများကို မဖွင့်နိုင်ပါ</string>
     <string name="cart_load_failed">ဈေးဝယ်ခြင်းကို မဖွင့်နိုင်ပါ</string>
     <string name="cart_shipping_at_checkout">ငွေရှင်းချိန်တွင် တွက်ချက်မည်</string>
+    <string name="checkout_placing_order">အမှာစာတင်နေသည်…</string>
+    <string name="checkout_address_required">အမှာစာတင်ရန် ပို့ဆောင်မည့်လိပ်စာ ထည့်ပါ</string>
+    <string name="checkout_add_address">ပို့ဆောင်မည့်လိပ်စာ ထည့်မည်</string>
+    <string name="checkout_quote_failed">ပို့ဆောင်ခ တွက်ချက်၍မရပါ</string>
     <string name="settings_saved">သိမ်းဆည်းပြီးပါပြီ</string>
     <string name="settings_saving">သိမ်းဆည်းနေသည်…</string>
 </resources>

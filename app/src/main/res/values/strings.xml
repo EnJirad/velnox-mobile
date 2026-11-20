@@ -605,6 +605,10 @@
     <string name="address_load_failed">โหลดที่อยู่ไม่สำเร็จ</string>
     <string name="cart_load_failed">โหลดตะกร้าสินค้าไม่สำเร็จ</string>
     <string name="cart_shipping_at_checkout">คำนวณตอนชำระเงิน</string>
+    <string name="checkout_placing_order">กำลังสร้างคำสั่งซื้อ…</string>
+    <string name="checkout_address_required">กรุณาเพิ่มที่อยู่จัดส่งก่อนทำการสั่งซื้อ</string>
+    <string name="checkout_add_address">เพิ่มที่อยู่จัดส่ง</string>
+    <string name="checkout_quote_failed">ไม่สามารถคำนวณค่าจัดส่งได้</string>
     <string name="settings_saved">บันทึกข้อมูลเรียบร้อยแล้ว</string>
     <string name="settings_saving">กำลังบันทึก…</string>
 </resources>

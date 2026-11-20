@@ -56,6 +56,13 @@ interface CustomerApi {
     suspend fun toggleWishlist(token: String, productId: String): CustomerResult<Boolean>
 
     // ---- checkout & orders
+    /** `POST /api/customer/shipping/quote` — server-authoritative shipping & total quote. */
+    suspend fun shippingQuote(
+        token: String,
+        addressId: String,
+        cartItemIds: List<String>? = null,
+    ): CustomerResult<ShippingQuote>
+
     /** `POST /api/customer/checkout` */
     suspend fun checkout(token: String, request: CheckoutRequest): CustomerResult<CheckoutOutcome>
 

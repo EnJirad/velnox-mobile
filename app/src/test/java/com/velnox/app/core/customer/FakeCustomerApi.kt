@@ -20,6 +20,7 @@ open class FakeCustomerApi : CustomerApi {
     override suspend fun removeCartItem(token: String, itemId: String): CustomerResult<RemoteCart> = unexpected()
     override suspend fun wishlist(token: String): CustomerResult<List<WishlistEntry>> = unexpected()
     override suspend fun toggleWishlist(token: String, productId: String): CustomerResult<Boolean> = unexpected()
+    override suspend fun shippingQuote(token: String, addressId: String, cartItemIds: List<String>?): CustomerResult<ShippingQuote> = unexpected()
     override suspend fun checkout(token: String, request: CheckoutRequest): CustomerResult<CheckoutOutcome> = unexpected()
     override suspend fun orders(token: String): CustomerResult<List<CustomerOrder>> = unexpected()
     override suspend fun order(token: String, id: String): CustomerResult<CustomerOrder> = unexpected()
