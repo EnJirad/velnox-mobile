@@ -98,6 +98,14 @@ fun CartScreen(
             return@Column
         }
 
+        val locale = LocalConfiguration.current.locales[0]
+        val totalPrice = state.selectedTotalPrice
+        val formattedTotal = if (totalPrice != null) {
+            PriceFormat.format(totalPrice, "THB", locale) ?: "฿${String.format(locale, "%.2f", totalPrice)}"
+        } else {
+            stringResource(R.string.common_value_placeholder)
+        }
+
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = PageGutter, vertical = 12.dp),
@@ -146,12 +154,12 @@ fun CartScreen(
                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                         SummaryRow(
                             stringResource(R.string.cart_subtotal),
-                            stringResource(R.string.common_value_placeholder),
+                            formattedTotal,
                         )
                         SummaryRow(stringResource(R.string.cart_shipping), stringResource(R.string.cart_shipping_free))
                         SummaryRow(
                             stringResource(R.string.cart_total),
-                            stringResource(R.string.common_value_placeholder),
+                            formattedTotal,
                             strong = true,
                         )
                         Spacer(Modifier.height(6.dp))
@@ -167,6 +175,7 @@ fun CartScreen(
 
         CheckoutBar(
             selectedCount = state.selectedCount,
+            totalPriceText = formattedTotal,
             onCheckout = onCheckout,
         )
     }
@@ -351,7 +360,11 @@ private fun SummaryRow(label: String, value: String, strong: Boolean = false) {
 }
 
 @Composable
-private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
+private fun CheckoutBar(
+    selectedCount: Int,
+    totalPriceText: String,
+    onCheckout: () -> Unit,
+) {
     val canCheckout = selectedCount > 0
     val buttonBackground = if (canCheckout) {
         MaterialTheme.colorScheme.primary
@@ -378,7 +391,7 @@ private fun CheckoutBar(selectedCount: Int, onCheckout: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = stringResource(R.string.common_value_placeholder),
+                    text = totalPriceText,
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

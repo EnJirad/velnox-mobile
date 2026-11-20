@@ -44,6 +44,15 @@ class CartState {
     val selectedCount: Int get() = items.count { it.selected }
     val allSelected: Boolean get() = items.isNotEmpty() && items.all { it.selected }
 
+    val selectedTotalPrice: Double?
+        get() {
+            val selectedItems = items.filter { it.selected }
+            if (selectedItems.isEmpty()) return 0.0
+            val pricedItems = selectedItems.filter { it.price != null }
+            if (pricedItems.isEmpty()) return null
+            return pricedItems.sumOf { (it.price ?: 0.0) * it.quantity }
+        }
+
     private fun update(id: String, transform: (CartItem) -> CartItem) {
         val index = items.indexOfFirst { it.productId == id }
         if (index >= 0) items[index] = transform(items[index])

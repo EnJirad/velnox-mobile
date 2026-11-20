@@ -108,4 +108,48 @@ class CartStateTest {
         assertEquals("prod-1_var-blue", cart.items[0].productId)
         assertEquals("prod-1_var-red", cart.items[1].productId)
     }
+
+    @Test
+    fun `selectedTotalPrice computes correct sum of selected items with prices`() {
+        val cart = CartState()
+        // clear demo items without prices
+        cart.items.clear()
+
+        cart.add(
+            productId = "prod-1",
+            name = "Item 1",
+            storeName = "Store 1",
+            imageUrl = null,
+            variantId = "v1",
+            variantName = null,
+            price = 150.0,
+            currency = "THB",
+            quantity = 2,
+            maxStock = 10,
+        )
+
+        cart.add(
+            productId = "prod-2",
+            name = "Item 2",
+            storeName = "Store 2",
+            imageUrl = null,
+            variantId = "v2",
+            variantName = null,
+            price = 200.0,
+            currency = "THB",
+            quantity = 1,
+            maxStock = 10,
+        )
+
+        // Both are selected by default
+        assertEquals(500.0, cart.selectedTotalPrice!!, 0.001)
+
+        // Unselect Item 2
+        cart.toggleSelection("prod-2_v2")
+        assertEquals(300.0, cart.selectedTotalPrice!!, 0.001)
+
+        // Toggle all off
+        cart.toggleAll()
+        assertEquals(0.0, cart.selectedTotalPrice!!, 0.001)
+    }
 }
