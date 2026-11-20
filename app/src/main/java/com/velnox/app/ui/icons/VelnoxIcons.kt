@@ -452,6 +452,10 @@ object VelnoxIcons {
         stroke("lucide-chevron-down", listOf("m6 9l6 6l6-6"))
     }
 
+    val ChevronUp: ImageVector by lazy {
+        stroke("lucide-chevron-up", listOf("m18 15l-6-6l-6 6"))
+    }
+
     val Close: ImageVector by lazy {
         stroke("lucide-x", listOf("M18 6L6 18", "M6 6l12 12"))
     }
