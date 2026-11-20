@@ -26,11 +26,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,6 +61,7 @@ import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.rememberCustomerRepository
 import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.session.LocalSession
+import com.velnox.app.core.util.ImageOptimizer
 import com.velnox.app.feature.messages.MessagesState
 import com.velnox.app.feature.orders.OrderStatus
 import com.velnox.app.feature.orders.OrdersFilter
@@ -114,6 +118,8 @@ fun ProfileScreen(
     val session = LocalSession.current
     val customerRepository = rememberCustomerRepository()
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var cacheBustVersion by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     var showPhotoOptionsFor by remember { mutableStateOf<PhotoTarget?>(null) }
     var isUploadingAvatar by remember { mutableStateOf(false) }
@@ -129,6 +135,7 @@ fun ProfileScreen(
                     avatar = p.avatarUrl,
                     coverUrl = p.coverUrl,
                 )
+                cacheBustVersion = System.currentTimeMillis()
             }
             else -> Unit
         }
@@ -141,38 +148,40 @@ fun ProfileScreen(
                 scope.launch {
                     if (target == PhotoTarget.Avatar) isUploadingAvatar = true else isUploadingCover = true
                     try {
-                        // 1. Instant local persistence for immediate offline feedback
-                        val savedPath = persistPickedImage(
+                        val kind = if (target == PhotoTarget.Avatar) "avatar" else "cover"
+                        val (maxW, maxH) = if (target == PhotoTarget.Avatar) 800 to 800 else 1920 to 600
+
+                        // 1. Optimize, rotate & compress to WebP format before uploading (parity with Web)
+                        val optimized = ImageOptimizer.optimize(
                             context = context,
-                            sourceUri = uri,
-                            prefix = if (target == PhotoTarget.Avatar) "profile_avatar" else "profile_cover",
+                            uri = uri,
+                            maxWidth = maxW,
+                            maxHeight = maxH,
+                            quality = 85,
                         )
-                        if (savedPath != null) {
-                            if (target == PhotoTarget.Avatar) {
-                                preferences.setAvatarUri(savedPath)
-                            } else {
-                                preferences.setCoverUri(savedPath)
-                            }
+
+                        if (optimized == null) {
+                            snackbarHostState.showSnackbar(
+                                message = context.getString(R.string.profile_image_type_error),
+                            )
+                            return@launch
                         }
 
-                        // 2. Read binary data and upload directly to Cloudflare R2
-                        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
-                        val bytes = withContext(Dispatchers.IO) {
-                            runCatching {
-                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                            }.getOrNull()
-                        }
-                        if (bytes != null) {
-                            val kind = if (target == PhotoTarget.Avatar) "avatar" else "cover"
-                            val uploadResult = customerRepository.call { api, token ->
+                        // 2. Upload directly to Cloudflare R2 and persist in Neon PostgreSQL
+                        val uploadResult = withContext(Dispatchers.IO) {
+                            customerRepository.call { api, token ->
                                 api.uploadProfileImage(
                                     token = token,
                                     kind = kind,
-                                    bytes = bytes,
-                                    mimeType = mimeType,
+                                    bytes = optimized.bytes,
+                                    mimeType = optimized.mimeType,
+                                    filename = optimized.filename,
                                 )
                             }
-                            if (uploadResult is CustomerResult.Ok) {
+                        }
+
+                        when (uploadResult) {
+                            is CustomerResult.Ok -> {
                                 val cdnUrl = uploadResult.value
                                 if (target == PhotoTarget.Avatar) {
                                     session.updateProfile(avatar = cdnUrl)
@@ -181,8 +190,31 @@ fun ProfileScreen(
                                     session.updateProfile(coverUrl = cdnUrl)
                                     preferences.setCoverUri(cdnUrl)
                                 }
+                                cacheBustVersion = System.currentTimeMillis()
+
+                                // 3. Re-sync latest customer profile from backend to verify DB persistence
+                                customerRepository.call { api, token ->
+                                    api.profile(token)
+                                }
+
+                                snackbarHostState.showSnackbar(
+                                    message = if (target == PhotoTarget.Avatar) {
+                                        context.getString(R.string.profile_avatar_updated)
+                                    } else {
+                                        context.getString(R.string.profile_cover_updated)
+                                    },
+                                )
+                            }
+                            is CustomerResult.Failed -> {
+                                snackbarHostState.showSnackbar(
+                                    message = context.getString(R.string.profile_image_upload_failed),
+                                )
                             }
                         }
+                    } catch (_: Exception) {
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(R.string.profile_image_upload_failed),
+                        )
                     } finally {
                         if (target == PhotoTarget.Avatar) isUploadingAvatar = false else isUploadingCover = false
                     }
@@ -191,63 +223,68 @@ fun ProfileScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .statusBarsPadding()
-                .padding(start = PageGutter, end = 8.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxSize(),
         ) {
-            Text(
-                text = stringResource(R.string.profile_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            IconActionButton(
-                icon = VelnoxIcons.Cog,
-                contentDescription = stringResource(R.string.profile_settings),
-                onClick = onOpenSettings,
-            )
-        }
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = PageGutter, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                val resolvedAvatar = preferences.current.avatarUri?.takeIf { it.isNotBlank() } ?: user.avatar
-                val resolvedCover = preferences.current.coverUri?.takeIf { it.isNotBlank() } ?: user.coverUrl
-                ProfileHeaderCard(
-                    user = user,
-                    avatarUri = resolvedAvatar,
-                    coverUri = resolvedCover,
-                    isUploadingAvatar = isUploadingAvatar,
-                    isUploadingCover = isUploadingCover,
-                    onEditAvatar = {
-                        if (resolvedAvatar != null) {
-                            showPhotoOptionsFor = PhotoTarget.Avatar
-                        } else {
-                            launchGallery(PhotoTarget.Avatar)
-                        }
-                    },
-                    onEditCover = {
-                        if (resolvedCover != null) {
-                            showPhotoOptionsFor = PhotoTarget.Cover
-                        } else {
-                            launchGallery(PhotoTarget.Cover)
-                        }
-                    },
-                    onOpenEditProfile = onOpenEditProfile,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .statusBarsPadding()
+                    .padding(start = PageGutter, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.profile_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                IconActionButton(
+                    icon = VelnoxIcons.Cog,
+                    contentDescription = stringResource(R.string.profile_settings),
+                    onClick = onOpenSettings,
                 )
             }
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = PageGutter, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item {
+                    val rawAvatar = preferences.current.avatarUri?.takeIf { it.isNotBlank() } ?: user.avatar
+                    val rawCover = preferences.current.coverUri?.takeIf { it.isNotBlank() } ?: user.coverUrl
+                    val resolvedAvatar = bust(rawAvatar, cacheBustVersion)
+                    val resolvedCover = bust(rawCover, cacheBustVersion)
+                    ProfileHeaderCard(
+                        user = user,
+                        avatarUri = resolvedAvatar,
+                        coverUri = resolvedCover,
+                        isUploadingAvatar = isUploadingAvatar,
+                        isUploadingCover = isUploadingCover,
+                        onEditAvatar = {
+                            if (resolvedAvatar != null) {
+                                showPhotoOptionsFor = PhotoTarget.Avatar
+                            } else {
+                                launchGallery(PhotoTarget.Avatar)
+                            }
+                        },
+                        onEditCover = {
+                            if (resolvedCover != null) {
+                                showPhotoOptionsFor = PhotoTarget.Cover
+                            } else {
+                                launchGallery(PhotoTarget.Cover)
+                            }
+                        },
+                        onOpenEditProfile = onOpenEditProfile,
+                    )
+                }
 
             item {
                 StatsRow(
@@ -284,7 +321,6 @@ fun ProfileScreen(
                 }
             }
         }
-    }
 
     val targetForOptions = showPhotoOptionsFor
     if (targetForOptions != null) {
@@ -338,9 +374,12 @@ fun ProfileScreen(
                                 showPhotoOptionsFor = null
                                 if (targetForOptions == PhotoTarget.Avatar) {
                                     preferences.setAvatarUri(null)
+                                    session.updateProfile(avatar = "")
                                 } else {
                                     preferences.setCoverUri(null)
+                                    session.updateProfile(coverUrl = "")
                                 }
+                                cacheBustVersion = System.currentTimeMillis()
                             }
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -370,6 +409,13 @@ fun ProfileScreen(
             },
         )
     }
+
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 16.dp),
+    )
 }
 
 @Composable
@@ -819,6 +865,19 @@ private fun StatTile(
             maxLines = 1,
         )
     }
+}
+
+/**
+ * Append a cache-busting version query param to a URL.
+ * The database stores the canonical URL without ?v=.
+ * Matches the Web contract (bust() in ShopProfile.tsx).
+ */
+private fun bust(url: String?, version: Long): String? {
+    if (url.isNullOrBlank()) return null
+    if (!url.startsWith("http://") && !url.startsWith("https://")) return url
+    val clean = url.replace(Regex("[?&]v=\\d+"), "").trimEnd('?')
+    val sep = if (clean.contains('?')) "&" else "?"
+    return "$clean${sep}v=$version"
 }
 
 /**

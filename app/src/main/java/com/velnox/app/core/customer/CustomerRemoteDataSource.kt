@@ -58,45 +58,55 @@ class CustomerRemoteDataSource(
         bytes: ByteArray,
         mimeType: String,
         filename: String,
-    ): CustomerResult<String> {
+    ): CustomerResult<String> = withContext(Dispatchers.IO) {
         val intentBody = JSONObject()
             .put("kind", kind)
             .put("filename", filename)
             .put("mimeType", mimeType)
         val intentRaw = send(token, "POST", "/api/customer/profile-image/upload-intent", intentBody)
         val intentData = (intentRaw as? Raw.Success)?.data as? JSONObject
-            ?: return (intentRaw as? Raw.Failure)?.let { CustomerResult.Failed(it.error, it.message) }
+            ?: return@withContext (intentRaw as? Raw.Failure)?.let { CustomerResult.Failed(it.error, it.message) }
             ?: CustomerResult.Failed(CustomerError.Server)
 
         val uploadUrl = intentData.optString("uploadUrl")
         val objectKey = intentData.optString("objectKey")
         if (uploadUrl.isBlank() || objectKey.isBlank()) {
-            return CustomerResult.Failed(CustomerError.Server, "Invalid upload intent response")
+            return@withContext CustomerResult.Failed(CustomerError.Server, "Invalid upload intent response")
         }
 
         // Upload binary directly to Cloudflare R2 via pre-signed PUT
+        val mediaType = mimeType.toMediaTypeOrNull() ?: "application/octet-stream".toMediaType()
         val putRequest = Request.Builder()
             .url(uploadUrl)
-            .put(bytes.toRequestBody(mimeType.toMediaType()))
+            .header("Content-Type", mimeType)
+            .put(bytes.toRequestBody(mediaType))
             .build()
 
         val isPutSuccess = try {
-            client.newCall(putRequest).execute().use { it.isSuccessful }
-        } catch (e: IOException) {
-            return CustomerResult.Failed(CustomerError.Network, e.message)
+            client.newCall(putRequest).execute().use { response ->
+                response.isSuccessful
+            }
+        } catch (e: Exception) {
+            return@withContext CustomerResult.Failed(CustomerError.Network, e.message)
         }
 
         if (!isPutSuccess) {
-            return CustomerResult.Failed(CustomerError.Server, "Storage upload failed")
+            return@withContext CustomerResult.Failed(CustomerError.Server, "Storage upload failed")
         }
 
         // Confirm upload and save to Neon PostgreSQL
         val saveBody = JSONObject().put("objectKey", objectKey)
         val saveRaw = send(token, "POST", "/api/customer/profile-image/save", saveBody)
-        return when (saveRaw) {
+        when (saveRaw) {
             is Raw.Success -> {
                 val saveObj = saveRaw.data as? JSONObject
-                val url = saveObj?.optString("url")?.takeIf { it.isNotBlank() }
+                val serverUrl = if (kind == "avatar") {
+                    saveObj?.optString("avatarUrl")?.takeIf { it.isNotBlank() }
+                } else {
+                    saveObj?.optString("coverUrl")?.takeIf { it.isNotBlank() }
+                }
+                val url = serverUrl
+                    ?: saveObj?.optString("url")?.takeIf { it.isNotBlank() }
                     ?: intentData.optString("cdnUrl").takeIf { it.isNotBlank() }
                     ?: objectKey
                 CustomerResult.Ok(url)
@@ -802,6 +812,7 @@ class CustomerRemoteDataSource(
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
             .build()
     }
 }

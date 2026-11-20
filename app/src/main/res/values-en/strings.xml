@@ -654,4 +654,9 @@
     <string name="profile_help_center">Help Center</string>
     <string name="profile_help_center_subtitle">FAQs &amp; customer support</string>
     <string name="profile_addresses_subtitle">Manage delivery addresses &amp; map pins</string>
+    <string name="profile_avatar_updated">Profile picture updated successfully</string>
+    <string name="profile_cover_updated">Cover photo updated successfully</string>
+    <string name="profile_image_upload_failed">Failed to upload image. Please try again.</string>
+    <string name="profile_image_type_error">Invalid image format or corrupted file</string>
+    <string name="profile_uploading_photo">Optimizing and uploading image...</string>
 </resources>

@@ -654,4 +654,9 @@
     <string name="profile_help_center">ศูนย์ช่วยเหลือ</string>
     <string name="profile_help_center_subtitle">คำถามที่พบบ่อยและการสนับสนุน</string>
     <string name="profile_addresses_subtitle">จัดการที่อยู่จัดส่งและหมุดแผนที่</string>
+    <string name="profile_avatar_updated">อัปเดตรูปโปรไฟล์เรียบร้อยแล้ว</string>
+    <string name="profile_cover_updated">อัปเดตรูปภาพหน้าปกเรียบร้อยแล้ว</string>
+    <string name="profile_image_upload_failed">อัปโหลดรูปภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</string>
+    <string name="profile_image_type_error">รูปแบบไฟล์ไม่ถูกต้อง หรือไฟล์เสียหาย</string>
+    <string name="profile_uploading_photo">กำลังปรับแต่งและอัปโหลดรูปภาพ...</string>
 </resources>

@@ -654,4 +654,9 @@
     <string name="profile_help_center">အကူအညီ စင်တာ</string>
     <string name="profile_help_center_subtitle">မေးလေ့ရှိသော မေးခွန်းများနှင့် ပံ့ပိုးမှု</string>
     <string name="profile_addresses_subtitle">ပို့ဆောင်မည့်လိပ်စာနှင့် မြေပုံပင်များ စီမံရန်</string>
+    <string name="profile_avatar_updated">ပရိုဖိုင်ပုံ အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ</string>
+    <string name="profile_cover_updated">မျက်နှာဖုံးပုံ အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ</string>
+    <string name="profile_image_upload_failed">ပုံတင်ခြင်း မအောင်မြင်ပါ။ ထပ်မံကြိုးစားကြည့်ပါ။</string>
+    <string name="profile_image_type_error">ပုံဖော်မတ် မမှန်ပါ သို့မဟုတ် ဖိုင်ပျက်စီးနေပါသည်</string>
+    <string name="profile_uploading_photo">ပုံကို အကောင်းဆုံးဖြစ်အောင် ပြင်ဆင်ပြီး တင်နေပါသည်...</string>
 </resources>

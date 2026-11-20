@@ -455,4 +455,31 @@ class CustomerRemoteDataSourceTest {
         assertFalse(sent.has("total"))
         assertFalse(sent.has("shippingFee"))
     }
+
+    @Test
+    fun `uploadProfileImage requests intent, puts to storage, and saves objectKey`() = runBlocking {
+        val api = api(
+            200 to """{"success":true,"data":{"uploadUrl":"https://storage.example.test/put","objectKey":"profile/avatar/u1.webp","cdnUrl":"https://cdn.example.test/profile/avatar/u1.webp"}}""",
+            200 to "",
+            200 to """{"success":true,"data":{"avatarUrl":"https://cdn.example.test/profile/avatar/u1.webp","coverUrl":null}}""",
+        )
+
+        val result = api.uploadProfileImage(
+            token = "tok-1",
+            kind = "avatar",
+            bytes = byteArrayOf(1, 2, 3),
+            mimeType = "image/webp",
+            filename = "avatar.webp",
+        )
+
+        result as CustomerResult.Ok
+        assertEquals("https://cdn.example.test/profile/avatar/u1.webp", result.value)
+        assertEquals(3, requests.size)
+        assertEquals("POST", requests[0].method)
+        assertTrue(requests[0].url.endsWith("/api/customer/profile-image/upload-intent"))
+        assertEquals("PUT", requests[1].method)
+        assertEquals("https://storage.example.test/put", requests[1].url)
+        assertEquals("POST", requests[2].method)
+        assertTrue(requests[2].url.endsWith("/api/customer/profile-image/save"))
+    }
 }
