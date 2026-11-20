@@ -437,7 +437,7 @@ private fun AddressCard(
             if (isDefault) {
                 Spacer(Modifier.width(8.dp))
                 BrandBadge(
-                    label = "ค่าเริ่มต้น",
+                    text = "ค่าเริ่มต้น",
                     modifier = Modifier.padding(vertical = 1.dp),
                 )
             }
@@ -488,7 +488,7 @@ private fun ShopItemsSection(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            BrandBadge(label = "Verified")
+            BrandBadge(text = "Verified")
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

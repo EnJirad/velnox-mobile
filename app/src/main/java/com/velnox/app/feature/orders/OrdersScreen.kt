@@ -55,6 +55,7 @@ import com.velnox.app.ui.components.TopBar
 import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.SquircleLg
+import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
