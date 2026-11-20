@@ -594,4 +594,15 @@
     <string name="search_sort_rating">Highest Rating</string>
     <string name="search_no_results">No products found</string>
     <string name="search_no_results_hint">Try checking your spelling or use more general keywords</string>
+
+    <!-- ═══════════════════════ customer data (server) ═══════════════════════ -->
+    <string name="customer_error_network">Can\'t reach the server. Check your connection and try again.</string>
+    <string name="customer_error_unauthorized">Your session has expired. Please sign in again.</string>
+    <string name="customer_error_not_found">We couldn\'t find that.</string>
+    <string name="customer_error_rejected">The server didn\'t accept that. Check the details and try again.</string>
+    <string name="customer_error_server">Something went wrong on our side. Please try again later.</string>
+    <string name="customer_loading">Loading…</string>
+    <string name="address_load_failed">Couldn\'t load your addresses</string>
+    <string name="settings_saved">Saved</string>
+    <string name="settings_saving">Saving…</string>
 </resources>

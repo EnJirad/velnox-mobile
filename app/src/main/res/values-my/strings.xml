@@ -594,4 +594,15 @@
     <string name="search_sort_rating">အဆင့်သတ်မှတ်ချက် အမြင့်ဆုံး</string>
     <string name="search_no_results">ပစ္စည်း မတွေ့ရှိပါ</string>
     <string name="search_no_results_hint">စာလုံးပေါင်း စစ်ဆေးပါ သို့မဟုတ် အခြားစာလုံးဖြင့် ရှာပါ</string>
+
+    <!-- ═══════════════════════ customer data (server) ═══════════════════════ -->
+    <string name="customer_error_network">ဆာဗာနှင့် ချိတ်ဆက်၍မရပါ။ အင်တာနက်ကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။</string>
+    <string name="customer_error_unauthorized">ဆက်ရှင်သက်တမ်းကုန်သွားပါပြီ။ ထပ်မံဝင်ရောက်ပါ။</string>
+    <string name="customer_error_not_found">ရှာမတွေ့ပါ။</string>
+    <string name="customer_error_rejected">ဆာဗာက လက်မခံပါ။ အချက်အလက်များကို စစ်ပြီး ထပ်ကြိုးစားပါ။</string>
+    <string name="customer_error_server">ဆာဗာတွင် ပြဿနာရှိနေပါသည်။ နောက်မှ ထပ်ကြိုးစားပါ။</string>
+    <string name="customer_loading">ဖွင့်နေသည်…</string>
+    <string name="address_load_failed">လိပ်စာများကို မဖွင့်နိုင်ပါ</string>
+    <string name="settings_saved">သိမ်းဆည်းပြီးပါပြီ</string>
+    <string name="settings_saving">သိမ်းဆည်းနေသည်…</string>
 </resources>

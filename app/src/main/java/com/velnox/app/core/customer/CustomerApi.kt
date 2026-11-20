@@ -17,8 +17,15 @@ interface CustomerApi {
     /** `GET /api/customer/addresses` */
     suspend fun addresses(token: String): CustomerResult<List<CustomerAddress>>
 
-    /** `POST /api/customer/addresses` */
-    suspend fun addAddress(token: String, input: AddressInput): CustomerResult<CustomerAddress>
+    /**
+     * `POST /api/customer/addresses` — creates the address, or overwrites
+     * [addressId] when given. Returns the saved address id.
+     */
+    suspend fun saveAddress(
+        token: String,
+        addressId: String?,
+        input: AddressInput,
+    ): CustomerResult<String>
 
     /** `DELETE /api/customer/addresses/:id` */
     suspend fun deleteAddress(token: String, id: String): CustomerResult<Unit>

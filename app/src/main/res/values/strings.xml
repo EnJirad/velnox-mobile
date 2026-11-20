@@ -594,4 +594,15 @@
     <string name="search_sort_rating">คะแนนรีวิวสูงสุด</string>
     <string name="search_no_results">ไม่พบสินค้าที่ตรงกับการค้นหา</string>
     <string name="search_no_results_hint">ลองตรวจสอบคำสะกด หรือใช้คำค้นหาที่กว้างขึ้น</string>
+
+    <!-- ═══════════════════════ customer data (server) ═══════════════════════ -->
+    <string name="customer_error_network">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง</string>
+    <string name="customer_error_unauthorized">เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง</string>
+    <string name="customer_error_not_found">ไม่พบข้อมูลที่ต้องการ</string>
+    <string name="customer_error_rejected">เซิร์ฟเวอร์ไม่รับคำขอนี้ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง</string>
+    <string name="customer_error_server">เซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่ภายหลัง</string>
+    <string name="customer_loading">กำลังโหลด…</string>
+    <string name="address_load_failed">โหลดที่อยู่ไม่สำเร็จ</string>
+    <string name="settings_saved">บันทึกข้อมูลเรียบร้อยแล้ว</string>
+    <string name="settings_saving">กำลังบันทึก…</string>
 </resources>

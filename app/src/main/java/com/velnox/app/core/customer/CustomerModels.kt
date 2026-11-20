@@ -9,11 +9,13 @@ package com.velnox.app.core.customer
  */
 
 data class CustomerProfile(
-    val id: String,
     val name: String?,
+    /** Absent from the `PUT` answer; only `GET` returns it. */
     val email: String?,
     val phone: String?,
     val avatarUrl: String?,
+    /** Epoch millis the account was created. */
+    val memberSince: Long?,
 )
 
 /** Fields the customer may change through `PUT /api/customer/profile`. */
@@ -24,26 +26,39 @@ data class ProfileUpdate(
 
 data class CustomerAddress(
     val id: String,
+    val label: String?,
     val recipientName: String,
     val phone: String,
+    /** The server's `line1`. */
     val addressLine: String,
+    val addressLine2: String?,
     val subDistrict: String,
     val district: String,
     val province: String,
     val postalCode: String,
+    val latitude: Double?,
+    val longitude: Double?,
     val isDefault: Boolean,
 )
 
-/** Body of `POST /api/customer/addresses`; the server assigns the id. */
+/**
+ * Body of `POST /api/customer/addresses`. The same route creates and updates: an
+ * update sends every field again (the server overwrites the whole row, so fields
+ * the app does not edit — label, line 2, coordinates — are passed through).
+ */
 data class AddressInput(
+    val label: String?,
     val recipientName: String,
     val phone: String,
     val addressLine: String,
+    val addressLine2: String?,
     val subDistrict: String,
     val district: String,
     val province: String,
     val postalCode: String,
-    val isDefault: Boolean = false,
+    val latitude: Double?,
+    val longitude: Double?,
+    val isDefault: Boolean,
 )
 
 data class RemoteCartItem(

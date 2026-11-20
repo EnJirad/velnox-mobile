@@ -308,4 +308,87 @@ class CustomerRemoteDataSourceTest {
         assertEquals("https://example.test/api/customer/conversations/t1/messages", posted.url)
         assertEquals("Thanks", JSONObject(posted.body).getString("text"))
     }
+
+    @Test
+    fun `the real address shape - line1, subdistrict, state - parses`() = runBlocking {
+        val body = """{"success":true,"data":[
+            {"id":"a1","label":"Home","recipientName":"Somchai","phone":"0812345678","line1":"99/1 Sukhumvit",
+             "line2":null,"subdistrict":"Khlong Toei","district":null,"province":"Bangkok","postalCode":"10110",
+             "country":"TH","latitude":13.7,"longitude":null,"isDefault":true}]}"""
+
+        val result = api(200 to body).addresses("tok")
+
+        result as CustomerResult.Ok
+        val address = result.value.single()
+        assertEquals("99/1 Sukhumvit", address.addressLine)
+        assertEquals("Khlong Toei", address.subDistrict)
+        assertEquals("", address.district)
+        assertNull(address.addressLine2)
+        assertEquals(13.7, address.latitude!!, 0.0)
+        assertNull(address.longitude)
+        assertEquals("Home", address.label)
+    }
+
+    @Test
+    fun `saving an address uses the server field names and returns the id`() = runBlocking {
+        val api = api(200 to """{"success":true,"data":{"id":"new-id"}}""")
+
+        val result = api.saveAddress(
+            "tok",
+            addressId = "a1",
+            input = AddressInput(
+                label = "Work", recipientName = "Somchai", phone = "0812345678",
+                addressLine = "99/1", addressLine2 = null, subDistrict = "A", district = "B",
+                province = "Bangkok", postalCode = "10110", latitude = null, longitude = null,
+                isDefault = true,
+            ),
+        )
+
+        assertEquals(CustomerResult.Ok("new-id"), result)
+        val sent = JSONObject(requests.single().body)
+        assertEquals("POST", requests.single().method)
+        assertEquals("a1", sent.getString("addressId"))
+        assertEquals("99/1", sent.getString("line1"))
+        assertEquals("A", sent.getString("subdistrict"))
+        assertEquals("Bangkok", sent.getString("province"))
+        assertTrue(sent.getBoolean("isDefault"))
+        assertFalse(sent.has("line2"))
+        assertFalse(sent.has("latitude"))
+    }
+
+    @Test
+    fun `the profile answer has no id and the PUT answer has no email`() = runBlocking {
+        val get = api(
+            200 to """{"success":true,"data":{"name":"Somchai","email":"s@x.test","phone":null,
+                "avatarUrl":null,"coverUrl":null,"memberSince":1767323045000}}""",
+        ).profile("tok")
+        get as CustomerResult.Ok
+        assertEquals("Somchai", get.value.name)
+        assertEquals("s@x.test", get.value.email)
+        assertNull(get.value.phone)
+        assertEquals(1767323045000L, get.value.memberSince)
+
+        val put = api(
+            200 to """{"success":true,"data":{"name":"New","phone":"0899999999","memberSince":1767323045000}}""",
+        ).updateProfile("tok", ProfileUpdate("New", "0899999999"))
+        put as CustomerResult.Ok
+        assertEquals("0899999999", put.value.phone)
+        assertNull(put.value.email)
+    }
+
+    @Test
+    fun `cart rows use the server's priceSnapshot, productName and productImageUrl`() = runBlocking {
+        val body = """{"success":true,"data":{"items":[
+            {"id":"c1","productId":"p1","variantId":null,"productName":"Lamp","quantity":2,
+             "priceSnapshot":199.5,"availableStock":7,"shopName":"Lumen","productImageUrl":"https://img.test/l.jpg"}]}}"""
+
+        val result = api(200 to body).cart("tok")
+
+        result as CustomerResult.Ok
+        val item = result.value.items.single()
+        assertEquals("Lamp", item.name)
+        assertEquals(199.5, item.price!!, 0.0)
+        assertEquals(7, item.maxStock)
+        assertEquals("https://img.test/l.jpg", item.imageUrl)
+    }
 }

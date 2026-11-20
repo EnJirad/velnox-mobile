@@ -11,6 +11,8 @@ import com.velnox.app.core.auth.AuthRepository
 import com.velnox.app.core.auth.GoogleClientIdSource
 import com.velnox.app.core.catalog.CatalogRemoteDataSource
 import com.velnox.app.core.catalog.CatalogRepository
+import com.velnox.app.core.customer.CustomerRemoteDataSource
+import com.velnox.app.core.customer.CustomerRepository
 import com.velnox.app.core.preferences.PreferencesRepository
 import com.velnox.app.core.session.SessionController
 import com.velnox.app.core.session.SessionManager
@@ -25,6 +27,7 @@ import com.velnox.app.core.session.SessionVault
  * - [googleClientId] — resolves the public Web OAuth client id for Google
  *   Sign-In, from the build or from the API's config probe.
  * - [catalog] — the public product catalogue, cached in memory across screens.
+ * - [customer] — the authenticated customer API (profile, addresses, cart, orders…).
  *
  * Wiring, in one place: `SessionVault` (Android Keystore) → `SessionManager`
  * (single in-memory token + expiry) → `AuthRemoteDataSource` (OkHttp) →
@@ -53,6 +56,10 @@ class VelnoxApplication : Application(), ImageLoaderFactory {
     lateinit var catalog: CatalogRepository
         private set
 
+    /** Authenticated customer data; attaches the session token and reacts to a 401. */
+    lateinit var customer: CustomerRepository
+        private set
+
     override fun onCreate() {
         super.onCreate()
         preferences = PreferencesRepository(this)
@@ -69,6 +76,12 @@ class VelnoxApplication : Application(), ImageLoaderFactory {
                 api = api,
                 sessions = sessions,
             ),
+        )
+
+        customer = CustomerRepository(
+            api = CustomerRemoteDataSource(),
+            token = { sessions.current() },
+            onUnauthorized = { session.onUnauthorized() },
         )
     }
 

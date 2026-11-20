@@ -2,6 +2,7 @@
 
 package com.velnox.app.feature.settings
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -34,9 +35,11 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +54,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.customer.ProfileUpdate
+import com.velnox.app.core.customer.rememberCustomerRepository
+import com.velnox.app.core.customer.userMessage
 import com.velnox.app.core.preferences.AppLanguage
 import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.preferences.ThemeMode
@@ -75,6 +83,7 @@ import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
+import kotlinx.coroutines.launch
 
 /**
  * Renders the child page for a [SettingsPage]. Every page shares the standalone
@@ -273,19 +282,26 @@ private fun ToggleRow(
 @Composable
 private fun EditProfilePage() {
     val session = LocalSession.current
+    val repository = rememberCustomerRepository()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val currentAuthUser = (session.state as? SessionState.Authenticated)?.user
 
     var name by rememberSaveable(currentAuthUser?.name) {
         mutableStateOf(currentAuthUser?.name ?: "")
     }
-    var handle by rememberSaveable { mutableStateOf("@somchai.j") }
-    var email by rememberSaveable(currentAuthUser?.email) {
-        mutableStateOf(currentAuthUser?.email ?: "")
-    }
-    var phone by rememberSaveable { mutableStateOf("081-234-5678") }
+    var phone by rememberSaveable { mutableStateOf("") }
     var saved by remember { mutableStateOf(false) }
-    var validationError by remember { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
+    var saving by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // The phone number lives only on the server; the session does not carry it.
+    LaunchedEffect(Unit) {
+        when (val result = repository.call { api, token -> api.profile(token) }) {
+            is CustomerResult.Ok -> if (phone.isEmpty()) phone = result.value.phone.orEmpty()
+            is CustomerResult.Failed -> errorMessage = result.userMessage(context)
+        }
+    }
 
     Text(
         text = stringResource(R.string.settings_edit_profile_body),
@@ -301,51 +317,61 @@ private fun EditProfilePage() {
             LabeledField(
                 label = stringResource(R.string.settings_field_name),
                 value = name,
-                placeholder = stringResource(R.string.profile_demo_name),
-                onValueChange = { name = it; saved = false; validationError = null },
-            )
-            LabeledField(
-                label = stringResource(R.string.settings_field_handle),
-                value = handle,
-                placeholder = stringResource(R.string.profile_demo_handle),
-                onValueChange = { handle = it; saved = false; validationError = null },
+                placeholder = stringResource(R.string.settings_field_name),
+                onValueChange = { name = it; saved = false; errorMessage = null },
             )
             LabeledField(
                 label = stringResource(R.string.settings_field_email),
-                value = email,
-                placeholder = stringResource(R.string.profile_demo_email),
+                value = currentAuthUser?.email.orEmpty(),
+                placeholder = stringResource(R.string.settings_field_email),
                 keyboardType = KeyboardType.Email,
-                onValueChange = { email = it; saved = false; validationError = null },
+                enabled = false,
+                onValueChange = {},
             )
             LabeledField(
                 label = stringResource(R.string.settings_field_phone),
                 value = phone,
                 placeholder = stringResource(R.string.settings_field_phone_placeholder),
                 keyboardType = KeyboardType.Phone,
-                onValueChange = { phone = it; saved = false; validationError = null },
+                onValueChange = { phone = it; saved = false; errorMessage = null },
             )
         }
     }
-    if (validationError != null) {
+    if (errorMessage != null) {
         Spacer(Modifier.height(8.dp))
         Text(
-            text = validationError ?: "",
+            text = errorMessage ?: "",
             style = Text2xs,
             color = MaterialTheme.colorScheme.error,
         )
     }
     Spacer(Modifier.height(14.dp))
     PrimaryPill(
-        label = stringResource(R.string.settings_save),
+        label = stringResource(if (saving) R.string.settings_saving else R.string.settings_save),
         onClick = {
-            if (name.isBlank()) {
-                validationError = context.getString(R.string.address_validation_error)
-            } else if (!email.contains("@") || !email.contains(".")) {
-                validationError = context.getString(R.string.address_validation_error)
+            if (saving) {
+                // A save is already in flight.
+            } else if (name.isBlank()) {
+                errorMessage = context.getString(R.string.address_validation_error)
             } else {
-                session.updateProfile(name = name.trim(), email = email.trim())
-                saved = true
-                validationError = null
+                saving = true
+                errorMessage = null
+                scope.launch {
+                    val update = ProfileUpdate(name = name.trim(), phone = phone.trim())
+                    when (val result = repository.call { api, token -> api.updateProfile(token, update) }) {
+                        is CustomerResult.Ok -> {
+                            // The email is not editable here, so the session keeps its own.
+                            session.updateProfile(
+                                name = result.value.name ?: update.name,
+                                email = currentAuthUser?.email.orEmpty(),
+                            )
+                            saved = true
+                        }
+
+                        is CustomerResult.Failed -> errorMessage = result.userMessage(context)
+                    }
+                    saving = false
+                }
             }
         },
     )
@@ -366,7 +392,7 @@ private fun EditProfilePage() {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = stringResource(R.string.settings_saved_local),
+                text = stringResource(R.string.settings_saved),
                 style = Text2xs,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -379,45 +405,63 @@ private fun EditProfilePage() {
 @Composable
 private fun PersonalInfoPage() {
     val session = LocalSession.current
+    val repository = rememberCustomerRepository()
+    val context = LocalContext.current
     val authUser = (session.state as? SessionState.Authenticated)?.user
+    var phone by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        when (val result = repository.call { api, token -> api.profile(token) }) {
+            is CustomerResult.Ok -> phone = result.value.phone
+            is CustomerResult.Failed -> errorMessage = result.userMessage(context)
+        }
+    }
 
     SectionCard {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-            DetailLine(stringResource(R.string.settings_field_name), authUser?.name ?: stringResource(R.string.profile_demo_name))
+            DetailLine(
+                stringResource(R.string.settings_field_name),
+                authUser?.name ?: stringResource(R.string.common_value_placeholder),
+            )
             CardDivider()
-            DetailLine(stringResource(R.string.settings_field_handle), stringResource(R.string.profile_demo_handle))
-            CardDivider()
-            DetailLine(stringResource(R.string.settings_field_email), authUser?.email ?: stringResource(R.string.profile_demo_email))
+            DetailLine(
+                stringResource(R.string.settings_field_email),
+                authUser?.email ?: stringResource(R.string.common_value_placeholder),
+            )
             CardDivider()
             DetailLine(
                 stringResource(R.string.settings_field_phone),
-                stringResource(R.string.settings_field_phone_placeholder),
+                phone ?: stringResource(R.string.common_value_placeholder),
             )
-            CardDivider()
-            DetailLine(
-                stringResource(R.string.settings_dob),
-                stringResource(R.string.common_value_placeholder),
-            )
-            CardDivider()
-            DetailLine(stringResource(R.string.settings_gender), stringResource(R.string.settings_gender_unspecified))
         }
     }
-    Spacer(Modifier.height(10.dp))
-    Text(
-        text = stringResource(R.string.common_preview_notice),
-        style = Text2xs,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    if (errorMessage != null) {
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = errorMessage ?: "",
+            style = Text2xs,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
 }
 
 // ----------------------------------------------------------------- addresses
 
 @Composable
 private fun AddressesPage() {
+    val repository = rememberCustomerRepository()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
     var editingAddress by remember { mutableStateOf<UserAddress?>(null) }
     var deletingAddressId by remember { mutableStateOf<String?>(null) }
+    var actionError by remember { mutableStateOf<String?>(null) }
     val addresses = AddressBookState.addresses
+    val status = AddressBookState.status
+
+    // Always re-read on open: the website may have changed the book since the app did.
+    LaunchedEffect(Unit) { AddressBookState.load(repository) }
 
     Text(
         text = stringResource(R.string.settings_addresses_title),
@@ -428,12 +472,33 @@ private fun AddressesPage() {
 
     if (addresses.isEmpty()) {
         SectionCard {
-            Text(
-                text = stringResource(R.string.address_empty),
-                style = TextXs,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
-            )
+            when (status) {
+                LoadStatus.Idle, LoadStatus.Loading -> Text(
+                    text = stringResource(R.string.customer_loading),
+                    style = TextXs,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+
+                LoadStatus.Failed -> Text(
+                    text = stringResource(R.string.address_load_failed) + " · " +
+                        stringResource(R.string.common_retry),
+                    style = TextXs,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .velnoxClickable(role = Role.Button) {
+                            scope.launch { AddressBookState.load(repository) }
+                        }
+                        .padding(16.dp),
+                )
+
+                LoadStatus.Ready -> Text(
+                    text = stringResource(R.string.address_empty),
+                    style = TextXs,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
         }
         Spacer(Modifier.height(12.dp))
     } else {
@@ -482,7 +547,11 @@ private fun AddressesPage() {
                                 color = VelnoxBrand,
                                 modifier = Modifier
                                     .velnoxClickable(role = Role.Button) {
-                                        AddressBookState.setDefault(addr.id)
+                                        scope.launch {
+                                            actionError = AddressBookState
+                                                .setDefault(repository, addr)
+                                                .failureText(context)
+                                        }
                                     }
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
                             )
@@ -516,6 +585,15 @@ private fun AddressesPage() {
         }
     }
 
+    if (actionError != null) {
+        Text(
+            text = actionError ?: "",
+            style = Text2xs,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(bottom = 10.dp),
+        )
+    }
+
     SectionCard {
         SettingRow(
             icon = VelnoxIcons.Plus,
@@ -530,8 +608,9 @@ private fun AddressesPage() {
             initialAddress = null,
             onDismiss = { showAddDialog = false },
             onSave = { newAddr ->
-                AddressBookState.add(newAddr)
-                showAddDialog = false
+                AddressBookState.save(repository, newAddr, existing = false)
+                    .failureText(context)
+                    .also { if (it == null) showAddDialog = false }
             },
         )
     }
@@ -541,8 +620,9 @@ private fun AddressesPage() {
             initialAddress = editingAddress,
             onDismiss = { editingAddress = null },
             onSave = { updated ->
-                AddressBookState.update(updated)
-                editingAddress = null
+                AddressBookState.save(repository, updated, existing = true)
+                    .failureText(context)
+                    .also { if (it == null) editingAddress = null }
             },
         )
     }
@@ -569,7 +649,10 @@ private fun AddressesPage() {
                 TextButton(
                     onClick = {
                         if (targetId != null) {
-                            AddressBookState.delete(targetId)
+                            scope.launch {
+                                actionError = AddressBookState.delete(repository, targetId)
+                                    .failureText(context)
+                            }
                         }
                         deletingAddressId = null
                     },
@@ -593,12 +676,21 @@ private fun AddressesPage() {
     }
 }
 
+private fun CustomerResult<Unit>.failureText(context: Context): String? =
+    (this as? CustomerResult.Failed)?.userMessage(context)
+
+/**
+ * [onSave] talks to the server and returns the text to show when it failed, or
+ * null when the address was saved (the caller then closes the dialog).
+ */
 @Composable
 private fun AddressFormDialog(
     initialAddress: UserAddress?,
     onDismiss: () -> Unit,
-    onSave: (UserAddress) -> Unit,
+    onSave: suspend (UserAddress) -> String?,
 ) {
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
     var recipientName by rememberSaveable { mutableStateOf(initialAddress?.recipientName ?: "") }
     var phone by rememberSaveable { mutableStateOf(initialAddress?.phone ?: "") }
     var addressLine by rememberSaveable { mutableStateOf(initialAddress?.addressLine ?: "") }
@@ -722,14 +814,18 @@ private fun AddressFormDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (recipientName.isBlank() || phone.isBlank() || addressLine.isBlank() ||
-                        subDistrict.isBlank() || district.isBlank() || province.isBlank() || postalCode.isBlank() ||
-                        phone.trim().length < 9
+                    // The server requires name, phone, address line, province and a
+                    // 5-digit postal code; sub-district and district are optional.
+                    if (saving) {
+                        // A save is already in flight.
+                    } else if (recipientName.isBlank() || phone.isBlank() || addressLine.isBlank() ||
+                        province.isBlank() || phone.trim().length < 9 ||
+                        !Regex("^\\d{5}$").matches(postalCode.trim())
                     ) {
                         errorMessage = context.getString(R.string.address_validation_error)
                     } else {
                         val newOrUpdated = (initialAddress ?: UserAddress(
-                            id = java.util.UUID.randomUUID().toString(),
+                            id = "",
                             recipientName = "",
                             phone = "",
                             addressLine = "",
@@ -747,7 +843,11 @@ private fun AddressFormDialog(
                             postalCode = postalCode.trim(),
                             isDefault = isDefault,
                         )
-                        onSave(newOrUpdated)
+                        saving = true
+                        scope.launch {
+                            errorMessage = onSave(newOrUpdated)
+                            saving = false
+                        }
                     }
                 },
             ) {
@@ -1429,6 +1529,7 @@ private fun LabeledField(
     onValueChange: (String) -> Unit,
     keyboardType: KeyboardType = KeyboardType.Text,
     masked: Boolean = false,
+    enabled: Boolean = true,
 ) {
     Column {
         Text(
@@ -1458,6 +1559,7 @@ private fun LabeledField(
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
+                enabled = enabled,
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodySmall.copy(
                     color = MaterialTheme.colorScheme.onSurface,

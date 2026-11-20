@@ -57,21 +57,27 @@ class CustomerRemoteDataSource(
             data.asArray("addresses", "items")?.objects()?.mapNotNull(::parseAddress)
         }
 
-    override suspend fun addAddress(
+    override suspend fun saveAddress(
         token: String,
+        addressId: String?,
         input: AddressInput,
-    ): CustomerResult<CustomerAddress> {
+    ): CustomerResult<String> {
         val body = JSONObject()
             .put("recipientName", input.recipientName)
             .put("phone", input.phone)
-            .put("addressLine", input.addressLine)
-            .put("subDistrict", input.subDistrict)
+            .put("line1", input.addressLine)
+            .put("subdistrict", input.subDistrict)
             .put("district", input.district)
             .put("province", input.province)
             .put("postalCode", input.postalCode)
             .put("isDefault", input.isDefault)
+        addressId?.let { body.put("addressId", it) }
+        input.label?.let { body.put("label", it) }
+        input.addressLine2?.let { body.put("line2", it) }
+        input.latitude?.let { body.put("latitude", it) }
+        input.longitude?.let { body.put("longitude", it) }
         return send(token, "POST", "/api/customer/addresses", body).map { data ->
-            data.asObject("address")?.let(::parseAddress)
+            (data as? JSONObject)?.str("id") ?: addressId
         }
     }
 
@@ -355,28 +361,29 @@ class CustomerRemoteDataSource(
         return RemoteCart(array.objects().mapNotNull(::parseCartItem))
     }
 
-    private fun parseProfile(obj: JSONObject): CustomerProfile? {
-        val id = obj.str("id", "userId", "user_id") ?: return null
-        return CustomerProfile(
-            id = id,
-            name = obj.str("name", "fullName", "full_name", "displayName"),
-            email = obj.str("email"),
-            phone = obj.str("phone", "phoneNumber", "phone_number"),
-            avatarUrl = obj.str("avatarUrl", "avatar_url", "avatar", "image"),
-        )
-    }
+    private fun parseProfile(obj: JSONObject): CustomerProfile = CustomerProfile(
+        name = obj.str("name"),
+        email = obj.str("email"),
+        phone = obj.str("phone"),
+        avatarUrl = obj.str("avatarUrl", "avatar"),
+        memberSince = obj.time("memberSince", "createdAt"),
+    )
 
     private fun parseAddress(obj: JSONObject): CustomerAddress? {
         val id = obj.str("id", "addressId", "address_id") ?: return null
         return CustomerAddress(
             id = id,
+            label = obj.str("label"),
             recipientName = obj.str("recipientName", "recipient_name", "recipient", "fullName", "name").orEmpty(),
             phone = obj.str("phone", "phoneNumber", "phone_number").orEmpty(),
-            addressLine = obj.str("addressLine", "address_line", "address", "line1", "street").orEmpty(),
-            subDistrict = obj.str("subDistrict", "sub_district", "subdistrict").orEmpty(),
+            addressLine = obj.str("line1", "addressLine", "address_line", "address", "street").orEmpty(),
+            addressLine2 = obj.str("line2", "addressLine2"),
+            subDistrict = obj.str("subdistrict", "subDistrict", "sub_district").orEmpty(),
             district = obj.str("district").orEmpty(),
-            province = obj.str("province").orEmpty(),
+            province = obj.str("province", "state").orEmpty(),
             postalCode = obj.str("postalCode", "postal_code", "zipCode", "zip").orEmpty(),
+            latitude = obj.num("latitude"),
+            longitude = obj.num("longitude"),
             isDefault = obj.flag("isDefault", "is_default", "default") ?: false,
         )
     }
@@ -396,8 +403,8 @@ class CustomerRemoteDataSource(
             shopName = obj.str("shopName", "shop_name") ?: product?.str("shopName")
                 ?: obj.optJSONObject("shop")?.str("name"),
             imageUrl = imageOf(obj) ?: product?.let(::imageOf),
-            price = obj.num("price", "unitPrice", "unit_price") ?: variant?.num("price")
-                ?: product?.num("price"),
+            price = obj.num("priceSnapshot", "price", "unitPrice", "unit_price")
+                ?: variant?.num("price") ?: product?.num("price"),
             currency = obj.str("currency") ?: DEFAULT_CURRENCY,
             quantity = quantity,
             maxStock = (obj.num("maxStock", "availableStock", "stock") ?: variant?.num("stock")
@@ -542,7 +549,7 @@ class CustomerRemoteDataSource(
 
     /** `primaryImage`, `images[]`, or a plain url field. */
     private fun imageOf(obj: JSONObject): String? {
-        obj.str("imageUrl", "image_url", "image", "thumbnail")?.let { return it }
+        obj.str("productImageUrl", "imageUrl", "image_url", "image", "thumbnail")?.let { return it }
         obj.optJSONObject("primaryImage")?.let { it.str("displayUrl", "url")?.let { u -> return u } }
         val images = obj.optJSONArray("images") ?: return null
         for (i in 0 until images.length()) {

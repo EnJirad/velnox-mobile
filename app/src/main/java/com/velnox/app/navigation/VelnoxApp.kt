@@ -43,6 +43,7 @@ import com.velnox.app.core.i18n.VelnoxLocaleProvider
 import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.preferences.ThemeMode
 import com.velnox.app.core.preferences.VelnoxPreferencesProvider
+import com.velnox.app.core.customer.rememberCustomerRepository
 import com.velnox.app.core.session.LocalSession
 import com.velnox.app.core.session.SessionNotice
 import com.velnox.app.core.session.SessionState
@@ -66,6 +67,7 @@ import com.velnox.app.feature.notifications.NotificationCenterScreen
 import com.velnox.app.feature.notifications.NotificationsState
 import com.velnox.app.feature.orders.OrderDetailScreen
 import com.velnox.app.feature.orders.OrdersScreen
+import com.velnox.app.feature.profile.AddressBookState
 import com.velnox.app.feature.profile.ProfileScreen
 import com.velnox.app.feature.search.SearchScreen
 import com.velnox.app.feature.search.SearchState
@@ -141,6 +143,18 @@ private fun VelnoxNavHost() {
     val session = LocalSession.current
     val sessionState = session.state
     val scope = rememberCoroutineScope()
+
+    // Server-backed customer data follows the session: loaded when an account is
+    // signed in, dropped the moment it is not, so one account's data is never
+    // shown to the next.
+    val customer = rememberCustomerRepository()
+    LaunchedEffect(sessionState.isAuthenticated) {
+        if (sessionState.isAuthenticated) {
+            AddressBookState.load(customer)
+        } else {
+            AddressBookState.clear()
+        }
+    }
 
     var tabKey by rememberSaveable { mutableStateOf(AppTab.Home.key) }
     var overlayKey by rememberSaveable { mutableStateOf<String?>(null) }
