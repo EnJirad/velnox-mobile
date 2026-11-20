@@ -5,8 +5,6 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
-import coil.request.CachePolicy
-import coil.request.crossfade
 import com.velnox.app.core.auth.AuthApi
 import com.velnox.app.core.auth.AuthRemoteDataSource
 import com.velnox.app.core.auth.AuthRepository
@@ -78,8 +76,8 @@ class VelnoxApplication : Application(), ImageLoaderFactory {
      * Optimized ImageLoader for e-commerce performance:
      * - Strict memory cache cap (15% max available heap) prevents memory pressure and crashes on low-RAM phones.
      * - 50MB LRU disk cache caches product thumbnails and promotional banners across sessions.
-     * - Fast 200ms crossfade avoids harsh layout snaps without dropping frames.
      * - allowRgb565(true) uses 2 bytes per pixel instead of 4 for opaque product photos on low memory devices.
+     * - respectCacheHeaders(false) ensures catalog images remain cached during browsing sessions.
      */
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
@@ -94,10 +92,6 @@ class VelnoxApplication : Application(), ImageLoaderFactory {
                     .maxSizeBytes(50L * 1024 * 1024)
                     .build()
             }
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            .diskCachePolicy(CachePolicy.ENABLED)
-            .networkCachePolicy(CachePolicy.ENABLED)
-            .crossfade(200)
             .respectCacheHeaders(false)
             .allowRgb565(true)
             .build()
