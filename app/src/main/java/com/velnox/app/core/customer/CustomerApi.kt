@@ -14,6 +14,18 @@ interface CustomerApi {
     /** `PUT /api/customer/profile` */
     suspend fun updateProfile(token: String, update: ProfileUpdate): CustomerResult<CustomerProfile>
 
+    /**
+     * Uploads and saves a profile image (avatar or cover) to Cloudflare R2 and persists it on the server.
+     * Returns the public CDN URL on success.
+     */
+    suspend fun uploadProfileImage(
+        token: String,
+        kind: String,
+        bytes: ByteArray,
+        mimeType: String,
+        filename: String = if (kind == "avatar") "avatar.webp" else "cover.webp",
+    ): CustomerResult<String>
+
     /** `GET /api/customer/addresses` */
     suspend fun addresses(token: String): CustomerResult<List<CustomerAddress>>
 

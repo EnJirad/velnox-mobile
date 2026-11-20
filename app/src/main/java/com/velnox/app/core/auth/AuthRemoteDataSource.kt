@@ -286,11 +286,17 @@ class AuthRemoteDataSource(
             val id = user.optString("id")
             val email = user.optString("email")
             if (id.isEmpty() || email.isEmpty()) return null
+            val avatar = user.optString("avatar").takeIf { it.isNotBlank() }
+                ?: user.optString("avatarUrl").takeIf { it.isNotBlank() }
+            val coverUrl = user.optString("coverUrl").takeIf { it.isNotBlank() }
+                ?: user.optString("cover_url").takeIf { it.isNotBlank() }
             AuthUser(
                 id = id,
                 email = email,
                 name = user.optString("name"),
                 role = user.optString("role", "customer"),
+                avatar = avatar,
+                coverUrl = coverUrl,
             )
         } catch (_: JSONException) {
             null

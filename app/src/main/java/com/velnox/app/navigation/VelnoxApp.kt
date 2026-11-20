@@ -69,6 +69,7 @@ import com.velnox.app.feature.messages.MessagesState
 import com.velnox.app.feature.notifications.NotificationCenterScreen
 import com.velnox.app.feature.notifications.NotificationsState
 import com.velnox.app.feature.orders.OrderDetailScreen
+import com.velnox.app.feature.orders.OrdersFilter
 import com.velnox.app.feature.orders.OrdersScreen
 import com.velnox.app.feature.orders.OrdersState
 import com.velnox.app.feature.profile.AddressBookState
@@ -165,6 +166,7 @@ private fun VelnoxNavHost(
     var resetToken by rememberSaveable { mutableStateOf("") }
     var authSucceeded by rememberSaveable { mutableStateOf(false) }
     var forgotSent by rememberSaveable { mutableStateOf(false) }
+    var activeOrdersFilter by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Google Sign-In availability and progress. Availability is a deployment
     // fact (is there a client id at all?), so it is resolved once per gate.
@@ -574,8 +576,13 @@ private fun VelnoxNavHost(
                                     cart = cart,
                                     notifications = notifications,
                                     sessionState = sessionState,
+                                    activeOrdersFilter = activeOrdersFilter,
                                     onOpenOverlay = ::requestOverlay,
                                     onOpenTab = ::requestTab,
+                                    onSelectOrdersFilter = { filter ->
+                                        activeOrdersFilter = filter.name
+                                        requestTab(AppTab.Orders)
+                                    },
                                     onPickImage = onPickImage,
                                 )
                             }
@@ -870,8 +877,10 @@ private fun TabContent(
     cart: CartState,
     notifications: NotificationsState,
     sessionState: SessionState,
+    activeOrdersFilter: String?,
     onOpenOverlay: (String) -> Unit,
     onOpenTab: (AppTab) -> Unit,
+    onSelectOrdersFilter: (OrdersFilter) -> Unit,
     onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
 ) {
     when (tab) {
@@ -902,6 +911,7 @@ private fun TabContent(
         AppTab.Orders -> OrdersScreen(
             onOpenOrder = { onOpenOverlay("order:$it") },
             onBrowseProducts = { onOpenTab(AppTab.Home) },
+            initialFilter = OrdersFilter.entries.firstOrNull { it.name == activeOrdersFilter } ?: OrdersFilter.All,
         )
 
         AppTab.Cart -> CartScreen(
@@ -926,6 +936,7 @@ private fun TabContent(
                     onOpenMessages = { onOpenOverlay("messages") },
                     onOpenHelpCenter = { onOpenOverlay(SettingsPage.HelpCenter.key) },
                     onPickImage = onPickImage,
+                    onOpenOrdersWithFilter = onSelectOrdersFilter,
                 )
             }
         }

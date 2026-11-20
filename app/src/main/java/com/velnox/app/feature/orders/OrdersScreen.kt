@@ -86,6 +86,7 @@ import kotlinx.coroutines.launch
 fun OrdersScreen(
     onOpenOrder: (String) -> Unit,
     onBrowseProducts: () -> Unit,
+    initialFilter: OrdersFilter = OrdersFilter.All,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -100,7 +101,10 @@ fun OrdersScreen(
         }
     }
 
-    var filter by rememberSaveable { mutableStateOf(OrdersFilter.All.name) }
+    var filter by rememberSaveable(initialFilter) { mutableStateOf(initialFilter.name) }
+    LaunchedEffect(initialFilter) {
+        filter = initialFilter.name
+    }
     val activeFilter = OrdersFilter.entries.firstOrNull { it.name == filter } ?: OrdersFilter.All
     val visibleOrders = OrdersState.forFilter(activeFilter)
 

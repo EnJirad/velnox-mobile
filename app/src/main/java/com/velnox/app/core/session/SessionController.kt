@@ -168,12 +168,24 @@ class SessionController(
     }
 
     /**
-     * Update the authenticated user's profile details in the active session.
+     * Update the authenticated user's profile details and photos in the active session.
      */
-    fun updateProfile(name: String, email: String) {
+    fun updateProfile(
+        name: String? = null,
+        email: String? = null,
+        avatar: String? = null,
+        coverUrl: String? = null,
+    ) {
         val current = state
         if (current is SessionState.Authenticated) {
-            state = SessionState.Authenticated(current.user.copy(name = name, email = email))
+            state = SessionState.Authenticated(
+                current.user.copy(
+                    name = name ?: current.user.name,
+                    email = email ?: current.user.email,
+                    avatar = avatar ?: current.user.avatar,
+                    coverUrl = coverUrl ?: current.user.coverUrl,
+                ),
+            )
         }
     }
 }

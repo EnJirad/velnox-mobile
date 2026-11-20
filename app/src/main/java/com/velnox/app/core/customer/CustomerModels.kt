@@ -14,6 +14,7 @@ data class CustomerProfile(
     val email: String?,
     val phone: String?,
     val avatarUrl: String?,
+    val coverUrl: String? = null,
     /** Epoch millis the account was created. */
     val memberSince: Long?,
 )

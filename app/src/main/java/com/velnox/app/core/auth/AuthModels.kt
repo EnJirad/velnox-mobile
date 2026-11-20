@@ -11,6 +11,8 @@ data class AuthUser(
     val email: String,
     val name: String,
     val role: String,
+    val avatar: String? = null,
+    val coverUrl: String? = null,
 )
 
 /** A session issued by the API: the opaque token plus the account it belongs to. */

@@ -22,12 +22,14 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +54,10 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.velnox.app.R
 import com.velnox.app.core.auth.AuthUser
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.rememberCustomerRepository
 import com.velnox.app.core.preferences.LocalPreferences
+import com.velnox.app.core.session.LocalSession
 import com.velnox.app.feature.messages.MessagesState
 import com.velnox.app.feature.orders.OrderStatus
 import com.velnox.app.feature.orders.OrdersFilter
@@ -102,29 +107,84 @@ fun ProfileScreen(
     onOpenHelpCenter: () -> Unit,
     modifier: Modifier = Modifier,
     onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
+    onOpenOrdersWithFilter: ((OrdersFilter) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val preferences = LocalPreferences.current
+    val session = LocalSession.current
+    val customerRepository = rememberCustomerRepository()
     val scope = rememberCoroutineScope()
 
     var showPhotoOptionsFor by remember { mutableStateOf<PhotoTarget?>(null) }
+    var isUploadingAvatar by remember { mutableStateOf(false) }
+    var isUploadingCover by remember { mutableStateOf(false) }
+
+    // Synchronize latest profile from backend so web updates appear instantly on mobile
+    LaunchedEffect(user.id) {
+        when (val res = customerRepository.call { api, token -> api.profile(token) }) {
+            is CustomerResult.Ok -> {
+                val p = res.value
+                session.updateProfile(
+                    name = p.name,
+                    avatar = p.avatarUrl,
+                    coverUrl = p.coverUrl,
+                )
+            }
+            else -> Unit
+        }
+    }
 
     fun launchGallery(target: PhotoTarget) {
         if (onPickImage == null) return
         onPickImage { uri ->
             if (uri != null) {
                 scope.launch {
-                    val savedPath = persistPickedImage(
-                        context = context,
-                        sourceUri = uri,
-                        prefix = if (target == PhotoTarget.Avatar) "profile_avatar" else "profile_cover",
-                    )
-                    if (savedPath != null) {
-                        if (target == PhotoTarget.Avatar) {
-                            preferences.setAvatarUri(savedPath)
-                        } else {
-                            preferences.setCoverUri(savedPath)
+                    if (target == PhotoTarget.Avatar) isUploadingAvatar = true else isUploadingCover = true
+                    try {
+                        // 1. Instant local persistence for immediate offline feedback
+                        val savedPath = persistPickedImage(
+                            context = context,
+                            sourceUri = uri,
+                            prefix = if (target == PhotoTarget.Avatar) "profile_avatar" else "profile_cover",
+                        )
+                        if (savedPath != null) {
+                            if (target == PhotoTarget.Avatar) {
+                                preferences.setAvatarUri(savedPath)
+                            } else {
+                                preferences.setCoverUri(savedPath)
+                            }
                         }
+
+                        // 2. Read binary data and upload directly to Cloudflare R2
+                        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+                        val bytes = withContext(Dispatchers.IO) {
+                            runCatching {
+                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            }.getOrNull()
+                        }
+                        if (bytes != null) {
+                            val kind = if (target == PhotoTarget.Avatar) "avatar" else "cover"
+                            val uploadResult = customerRepository.call { api, token ->
+                                api.uploadProfileImage(
+                                    token = token,
+                                    kind = kind,
+                                    bytes = bytes,
+                                    mimeType = mimeType,
+                                )
+                            }
+                            if (uploadResult is CustomerResult.Ok) {
+                                val cdnUrl = uploadResult.value
+                                if (target == PhotoTarget.Avatar) {
+                                    session.updateProfile(avatar = cdnUrl)
+                                    preferences.setAvatarUri(cdnUrl)
+                                } else {
+                                    session.updateProfile(coverUrl = cdnUrl)
+                                    preferences.setCoverUri(cdnUrl)
+                                }
+                            }
+                        }
+                    } finally {
+                        if (target == PhotoTarget.Avatar) isUploadingAvatar = false else isUploadingCover = false
                     }
                 }
             }
@@ -163,19 +223,23 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
+                val resolvedAvatar = preferences.current.avatarUri?.takeIf { it.isNotBlank() } ?: user.avatar
+                val resolvedCover = preferences.current.coverUri?.takeIf { it.isNotBlank() } ?: user.coverUrl
                 ProfileHeaderCard(
                     user = user,
-                    avatarUri = preferences.current.avatarUri,
-                    coverUri = preferences.current.coverUri,
+                    avatarUri = resolvedAvatar,
+                    coverUri = resolvedCover,
+                    isUploadingAvatar = isUploadingAvatar,
+                    isUploadingCover = isUploadingCover,
                     onEditAvatar = {
-                        if (preferences.current.avatarUri != null) {
+                        if (resolvedAvatar != null) {
                             showPhotoOptionsFor = PhotoTarget.Avatar
                         } else {
                             launchGallery(PhotoTarget.Avatar)
                         }
                     },
                     onEditCover = {
-                        if (preferences.current.coverUri != null) {
+                        if (resolvedCover != null) {
                             showPhotoOptionsFor = PhotoTarget.Cover
                         } else {
                             launchGallery(PhotoTarget.Cover)
@@ -194,7 +258,10 @@ fun ProfileScreen(
             }
 
             item {
-                OrderShortcutsCard(onOpenOrders = onOpenOrders)
+                OrderShortcutsCard(
+                    onOpenOrders = onOpenOrders,
+                    onOpenOrdersWithFilter = onOpenOrdersWithFilter,
+                )
             }
 
             item {
@@ -310,6 +377,8 @@ private fun ProfileHeaderCard(
     user: AuthUser,
     avatarUri: String?,
     coverUri: String?,
+    isUploadingAvatar: Boolean = false,
+    isUploadingCover: Boolean = false,
     onEditAvatar: () -> Unit,
     onEditCover: () -> Unit,
     onOpenEditProfile: () -> Unit,
@@ -368,13 +437,22 @@ private fun ProfileHeaderCard(
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = VelnoxIcons.Camera,
-                        contentDescription = stringResource(R.string.profile_change_cover),
-                        tint = Color.White,
-                        modifier = Modifier.size(13.dp),
-                    )
-                    Spacer(Modifier.width(5.dp))
+                    if (isUploadingCover) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 1.5.dp,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Spacer(Modifier.width(5.dp))
+                    } else {
+                        Icon(
+                            imageVector = VelnoxIcons.Camera,
+                            contentDescription = stringResource(R.string.profile_change_cover),
+                            tint = Color.White,
+                            modifier = Modifier.size(13.dp),
+                        )
+                        Spacer(Modifier.width(5.dp))
+                    }
                     Text(
                         text = stringResource(R.string.profile_change_cover),
                         style = Text2xs.copy(fontWeight = FontWeight.Medium),
@@ -401,7 +479,13 @@ private fun ProfileHeaderCard(
                         .velnoxClickable(role = Role.Button, onClick = onEditAvatar),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (!avatarUri.isNullOrBlank()) {
+                    if (isUploadingAvatar) {
+                        CircularProgressIndicator(
+                            color = VelnoxBrand,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    } else if (!avatarUri.isNullOrBlank()) {
                         AsyncImage(
                             model = avatarUri,
                             contentDescription = stringResource(R.string.profile_change_avatar),
@@ -426,6 +510,11 @@ private fun ProfileHeaderCard(
                     Icon(
                         imageVector = VelnoxIcons.Camera,
                         contentDescription = stringResource(R.string.profile_change_avatar),
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+            }
                         tint = Color.White,
                         modifier = Modifier.size(13.dp),
                     )
@@ -555,12 +644,23 @@ private fun StatsRow(
 }
 
 @Composable
-private fun OrderShortcutsCard(onOpenOrders: () -> Unit) {
+private fun OrderShortcutsCard(
+    onOpenOrders: () -> Unit,
+    onOpenOrdersWithFilter: ((OrdersFilter) -> Unit)? = null,
+) {
     val toPayCount = OrdersState.forFilter(OrdersFilter.Pending).size
     val toShipCount = OrdersState.forFilter(OrdersFilter.Processing).size
     val toReceiveCount = OrdersState.forFilter(OrdersFilter.Shipping).size
     val toReviewCount = OrdersState.forFilter(OrdersFilter.Completed).size
     val returnsCount = OrdersState.orders.count { it.uiStatus == OrderStatus.Returned }
+
+    val openFilter: (OrdersFilter) -> Unit = { filter ->
+        if (onOpenOrdersWithFilter != null) {
+            onOpenOrdersWithFilter(filter)
+        } else {
+            onOpenOrders()
+        }
+    }
 
     SectionCard {
         Row(
@@ -605,28 +705,28 @@ private fun OrderShortcutsCard(onOpenOrders: () -> Unit) {
                 icon = VelnoxIcons.Wallet,
                 label = stringResource(R.string.profile_shortcut_to_pay),
                 badge = toPayCount,
-                onClick = onOpenOrders,
+                onClick = { openFilter(OrdersFilter.Pending) },
                 modifier = Modifier.weight(1f),
             )
             OrderShortcutItem(
                 icon = VelnoxIcons.Package,
                 label = stringResource(R.string.profile_shortcut_to_ship),
                 badge = toShipCount,
-                onClick = onOpenOrders,
+                onClick = { openFilter(OrdersFilter.Processing) },
                 modifier = Modifier.weight(1f),
             )
             OrderShortcutItem(
                 icon = VelnoxIcons.Truck,
                 label = stringResource(R.string.profile_shortcut_to_receive),
                 badge = toReceiveCount,
-                onClick = onOpenOrders,
+                onClick = { openFilter(OrdersFilter.Shipping) },
                 modifier = Modifier.weight(1f),
             )
             OrderShortcutItem(
                 icon = VelnoxIcons.Star,
                 label = stringResource(R.string.profile_shortcut_to_review),
                 badge = toReviewCount,
-                onClick = onOpenOrders,
+                onClick = { openFilter(OrdersFilter.Completed) },
                 modifier = Modifier.weight(1f),
             )
             OrderShortcutItem(
