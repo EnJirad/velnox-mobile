@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
+import com.velnox.app.core.preferences.AppLanguage
 import com.velnox.app.ui.components.velnoxClickable
 import com.velnox.app.ui.theme.SquircleLg
 import com.velnox.app.ui.theme.SquircleXs
@@ -63,6 +64,8 @@ fun RegisterScreen(
     onGoogleSignIn: () -> Unit,
     googleAvailable: Boolean,
     googleBusy: Boolean,
+    currentLanguage: AppLanguage? = null,
+    onLanguageSelected: ((AppLanguage) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
 
@@ -78,8 +81,6 @@ fun RegisterScreen(
     var emailTouched by rememberSaveable { mutableStateOf(false) }
     var passwordTouched by rememberSaveable { mutableStateOf(false) }
     var confirmTouched by rememberSaveable { mutableStateOf(false) }
-
-    var showComingSoon by remember { mutableStateOf(false) }
 
     val nameError = CredentialRules.nameError(name)
     val emailError = CredentialRules.emailError(email)
@@ -102,34 +103,27 @@ fun RegisterScreen(
         confirmTouched = true
         if (!canSubmit) return
         focusManager.clearFocus()
-        showComingSoon = false
         onSubmit(name.trim(), email.trim(), password)
     }
 
     AuthScreenFrame {
-        AuthBrandHeader()
+        AuthBrandHeader(
+            trailing = {
+                LoginLanguageSelector(
+                    currentLanguage = currentLanguage,
+                    onLanguageSelected = onLanguageSelected,
+                )
+            },
+        )
 
         Spacer(Modifier.height(24.dp))
-        Text(
-            text = stringResource(R.string.register_eyebrow),
-            style = TextXs.copy(fontWeight = FontWeight.Medium),
-            color = VelnoxBrand,
-        )
-        Spacer(Modifier.height(6.dp))
         Text(
             text = stringResource(R.string.register_title),
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.register_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.widthIn(max = 340.dp),
-        )
 
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(20.dp))
 
         Column(
             modifier = Modifier
@@ -275,17 +269,6 @@ fun RegisterScreen(
             }
         }
 
-        AnimatedVisibility(
-            visible = showComingSoon,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 3 }),
-            exit = fadeOut(),
-        ) {
-            Column {
-                Spacer(Modifier.height(12.dp))
-                NoticeBanner(stringResource(R.string.common_coming_soon))
-            }
-        }
-
         Spacer(Modifier.height(14.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -317,35 +300,20 @@ fun RegisterScreen(
         OrDivider()
         Spacer(Modifier.height(16.dp))
 
-        Row(
+        SocialButton(
+            label = stringResource(R.string.login_continue_google),
+            glyph = "G",
+            // Same real flow as the sign-in screen: Google either creates the
+            // account or returns the existing one, so this is not a separate
+            // registration path.
+            enabled = googleButtonEnabled(
+                isSubmitting = isSubmitting,
+                googleBusy = googleBusy,
+                googleAvailable = googleAvailable,
+            ),
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            SocialButton(
-                label = stringResource(R.string.login_continue_google),
-                glyph = "G",
-                // Same real flow as the sign-in screen: Google either creates the
-                // account or returns the existing one, so this is not a separate
-                // registration path. Only LINE is still an entry point.
-                enabled = googleButtonEnabled(
-                    isSubmitting = isSubmitting,
-                    googleBusy = googleBusy,
-                    googleAvailable = googleAvailable,
-                ),
-                modifier = Modifier.weight(1f),
-                onClick = onGoogleSignIn,
-            )
-            SocialButton(
-                label = stringResource(R.string.login_continue_line),
-                glyph = "LINE",
-                enabled = !isSubmitting,
-                modifier = Modifier.weight(1f),
-                onClick = { showComingSoon = true },
-            )
-        }
-
-        Spacer(Modifier.height(20.dp))
-        AuthFooter()
+            onClick = onGoogleSignIn,
+        )
     }
 }
 

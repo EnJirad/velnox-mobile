@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
+import com.velnox.app.core.preferences.AppLanguage
 import com.velnox.app.ui.components.velnoxClickable
 import com.velnox.app.ui.theme.SquircleLg
 import com.velnox.app.ui.theme.SquircleXs
@@ -57,6 +58,8 @@ fun ForgotPasswordScreen(
     submitted: Boolean,
     onBackToLogin: () -> Unit,
     onEnterCode: () -> Unit,
+    currentLanguage: AppLanguage? = null,
+    onLanguageSelected: ((AppLanguage) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
     var email by rememberSaveable { mutableStateOf("") }
@@ -73,29 +76,23 @@ fun ForgotPasswordScreen(
     }
 
     AuthScreenFrame {
-        AuthBrandHeader()
+        AuthBrandHeader(
+            trailing = {
+                LoginLanguageSelector(
+                    currentLanguage = currentLanguage,
+                    onLanguageSelected = onLanguageSelected,
+                )
+            },
+        )
 
         Spacer(Modifier.height(24.dp))
-        Text(
-            text = stringResource(R.string.forgot_eyebrow),
-            style = TextXs.copy(fontWeight = FontWeight.Medium),
-            color = VelnoxBrand,
-        )
-        Spacer(Modifier.height(6.dp))
         Text(
             text = stringResource(R.string.forgot_title),
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.forgot_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.widthIn(max = 340.dp),
-        )
 
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(20.dp))
 
         Column(
             modifier = Modifier
@@ -205,9 +202,6 @@ fun ForgotPasswordScreen(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
             )
         }
-
-        Spacer(Modifier.height(20.dp))
-        AuthFooter()
     }
 }
 
@@ -226,6 +220,8 @@ fun ResetPasswordScreen(
     errorRes: Int?,
     submitted: Boolean,
     onBackToLogin: () -> Unit,
+    currentLanguage: AppLanguage? = null,
+    onLanguageSelected: ((AppLanguage) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
 
@@ -252,29 +248,23 @@ fun ResetPasswordScreen(
     }
 
     AuthScreenFrame {
-        AuthBrandHeader()
+        AuthBrandHeader(
+            trailing = {
+                LoginLanguageSelector(
+                    currentLanguage = currentLanguage,
+                    onLanguageSelected = onLanguageSelected,
+                )
+            },
+        )
 
         Spacer(Modifier.height(24.dp))
-        Text(
-            text = stringResource(R.string.reset_eyebrow),
-            style = TextXs.copy(fontWeight = FontWeight.Medium),
-            color = VelnoxBrand,
-        )
-        Spacer(Modifier.height(6.dp))
         Text(
             text = stringResource(R.string.reset_title),
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.reset_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.widthIn(max = 340.dp),
-        )
 
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(20.dp))
 
         Column(
             modifier = Modifier
@@ -422,9 +412,6 @@ fun ResetPasswordScreen(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
             )
         }
-
-        Spacer(Modifier.height(20.dp))
-        AuthFooter()
     }
 }
 
