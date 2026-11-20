@@ -1,5 +1,7 @@
 package com.velnox.app.core.customer
 
+package com.velnox.app.core.customer
+
 /**
  * Wire-level models for the authenticated `/api/customer/*` endpoints.
  *
