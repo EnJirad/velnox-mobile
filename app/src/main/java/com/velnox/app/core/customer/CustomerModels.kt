@@ -144,6 +144,7 @@ data class OrderLine(
     val imageUrl: String?,
     val quantity: Int,
     val price: Double?,
+    val variantName: String? = null,
 )
 
 data class CustomerOrder(
@@ -158,8 +159,22 @@ data class CustomerOrder(
     val shopName: String?,
     val deliveryAddress: String?,
     val items: List<OrderLine>,
+    val subtotal: Double? = null,
+    val shippingFee: Double? = null,
+    val discount: Double? = null,
+    val paymentMethod: String? = null,
+    val trackingNumber: String? = null,
+    val carrier: String? = null,
+    val shopId: String? = null,
 ) {
     val itemCount: Int get() = items.sumOf { it.quantity }.coerceAtLeast(items.size)
+
+    /** Matches backend `CANCELABLE_STATUSES` in `routes/cart.ts`. */
+    val isCancelable: Boolean get() = status in CANCELABLE_STATUSES
+
+    companion object {
+        val CANCELABLE_STATUSES = setOf("pending", "pending_payment", "confirmed")
+    }
 }
 
 data class CustomerNotification(

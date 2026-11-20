@@ -609,6 +609,10 @@
     <string name="checkout_address_required">Please add a shipping address to place an order</string>
     <string name="checkout_add_address">Add shipping address</string>
     <string name="checkout_quote_failed">Could not calculate shipping</string>
+    <string name="orders_load_failed">Couldn\'t load your orders</string>
+    <string name="orders_not_found">Order not found</string>
+    <string name="orders_cancelling">Cancelling…</string>
+    <string name="orders_reordering">Adding to cart…</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_saving">Saving…</string>
 </resources>

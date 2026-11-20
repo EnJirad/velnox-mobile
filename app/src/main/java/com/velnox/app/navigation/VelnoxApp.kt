@@ -68,6 +68,7 @@ import com.velnox.app.feature.notifications.NotificationCenterScreen
 import com.velnox.app.feature.notifications.NotificationsState
 import com.velnox.app.feature.orders.OrderDetailScreen
 import com.velnox.app.feature.orders.OrdersScreen
+import com.velnox.app.feature.orders.OrdersState
 import com.velnox.app.feature.profile.AddressBookState
 import com.velnox.app.feature.profile.ProfileScreen
 import com.velnox.app.feature.search.SearchScreen
@@ -202,9 +203,11 @@ private fun VelnoxNavHost() {
         if (sessionState.isAuthenticated) {
             AddressBookState.load(customer)
             cart.syncLocalAndLoad(customer)
+            OrdersState.load(customer)
         } else {
             AddressBookState.clear()
             cart.clear()
+            OrdersState.clear()
         }
     }
 
@@ -550,7 +553,7 @@ private fun VelnoxNavHost() {
                             selected = tab,
                             onSelectTab = ::requestTab,
                             cartCount = cart.items.size,
-                            ordersBadge = 1,
+                            ordersBadge = OrdersState.activeCount,
                         ) {
                             tabStateHolder.SaveableStateProvider(tab.key) {
                                 TabContent(
@@ -721,6 +724,11 @@ private fun VelnoxNavHost() {
                                 } else if (overlay.startsWith("order:")) {
                                     OrderDetailScreen(
                                         orderId = overlay.removePrefix("order:"),
+                                        cartState = cart,
+                                        onOpenCart = {
+                                            closeOverlay()
+                                            requestTab(AppTab.Cart)
+                                        },
                                         onBack = ::closeOverlay,
                                     )
                                 } else if (overlay.startsWith("thread:")) {

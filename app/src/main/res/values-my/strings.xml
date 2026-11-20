@@ -609,6 +609,10 @@
     <string name="checkout_address_required">အမှာစာတင်ရန် ပို့ဆောင်မည့်လိပ်စာ ထည့်ပါ</string>
     <string name="checkout_add_address">ပို့ဆောင်မည့်လိပ်စာ ထည့်မည်</string>
     <string name="checkout_quote_failed">ပို့ဆောင်ခ တွက်ချက်၍မရပါ</string>
+    <string name="orders_load_failed">အမှာစာများကို မဖွင့်နိုင်ပါ</string>
+    <string name="orders_not_found">အမှာစာ ရှာမတွေ့ပါ</string>
+    <string name="orders_cancelling">ပယ်ဖျက်နေသည်…</string>
+    <string name="orders_reordering">ဈေးဝယ်ခြင်းထဲ ထည့်နေသည်…</string>
     <string name="settings_saved">သိမ်းဆည်းပြီးပါပြီ</string>
     <string name="settings_saving">သိမ်းဆည်းနေသည်…</string>
 </resources>

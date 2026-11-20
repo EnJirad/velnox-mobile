@@ -517,8 +517,11 @@ class CustomerRemoteDataSource(
                 imageUrl = imageOf(line) ?: product?.let(::imageOf),
                 quantity = line.num("quantity", "qty")?.toInt() ?: 1,
                 price = line.num("price", "unitPrice", "unit_price"),
+                variantName = line.str("variantName", "variant_name"),
             )
         }
+        val firstShipment = obj.optJSONArray("shipments")?.optJSONObject(0)
+        val firstPayment = obj.optJSONArray("payments")?.optJSONObject(0)
         return CustomerOrder(
             id = id,
             orderNumber = obj.str("orderNumber", "order_number", "number") ?: id,
@@ -529,21 +532,37 @@ class CustomerRemoteDataSource(
             shopName = obj.str("shopName", "shop_name") ?: obj.optJSONObject("shop")?.str("name"),
             deliveryAddress = addressText(obj),
             items = lines,
+            subtotal = obj.num("subtotal"),
+            shippingFee = obj.num("shippingFee", "shipping_fee"),
+            discount = obj.num("discount"),
+            paymentMethod = obj.str("paymentMethod", "payment_method") ?: firstPayment?.str("method"),
+            trackingNumber = obj.str("trackingNumber", "tracking_number")
+                ?: firstShipment?.str("trackingNumber", "tracking_number"),
+            carrier = obj.str("carrier") ?: firstShipment?.str("carrier"),
+            shopId = obj.str("shopId", "shop_id") ?: obj.optJSONObject("shop")?.str("id"),
         )
     }
 
     /** The shipping address as one line: a ready-made string, or the parts of an object. */
     private fun addressText(order: JSONObject): String? {
         order.str("deliveryAddress", "delivery_address")?.let { return it }
-        val obj = order.optJSONObject("shippingAddress") ?: order.optJSONObject("shipping_address")
+        val obj = order.optJSONObject("addressSnapshot")
+            ?: order.optJSONObject("shippingAddress")
+            ?: order.optJSONObject("shipping_address")
             ?: order.optJSONObject("address")
         if (obj == null) return order.str("shippingAddress", "shipping_address")
         val address = parseAddress(obj)
         val parts = if (address != null) {
-            listOf(address.addressLine, address.subDistrict, address.district, address.province, address.postalCode)
+            listOf(address.addressLine, address.addressLine2.orEmpty(), address.subDistrict, address.district, address.province, address.postalCode)
         } else {
-            listOf("addressLine", "subDistrict", "district", "province", "postalCode")
-                .map { obj.str(it).orEmpty() }
+            listOf(
+                obj.str("line1", "addressLine", "address_line", "address").orEmpty(),
+                obj.str("line2").orEmpty(),
+                obj.str("subdistrict", "subDistrict", "city").orEmpty(),
+                obj.str("district").orEmpty(),
+                obj.str("province", "state").orEmpty(),
+                obj.str("postalCode", "postal_code").orEmpty(),
+            )
         }
         return parts.filter { it.isNotBlank() }.joinToString(" ").takeIf { it.isNotBlank() }
     }

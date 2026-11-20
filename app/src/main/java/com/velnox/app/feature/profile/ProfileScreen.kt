@@ -44,9 +44,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
 import com.velnox.app.core.auth.AuthUser
-import com.velnox.app.feature.orders.OrdersDemo
 import com.velnox.app.feature.orders.OrdersFilter
+import com.velnox.app.feature.orders.OrdersState
 import com.velnox.app.feature.orders.OrderStatus
+import com.velnox.app.feature.orders.uiStatus
 import com.velnox.app.feature.wishlist.WishlistState
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
@@ -348,7 +349,7 @@ private fun StatsRow(
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         StatTile(
-            value = OrdersDemo.orders.size.toString(),
+            value = OrdersState.orders.size.toString(),
             label = stringResource(R.string.profile_stats_orders),
             modifier = Modifier.weight(1f),
             onClick = onOpenOrders,
@@ -376,11 +377,11 @@ private fun StatsRow(
 
 @Composable
 private fun OrderShortcutsCard(onOpenOrders: () -> Unit) {
-    val toPayCount = OrdersDemo.forFilter(OrdersFilter.Pending).size
-    val toShipCount = OrdersDemo.forFilter(OrdersFilter.Processing).size
-    val toReceiveCount = OrdersDemo.forFilter(OrdersFilter.Shipping).size
-    val toReviewCount = OrdersDemo.forFilter(OrdersFilter.Completed).size
-    val returnsCount = OrdersDemo.orders.count { it.status == OrderStatus.Returned }
+    val toPayCount = OrdersState.forFilter(OrdersFilter.Pending).size
+    val toShipCount = OrdersState.forFilter(OrdersFilter.Processing).size
+    val toReceiveCount = OrdersState.forFilter(OrdersFilter.Shipping).size
+    val toReviewCount = OrdersState.forFilter(OrdersFilter.Completed).size
+    val returnsCount = OrdersState.orders.count { it.uiStatus == OrderStatus.Returned }
 
     SectionCard {
         Row(
