@@ -118,6 +118,8 @@
 
 ### [x] Part 07: Wishlist & Favorites System
 - **Document:** `.project/part-07-wishlist-favorites-system.md`
+- **Commit:** `cdf7079`
+- **CI Run:** [Run #44719129209](https://github.com/EnJirad/velnox-mobile/actions/runs/44719129209) (PASS)
 - **Target Files:**
   - `WishlistScreen.kt`
   - `WishlistModels.kt`
@@ -133,17 +135,21 @@
 
 ---
 
-### [ ] Part 08: Notification Center & Activity Feed
+### [x] Part 08: Notification Center & Activity Feed
 - **Document:** `.project/part-08-notification-center-activity-feed.md`
 - **Target Files:**
   - `NotificationCenterScreen.kt`
+  - `NotificationModels.kt`
   - `HomeScreen.kt`
+  - `VelnoxApp.kt`
+  - `AccessPolicy.kt`
+  - `NotificationsStateTest.kt`
 - **Key Objectives:**
-  - [ ] Replace empty notification popover with full `NotificationCenterScreen`.
-  - [ ] Categorized tabs: All, Orders, Promotions, System.
-  - [ ] Mark all as read action & unread indicator dots.
-  - [ ] Notification tap navigation to relevant screens (orders, vouchers, products).
-  - [ ] Unread notification count badge over Bell icon in Home TopBar.
+  - [x] Replace empty notification popover with full `NotificationCenterScreen`.
+  - [x] Categorized tabs: All, Orders, Promotions, System.
+  - [x] Mark all as read action & unread indicator dots.
+  - [x] Notification tap navigation to relevant screens (orders, vouchers, products).
+  - [x] Unread notification count badge over Bell icon in Home TopBar.
 
 ---
 

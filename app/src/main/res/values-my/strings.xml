@@ -566,4 +566,12 @@
     <string name="wishlist_undo">ပြန်ပြင်မည်</string>
     <string name="wishlist_count">စုစုပေါင်း ပစ္စည်း (%1$d)</string>
     <string name="common_delete">ဖျက်မည်</string>
+    <string name="notifications_title">အသိပေးချက်များ</string>
+    <string name="notifications_tab_all">အားလုံး</string>
+    <string name="notifications_tab_orders">အမှာစာများ</string>
+    <string name="notifications_tab_promotions">ပရိုမိုးရှင်းများ</string>
+    <string name="notifications_tab_system">စနစ်</string>
+    <string name="notifications_mark_all_read">အားလုံးဖတ်ပြီးသားမှတ်ရန်</string>
+    <string name="notifications_clear_all">အသိပေးချက်အားလုံးရှင်းရန်</string>
+    <string name="notifications_empty_filter">ဤအမျိုးအစားတွင် အသိပေးချက် မရှိပါ</string>
 </resources>

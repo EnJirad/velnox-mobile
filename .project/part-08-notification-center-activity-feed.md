@@ -10,11 +10,17 @@ Replace the empty notification popover and placeholder destination with an inter
      - **Orders:** Shipping status alerts, delivery confirmations, payment updates.
      - **Promotions:** Flash sale discounts, voucher drops, shop coupons.
      - **System:** Account security, policy updates.
-   - Distinct visual icons and badge tones per notification type.
+   - Distinct visual icons and badge tones per notification type (`Truck`, `Sparkles`, `ShieldCheck`, `Bell`).
    - Unread indicator dot with "Mark All as Read" header button.
-   - Tap on notification routes to the relevant destination (e.g. order tracking, voucher center, or product page).
+   - Tap on notification routes to the relevant destination (e.g. order tracking `order:VLX-2401`, category `category:electronics`, security `settings/security`).
+   - Clear all notifications with confirmation dialog.
 2. **Top Bar & Icon Badges:**
-   - Real unread notification count badge over the Bell icon in `HomeScreen` and other headers.
+   - Real unread notification count badge over the Bell icon in `HomeScreen`.
+   - Direct navigation from bell tap to `NotificationCenterScreen`.
 3. **Verification & Tests:**
-   - Test mark-as-read logic and filtering.
+   - `NotificationsStateTest`: tests initial state, category filtering, unread counting per category, markAsRead, markAllAsRead, deleteNotification, clearAll, addNotification.
+   - `AccessPolicyTest`: verified public access to `"notifications"` overlay.
    - GitHub Actions CI build & verification.
+
+## Status
+- Implementation complete, unit tests added, pushed to GitHub Actions for verification.

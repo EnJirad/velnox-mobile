@@ -566,4 +566,12 @@
     <string name="wishlist_undo">เลิกทำ</string>
     <string name="wishlist_count">สินค้าทั้งหมด (%1$d ชิ้น)</string>
     <string name="common_delete">ลบ</string>
+    <string name="notifications_title">การแจ้งเตือน</string>
+    <string name="notifications_tab_all">ทั้งหมด</string>
+    <string name="notifications_tab_orders">คำสั่งซื้อ</string>
+    <string name="notifications_tab_promotions">โปรโมชั่น</string>
+    <string name="notifications_tab_system">ระบบ</string>
+    <string name="notifications_mark_all_read">อ่านทั้งหมดแล้ว</string>
+    <string name="notifications_clear_all">ล้างการแจ้งเตือนทั้งหมด</string>
+    <string name="notifications_empty_filter">ไม่มีการแจ้งเตือนในหมวดหมู่นี้</string>
 </resources>

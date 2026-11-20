@@ -136,6 +136,8 @@ fun HomeScreen(
     onOpenProduct: (String) -> Unit,
     modifier: Modifier = Modifier,
     onOpenMessages: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
+    unreadNotificationsCount: Int = 0,
 ) {
     val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
     val isThai = LocalConfiguration.current.locales[0].language == "th"
@@ -216,7 +218,8 @@ fun HomeScreen(
             query = query,
             onQueryChange = { query = it },
             onClearQuery = { query = "" },
-            notifications = HomeNotifications.items,
+            unreadNotificationsCount = unreadNotificationsCount,
+            onOpenNotifications = onOpenNotifications,
             onOpenMessages = onOpenMessages,
         )
 
@@ -522,7 +525,8 @@ private fun HomeToolbar(
     query: String,
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
-    notifications: List<HomeNotification>,
+    unreadNotificationsCount: Int,
+    onOpenNotifications: () -> Unit,
     onOpenMessages: () -> Unit,
 ) {
     Box(
@@ -548,7 +552,10 @@ private fun HomeToolbar(
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(VelnoxSpacing.xs))
-            NotificationBell(notifications = notifications)
+            NotificationBell(
+                unreadCount = unreadNotificationsCount,
+                onClick = onOpenNotifications,
+            )
             Spacer(Modifier.width(VelnoxSpacing.xs))
             HeaderMessagesButton(onClick = onOpenMessages)
         }
@@ -661,106 +668,40 @@ private fun HomeSearchField(
 }
 
 @Composable
-private fun NotificationBell(notifications: List<HomeNotification>) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val hasUnread = notifications.any { it.unread }
-
-    Box {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(Circle)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .velnoxClickable(role = Role.Button, onClick = { expanded = true }),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = VelnoxIcons.Bell,
-                contentDescription = stringResource(R.string.home_notifications),
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(19.dp),
-            )
-            if (hasUnread) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 9.dp, end = 9.dp)
-                        .size(7.dp)
-                        .clip(Circle)
-                        .background(VelnoxBrand),
-                )
-            }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.widthIn(min = 280.dp, max = 340.dp),
-            shape = SquircleLg,
-            containerColor = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            shadowElevation = 8.dp,
-        ) {
-            Column(modifier = Modifier.padding(VelnoxSpacing.lg)) {
+private fun NotificationBell(
+    unreadCount: Int,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(Circle)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .velnoxClickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = VelnoxIcons.Bell,
+            contentDescription = stringResource(R.string.home_notifications),
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(19.dp),
+        )
+        if (unreadCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 5.dp, end = 5.dp)
+                    .clip(Circle)
+                    .background(VelnoxBrand)
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
-                    text = stringResource(R.string.home_notifications),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = if (unreadCount > 9) "9+" else unreadCount.toString(),
+                    style = Text2xs,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.height(VelnoxSpacing.md))
-                if (notifications.isEmpty()) {
-                    Row(verticalAlignment = Alignment.Top) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(SquircleSm)
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = VelnoxIcons.Bell,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(17.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(VelnoxSpacing.md))
-                        Column {
-                            Text(
-                                text = stringResource(R.string.notifications_empty_title),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Spacer(Modifier.height(VelnoxSpacing.xs))
-                            Text(
-                                text = stringResource(R.string.notifications_empty_body),
-                                style = TextXs,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                } else {
-                    notifications.forEach { item ->
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = item.body,
-                            style = TextXs,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        item.time?.let { time ->
-                            Text(
-                                text = time,
-                                style = Text2xs,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Spacer(Modifier.height(VelnoxSpacing.md))
-                    }
-                }
             }
         }
     }

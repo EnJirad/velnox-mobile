@@ -99,6 +99,7 @@ object AccessPolicy {
         key.startsWith("product:") -> null
         key.startsWith("shop:") -> null
         key == "search" -> null
+        key == "notifications" -> null
 
         key == "checkout" -> LoginReason.Checkout
         key.startsWith("order:") -> LoginReason.Orders

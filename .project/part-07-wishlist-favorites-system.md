@@ -24,6 +24,9 @@ Replace the current placeholder destination for wishlist with a dedicated, full-
    - GitHub Actions CI verification.
 
 ## Implementation Summary
+- **Commit:** `cdf7079`
+- **GitHub Actions Run:** [Run #44719129209](https://github.com/EnJirad/velnox-mobile/actions/runs/44719129209) (PASS)
+- **APK Artifact:** `velnox-debug-apk` (ID: 14621720586, 12.5 MB)
 - **Wishlist State:** Implemented `WishlistItem` and `WishlistState` (`mutableStateListOf`) with `add`, `remove`, `toggle`, `isFavorite`, and `reset`.
 - **Dedicated Screen:** Created `WishlistScreen.kt` with product thumbnails, stock status, direct "Move to Cart" action, and removal with undo banner.
 - **Interactive Heart Toggles:** Added heart button to `ProductDetailScreen` top bar actions and corner heart button on `HomeScreen` `ProductCard` tiles.

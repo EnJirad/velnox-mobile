@@ -62,6 +62,8 @@ import com.velnox.app.feature.home.HomeScreen
 import com.velnox.app.feature.market.MarketScreen
 import com.velnox.app.feature.messages.ConversationScreen
 import com.velnox.app.feature.messages.MessagesScreen
+import com.velnox.app.feature.notifications.NotificationCenterScreen
+import com.velnox.app.feature.notifications.NotificationsState
 import com.velnox.app.feature.orders.OrderDetailScreen
 import com.velnox.app.feature.orders.OrdersScreen
 import com.velnox.app.feature.profile.ProfileScreen
@@ -183,6 +185,7 @@ private fun VelnoxNavHost() {
     val loginReason = LoginReason.fromKey(loginReasonKey)
     val authStep = AuthStep.fromKey(authStepKey)
     val cart = remember { CartState() }
+    val notifications = remember { NotificationsState() }
     val tabStateHolder = rememberSaveableStateHolder()
 
     fun openTab(next: AppTab) {
@@ -528,6 +531,7 @@ private fun VelnoxNavHost() {
                             TabContent(
                                 tab = tab,
                                 cart = cart,
+                                notifications = notifications,
                                 sessionState = sessionState,
                                 onOpenOverlay = ::requestOverlay,
                                 onOpenTab = ::requestTab,
@@ -573,6 +577,24 @@ private fun VelnoxNavHost() {
                         onExplore = {
                             closeOverlay()
                             requestTab(AppTab.Home)
+                        },
+                    )
+
+                    "notifications" -> NotificationCenterScreen(
+                        state = notifications,
+                        onBack = ::closeOverlay,
+                        onOpenRoute = { route ->
+                            if (route.startsWith("order:")) {
+                                overlayKey = route
+                            } else if (route.startsWith("category:") || route == "category") {
+                                overlayKey = route
+                            } else if (route.startsWith("product:")) {
+                                overlayKey = route
+                            } else if (route.startsWith("settings/")) {
+                                overlayKey = route
+                            } else {
+                                requestOverlay(route)
+                            }
                         },
                     )
 
@@ -765,6 +787,7 @@ private fun authMessage(error: AuthError): Int = when (error) {
 private fun TabContent(
     tab: AppTab,
     cart: CartState,
+    notifications: NotificationsState,
     sessionState: SessionState,
     onOpenOverlay: (String) -> Unit,
     onOpenTab: (AppTab) -> Unit,
@@ -783,6 +806,8 @@ private fun TabContent(
             },
             onOpenProduct = { onOpenOverlay("product:$it") },
             onOpenMessages = { onOpenOverlay("messages") },
+            onOpenNotifications = { onOpenOverlay("notifications") },
+            unreadNotificationsCount = notifications.unreadCount,
         )
 
         AppTab.Market -> MarketScreen(
