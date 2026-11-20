@@ -90,6 +90,8 @@ import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
+import com.velnox.app.feature.wishlist.WishlistItem
+import com.velnox.app.feature.wishlist.WishlistState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1028,12 +1030,45 @@ internal fun ProductCard(
             .velnoxClickable(role = Role.Button, onClick = onClick)
             .padding(VelnoxSpacing.sm),
     ) {
-        ProductThumbnail(
-            url = product.imageUrl,
-            name = product.name,
-            outOfStock = product.inStock == false,
-            modifier = Modifier.aspectRatio(1f),
-        )
+        Box {
+            ProductThumbnail(
+                url = product.imageUrl,
+                name = product.name,
+                outOfStock = product.inStock == false,
+                modifier = Modifier.aspectRatio(1f),
+            )
+            val isFav = WishlistState.isFavorite(product.id)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(28.dp)
+                    .clip(Circle)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                    .velnoxClickable(role = Role.Button) {
+                        WishlistState.toggle(
+                            WishlistItem(
+                                productId = product.id,
+                                name = product.name,
+                                price = product.displayPrice,
+                                currency = product.currency,
+                                imageUrl = product.imageUrl,
+                                shopName = product.shopName,
+                                inStock = product.inStock ?: true,
+                                rating = product.rating,
+                            )
+                        )
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isFav) VelnoxIcons.HeartFill else VelnoxIcons.Heart,
+                    contentDescription = null,
+                    tint = if (isFav) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(VelnoxSpacing.sm))
         Text(
             text = product.name,

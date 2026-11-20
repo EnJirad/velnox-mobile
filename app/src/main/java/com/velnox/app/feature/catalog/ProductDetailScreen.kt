@@ -82,6 +82,8 @@ import com.velnox.app.core.catalog.ProductReviewsData
 import com.velnox.app.core.catalog.ProductVariant
 import com.velnox.app.feature.home.ProductCard
 import com.velnox.app.feature.home.ProductThumbnail
+import com.velnox.app.feature.wishlist.WishlistItem
+import com.velnox.app.feature.wishlist.WishlistState
 import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.PageGutter
 import com.velnox.app.ui.components.QuantityStepper
@@ -208,6 +210,37 @@ fun ProductDetailScreen(
             title = title,
             onBack = onBack,
             actions = {
+                val isFav = WishlistState.isFavorite(productId)
+                val detail = (state as? ProductState.Content)?.product
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .velnoxClickable(role = Role.Button) {
+                            if (detail != null) {
+                                WishlistState.toggle(
+                                    WishlistItem(
+                                        productId = detail.id,
+                                        name = detail.name,
+                                        price = detail.displayPrice,
+                                        currency = detail.currency,
+                                        imageUrl = detail.images.firstOrNull()?.url,
+                                        shopName = detail.shopName,
+                                        inStock = detail.isInStock ?: true,
+                                        rating = detail.rating,
+                                    )
+                                )
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (isFav) VelnoxIcons.HeartFill else VelnoxIcons.Heart,
+                        contentDescription = stringResource(R.string.profile_wishlist),
+                        tint = if (isFav) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
                 if (onOpenCart != null) {
                     Box(
                         modifier = Modifier

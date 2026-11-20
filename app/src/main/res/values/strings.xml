@@ -555,4 +555,14 @@
     <string name="settings_help_search_hint">ค้นหาคำถามหรือหัวข้อช่วยเหลือ...</string>
     <string name="settings_contact_live_agent">แชทสดกับเจ้าหน้าที่ฝ่ายบริการ</string>
     <string name="settings_contact_live_agent_status">เจ้าหน้าที่พร้อมให้บริการ 24 ชม.</string>
+    <string name="wishlist_title">รายการโปรด</string>
+    <string name="wishlist_empty_title">ยังไม่มีสินค้าในรายการโปรด</string>
+    <string name="wishlist_empty_body">แตะไอคอนหัวใจบนสินค้าที่คุณถูกใจเพื่อบันทึกไว้ดูภายหลัง</string>
+    <string name="wishlist_explore">ค้นหาสินค้า</string>
+    <string name="wishlist_move_to_cart">ย้ายไปตะกร้า</string>
+    <string name="wishlist_in_stock">มีสินค้า</string>
+    <string name="wishlist_out_of_stock">สินค้าหมด</string>
+    <string name="wishlist_removed">นำออกจากรายการโปรดแล้ว</string>
+    <string name="wishlist_undo">เลิกทำ</string>
+    <string name="wishlist_count">สินค้าทั้งหมด (%1$d ชิ้น)</string>
 </resources>

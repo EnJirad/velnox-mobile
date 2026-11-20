@@ -68,6 +68,7 @@ import com.velnox.app.feature.profile.ProfileScreen
 import com.velnox.app.feature.settings.SettingsDetailScreen
 import com.velnox.app.feature.settings.SettingsPage
 import com.velnox.app.feature.settings.SettingsScreen
+import com.velnox.app.feature.wishlist.WishlistScreen
 import com.velnox.app.ui.components.PageGutter
 import com.velnox.app.ui.components.VelnoxSpacing
 import com.velnox.app.ui.components.velnoxClickable
@@ -562,6 +563,16 @@ private fun VelnoxNavHost() {
                         onBack = ::closeOverlay,
                         onViewOrder = { orderId ->
                             overlayKey = "order:$orderId"
+                        },
+                    )
+
+                    "wishlist" -> WishlistScreen(
+                        cartState = cart,
+                        onBack = ::closeOverlay,
+                        onOpenProduct = ::requestOverlay,
+                        onExplore = {
+                            closeOverlay()
+                            requestTab(AppTab.Home)
                         },
                     )
 

@@ -22,3 +22,10 @@ Replace the current placeholder destination for wishlist with a dedicated, full-
 5. **Verification & Tests:**
    - Unit tests for adding, removing, and toggling wishlist items.
    - GitHub Actions CI verification.
+
+## Implementation Summary
+- **Wishlist State:** Implemented `WishlistItem` and `WishlistState` (`mutableStateListOf`) with `add`, `remove`, `toggle`, `isFavorite`, and `reset`.
+- **Dedicated Screen:** Created `WishlistScreen.kt` with product thumbnails, stock status, direct "Move to Cart" action, and removal with undo banner.
+- **Interactive Heart Toggles:** Added heart button to `ProductDetailScreen` top bar actions and corner heart button on `HomeScreen` `ProductCard` tiles.
+- **Profile Integration:** Linked Profile tab wishlist stat counter directly to `WishlistState.items.size`.
+- **Unit Tests:** Created `WishlistStateTest.kt` covering all core operations.

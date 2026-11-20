@@ -47,6 +47,7 @@ import com.velnox.app.core.auth.AuthUser
 import com.velnox.app.feature.orders.OrdersDemo
 import com.velnox.app.feature.orders.OrdersFilter
 import com.velnox.app.feature.orders.OrderStatus
+import com.velnox.app.feature.wishlist.WishlistState
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
 import com.velnox.app.ui.components.DangerRow
@@ -353,7 +354,7 @@ private fun StatsRow(
             onClick = onOpenOrders,
         )
         StatTile(
-            value = "2",
+            value = WishlistState.items.size.toString(),
             label = stringResource(R.string.profile_stats_wishlist),
             modifier = Modifier.weight(1f),
             onClick = onOpenWishlist,

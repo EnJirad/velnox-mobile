@@ -555,4 +555,14 @@
     <string name="settings_help_search_hint">မေးခွန်းများ ရှာဖွေပါ...</string>
     <string name="settings_contact_live_agent">ဝန်ဆောင်မှု အဖွဲ့နှင့် တိုက်ရိုက်စကားပြောပါ</string>
     <string name="settings_contact_live_agent_status">၂၄ နာရီ ဝန်ဆောင်မှု ပေးနေပါသည်</string>
+    <string name="wishlist_title">နှစ်သက်စာရင်း</string>
+    <string name="wishlist_empty_title">နှစ်သက်စာရင်း မရှိသေးပါ</string>
+    <string name="wishlist_empty_body">နှစ်သက်သော ပစ္စည်းများကို သိမ်းဆည်းရန် အသည်းပုံကို နှိပ်ပါ</string>
+    <string name="wishlist_explore">ပစ္စည်းများ ရှာဖွေမည်</string>
+    <string name="wishlist_move_to_cart">ခြင်းထဲသို့ ထည့်မည်</string>
+    <string name="wishlist_in_stock">ပစ္စည်းရှိသည်</string>
+    <string name="wishlist_out_of_stock">ပစ္စည်းကုန်နေသည်</string>
+    <string name="wishlist_removed">နှစ်သက်စာရင်းမှ ဖယ်ရှားပြီးပါပြီ</string>
+    <string name="wishlist_undo">ပြန်ပြင်မည်</string>
+    <string name="wishlist_count">စုစုပေါင်း ပစ္စည်း (%1$d)</string>
 </resources>

@@ -3,7 +3,7 @@
 ## Progress Overview
 - [x] **Round 1 (Parts 1–16):** Full UI/UX Overhaul & Remote Verification Completed.
 - [ ] **Round 2 (Parts 01–10):** E-Commerce Engine, Flow Completeness, RAM Efficiency & Polish.
-  - Completed: 6 / 10 Parts (60%)
+  - Completed: 7 / 10 Parts (70%)
 
 ---
 
@@ -101,6 +101,8 @@
 
 ### [x] Part 06: Settings Hub Refinement, Security & Help Center
 - **Document:** `.project/part-06-settings-security-help-center.md`
+- **Commit:** `bb520f8`
+- **CI Run:** [Run #44706844244](https://github.com/EnJirad/velnox-mobile/actions/runs/44706844244) (PASS)
 - **Target Files:**
   - `SettingsScreen.kt`
   - `SettingsDetailScreen.kt`
@@ -114,19 +116,20 @@
 
 ---
 
-### [ ] Part 07: Wishlist & Favorites System
+### [x] Part 07: Wishlist & Favorites System
 - **Document:** `.project/part-07-wishlist-favorites-system.md`
 - **Target Files:**
   - `WishlistScreen.kt`
-  - `WishlistState.kt`
+  - `WishlistModels.kt`
   - `ProductDetailScreen.kt`
   - `HomeScreen.kt`
   - `ProfileScreen.kt`
+  - `WishlistStateTest.kt`
 - **Key Objectives:**
-  - [ ] Replace `PlaceholderDestination("wishlist")` with dedicated `WishlistScreen`.
-  - [ ] Interactive heart toggle on Product Detail, Home, and Market product cards.
-  - [ ] Stock status, quick "Move to Cart", and item removal with undo.
-  - [ ] Live counter badge in Profile screen statistics tile.
+  - [x] Replace `PlaceholderDestination("wishlist")` with dedicated `WishlistScreen`.
+  - [x] Interactive heart toggle on Product Detail, Home, and Market product cards.
+  - [x] Stock status, quick "Move to Cart", and item removal with undo.
+  - [x] Live counter badge in Profile screen statistics tile.
 
 ---
 
