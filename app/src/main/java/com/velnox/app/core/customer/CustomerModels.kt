@@ -1,9 +1,7 @@
 package com.velnox.app.core.customer
 
-package com.velnox.app.core.customer
-
 /**
- * Wire-level models for the authenticated `/api/customer/*` endpoints.
+ * Wire-level models for the authenticated customer endpoints under `/api/customer`.
  *
  * These carry exactly what the server returned. Anything the API did not send is
  * `null` (or an empty list); nothing is invented, so a screen that has no data
