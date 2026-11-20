@@ -140,6 +140,12 @@
     <string name="messages_preview_1">สินค้าพร้อมส่งแล้วครับ ขอบคุณที่รอ</string>
     <string name="messages_preview_2">มีสีดำให้เลือกเพิ่มไหมครับ</string>
     <string name="messages_preview_3">ได้รับสินค้าแล้ว ขอบคุณมากครับ</string>
+    <string name="messages_online">ออนไลน์</string>
+    <string name="messages_send">ส่ง</string>
+    <string name="messages_view_product">ดูสินค้า</string>
+    <string name="messages_product_inquiry">สอบถามเกี่ยวกับสินค้านี้</string>
+    <string name="messages_pinned_product_name">เก้าอี้ไม้โอ๊คสไตล์นอร์ดิก</string>
+    <string name="messages_pinned_product_price">฿3,200</string>
 
     <!-- ═════════════════════════════ orders ═════════════════════════════ -->
     <string name="orders_title">คำสั่งซื้อของฉัน</string>

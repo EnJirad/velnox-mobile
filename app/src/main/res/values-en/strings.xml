@@ -140,6 +140,12 @@
     <string name="messages_preview_1">Your order is ready to ship, thanks for waiting.</string>
     <string name="messages_preview_2">Do you have this in black as well?</string>
     <string name="messages_preview_3">Item received, thank you so much.</string>
+    <string name="messages_online">Online</string>
+    <string name="messages_send">Send</string>
+    <string name="messages_view_product">View product</string>
+    <string name="messages_product_inquiry">Inquiring about this item</string>
+    <string name="messages_pinned_product_name">Nordic Oak Minimalist Chair</string>
+    <string name="messages_pinned_product_price">฿3,200</string>
 
     <!-- ═════════════════════════════ orders ═════════════════════════════ -->
     <string name="orders_title">My orders</string>

@@ -140,6 +140,12 @@
     <string name="messages_preview_1">သင့်အမှာစာ ပို့ရန် အသင့်ဖြစ်ပါပြီ၊ စောင့်ပေးသည့်အတွက် ကျေးဇူးတင်ပါသည်</string>
     <string name="messages_preview_2">အနက်ရောင် ရနိုင်ပါသလား</string>
     <string name="messages_preview_3">ပစ္စည်း ရရှိပါပြီ၊ ကျေးဇူးတင်ပါသည်</string>
+    <string name="messages_online">အွန်လိုင်း</string>
+    <string name="messages_send">ပို့ရန်</string>
+    <string name="messages_view_product">ကုန်ပစ္စည်းကြည့်ရန်</string>
+    <string name="messages_product_inquiry">ဤပစ္စည်းအကြောင်း မေးမြန်းချက်</string>
+    <string name="messages_pinned_product_name">Nordic Oak Minimalist Chair</string>
+    <string name="messages_pinned_product_price">฿3,200</string>
 
     <!-- ═════════════════════════════ orders ═════════════════════════════ -->
     <string name="orders_title">ကျွန်ုပ်၏ အမှာစာများ</string>

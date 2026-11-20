@@ -21,7 +21,7 @@
    - Clean illustration and guidance: "No messages yet. Chat with sellers to inquire about products and orders."
 
 ## Verification Checklist
-- [ ] Thread list and message bubbles adapt smoothly to light and dark themes.
-- [ ] Software keyboard does not obscure latest messages or input bar.
-- [ ] Tapping a thread opens the conversation smoothly.
-- [ ] Remote CI passes successfully.
+- [x] Thread list and message bubbles adapt smoothly to light and dark themes.
+- [x] Software keyboard does not obscure latest messages or input bar.
+- [x] Tapping a thread opens the conversation smoothly.
+- [x] Remote CI passes successfully.

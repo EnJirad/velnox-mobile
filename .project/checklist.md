@@ -90,14 +90,14 @@
   - [x] Polish Settings list items, icons, switches, and chevron indicators.
   - [x] Polish Settings Detail screens (Language selection with 3 native languages, Theme mode selector, Notifications).
 
-### [ ] Part 15: Messages & Seller Chat UI
+### [x] Part 15: Messages & Seller Chat UI
 - **Document:** `.project/part-15-messages-chat-ui.md`
 - **Target Screens:** `MessagesScreen.kt`
 - **Key Objectives:**
-  - [ ] Polish conversation thread list: seller avatar, store name, last message snippet, timestamp, and unread badge.
-  - [ ] Polish active conversation screen: chat bubbles (incoming vs outgoing), timestamp, product reference preview card.
-  - [ ] Polish message input field, send button, and keyboard safe area handling (`imePadding`).
-  - [ ] Clean up empty messages state.
+  - [x] Polish conversation thread list: seller avatar, store name, last message snippet, timestamp, and unread badge.
+  - [x] Polish active conversation screen: chat bubbles (incoming vs outgoing), timestamp, product reference preview card.
+  - [x] Polish message input field, send button, and keyboard safe area handling (`imePadding`).
+  - [x] Clean up empty messages state.
 
 ### [ ] Part 16: Global Navigation, Theme System & Mobile Insets Consistency
 - **Document:** `.project/part-16-global-navigation-theme-ui.md`
