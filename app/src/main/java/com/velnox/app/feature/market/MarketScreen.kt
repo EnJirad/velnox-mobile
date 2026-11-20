@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -392,11 +394,17 @@ fun MarketScreen(
         }
 
         // Main content
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
         ) {
+            val columns = when {
+                maxWidth < 400.dp -> 2
+                maxWidth < 600.dp -> 3
+                else -> 4
+            }
+
             when {
                 isLoading && products.isEmpty() -> {
                     Box(
@@ -495,8 +503,8 @@ fun MarketScreen(
                             }
                         }
 
-                        // Responsive 2-column Product Grid
-                        val chunked = products.chunked(2)
+                        // Responsive Product Grid
+                        val chunked = products.chunked(columns)
                         items(chunked, key = { row -> row.joinToString("|") { it.id } }) { row ->
                             Row(
                                 modifier = Modifier
@@ -511,7 +519,7 @@ fun MarketScreen(
                                         onClick = { onOpenProduct(product.id) },
                                     )
                                 }
-                                repeat(2 - row.size) {
+                                repeat(columns - row.size) {
                                     Spacer(Modifier.weight(1f))
                                 }
                             }
@@ -997,6 +1005,7 @@ private fun MarketFilterBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = PageGutter)
+                .navigationBarsPadding()
                 .padding(bottom = VelnoxSpacing.xl),
         ) {
             // Header
