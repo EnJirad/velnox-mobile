@@ -523,168 +523,174 @@ private fun VelnoxNavHost() {
                     )
                 }
             } else {
-                when (val overlay = overlayKey) {
-                    null -> TabScaffold(
-                        selected = tab,
-                        onSelectTab = ::requestTab,
-                        cartCount = cart.items.size,
-                        ordersBadge = 1,
-                    ) {
-                        tabStateHolder.SaveableStateProvider(tab.key) {
-                            TabContent(
-                                tab = tab,
-                                cart = cart,
-                                notifications = notifications,
-                                sessionState = sessionState,
-                                onOpenOverlay = ::requestOverlay,
-                                onOpenTab = ::requestTab,
-                                onSignOut = ::signOut,
-                            )
-                        }
-                    }
-
-                    "settings" -> SettingsScreen(
-                        onBack = ::closeOverlay,
-                        onOpen = { page -> requestOverlay(page.key) },
-                        onSignOut = ::signOut,
-                    )
-
-                    "messages" -> MessagesScreen(
-                        onOpenThread = { requestOverlay("thread:$it") },
-                        onBrowseProducts = {
-                            closeOverlay()
-                            requestTab(AppTab.Home)
-                        },
-                        onBack = ::closeOverlay,
-                    )
-
-                    "category" -> MarketScreen(
-                        initialCategorySlug = null,
-                        onBack = ::closeOverlay,
-                        onOpenProduct = ::requestOverlay,
-                        onOpenCategory = { slug -> requestOverlay("category:$slug") },
-                    )
-
-                    "checkout" -> CheckoutScreen(
-                        cartState = cart,
-                        onBack = ::closeOverlay,
-                        onViewOrder = { orderId ->
-                            overlayKey = "order:$orderId"
-                        },
-                    )
-
-                    "wishlist" -> WishlistScreen(
-                        cartState = cart,
-                        onBack = ::closeOverlay,
-                        onOpenProduct = ::requestOverlay,
-                        onExplore = {
-                            closeOverlay()
-                            requestTab(AppTab.Home)
-                        },
-                    )
-
-                    "notifications" -> NotificationCenterScreen(
-                        state = notifications,
-                        onBack = ::closeOverlay,
-                        onOpenRoute = { route ->
-                            if (route.startsWith("order:")) {
-                                overlayKey = route
-                            } else if (route.startsWith("category:") || route == "category") {
-                                overlayKey = route
-                            } else if (route.startsWith("product:")) {
-                                overlayKey = route
-                            } else if (route.startsWith("settings/")) {
-                                overlayKey = route
-                            } else {
-                                requestOverlay(route)
+                Crossfade(
+                    targetState = overlayKey,
+                    animationSpec = tween(durationMillis = 220),
+                    label = "overlayTransition",
+                ) { overlay ->
+                    when (overlay) {
+                        null -> TabScaffold(
+                            selected = tab,
+                            onSelectTab = ::requestTab,
+                            cartCount = cart.items.size,
+                            ordersBadge = 1,
+                        ) {
+                            tabStateHolder.SaveableStateProvider(tab.key) {
+                                TabContent(
+                                    tab = tab,
+                                    cart = cart,
+                                    notifications = notifications,
+                                    sessionState = sessionState,
+                                    onOpenOverlay = ::requestOverlay,
+                                    onOpenTab = ::requestTab,
+                                    onSignOut = ::signOut,
+                                )
                             }
-                        },
-                    )
+                        }
 
-                    "search" -> SearchScreen(
-                        onBack = ::closeOverlay,
-                        onOpenProduct = ::requestOverlay,
-                        searchState = searchState,
-                    )
+                        "settings" -> SettingsScreen(
+                            onBack = ::closeOverlay,
+                            onOpen = { page -> requestOverlay(page.key) },
+                            onSignOut = ::signOut,
+                        )
 
-                    else -> {
-                        if (overlay.startsWith("category:")) {
-                            MarketScreen(
-                                initialCategorySlug = overlay.removePrefix("category:"),
-                                onBack = { overlayKey = "category" },
-                                onOpenProduct = ::requestOverlay,
-                                onOpenCategory = { slug -> requestOverlay("category:$slug") },
-                            )
-                        } else if (overlay.startsWith("shop:")) {
-                            ShopScreen(
-                                shopSlugOrId = overlay.removePrefix("shop:"),
-                                onBack = ::closeOverlay,
-                                onOpenProduct = ::requestOverlay,
-                            )
-                        } else if (overlay.startsWith("product:")) {
-                            ProductDetailScreen(
-                                productId = overlay.removePrefix("product:"),
-                                onBack = ::closeOverlay,
-                                onOpenShop = { requestOverlay("shop:$it") },
-                                onOpenProduct = ::requestOverlay,
-                                onAddToCart = { product, variant, qty, imageUrl ->
-                                    cart.add(
-                                        productId = product.id,
-                                        name = product.name,
-                                        storeName = product.shopName,
-                                        imageUrl = imageUrl ?: product.images.firstOrNull()?.url,
-                                        variantId = variant?.id,
-                                        variantName = variant?.title ?: variant?.name,
-                                        price = variant?.price ?: product.displayPrice,
-                                        currency = product.currency,
-                                        quantity = qty,
-                                        maxStock = variant?.stock ?: product.availableStock,
-                                    )
-                                },
-                                onBuyNow = { product, variant, qty, imageUrl ->
-                                    cart.add(
-                                        productId = product.id,
-                                        name = product.name,
-                                        storeName = product.shopName,
-                                        imageUrl = imageUrl ?: product.images.firstOrNull()?.url,
-                                        variantId = variant?.id,
-                                        variantName = variant?.title ?: variant?.name,
-                                        price = variant?.price ?: product.displayPrice,
-                                        currency = product.currency,
-                                        quantity = qty,
-                                        maxStock = variant?.stock ?: product.availableStock,
-                                    )
-                                    requestOverlay("checkout")
-                                },
-                                onOpenCart = {
-                                    closeOverlay()
-                                    requestTab(AppTab.Cart)
-                                },
-                            )
-                        } else {
-                            val page = SettingsPage.fromKey(overlay)
-                            if (page != null) {
-                                // A child page always returns to the Settings hub; the
-                                // hub's own Back is the one that closes the overlay.
-                                SettingsDetailScreen(
-                                    page = page,
-                                    onBack = { overlayKey = "settings" },
+                        "messages" -> MessagesScreen(
+                            onOpenThread = { requestOverlay("thread:$it") },
+                            onBrowseProducts = {
+                                closeOverlay()
+                                requestTab(AppTab.Home)
+                            },
+                            onBack = ::closeOverlay,
+                        )
+
+                        "category" -> MarketScreen(
+                            initialCategorySlug = null,
+                            onBack = ::closeOverlay,
+                            onOpenProduct = ::requestOverlay,
+                            onOpenCategory = { slug -> requestOverlay("category:$slug") },
+                        )
+
+                        "checkout" -> CheckoutScreen(
+                            cartState = cart,
+                            onBack = ::closeOverlay,
+                            onViewOrder = { orderId ->
+                                overlayKey = "order:$orderId"
+                            },
+                        )
+
+                        "wishlist" -> WishlistScreen(
+                            cartState = cart,
+                            onBack = ::closeOverlay,
+                            onOpenProduct = ::requestOverlay,
+                            onExplore = {
+                                closeOverlay()
+                                requestTab(AppTab.Home)
+                            },
+                        )
+
+                        "notifications" -> NotificationCenterScreen(
+                            state = notifications,
+                            onBack = ::closeOverlay,
+                            onOpenRoute = { route ->
+                                if (route.startsWith("order:")) {
+                                    overlayKey = route
+                                } else if (route.startsWith("category:") || route == "category") {
+                                    overlayKey = route
+                                } else if (route.startsWith("product:")) {
+                                    overlayKey = route
+                                } else if (route.startsWith("settings/")) {
+                                    overlayKey = route
+                                } else {
+                                    requestOverlay(route)
+                                }
+                            },
+                        )
+
+                        "search" -> SearchScreen(
+                            onBack = ::closeOverlay,
+                            onOpenProduct = ::requestOverlay,
+                            searchState = searchState,
+                        )
+
+                        else -> {
+                            if (overlay.startsWith("category:")) {
+                                MarketScreen(
+                                    initialCategorySlug = overlay.removePrefix("category:"),
+                                    onBack = { overlayKey = "category" },
+                                    onOpenProduct = ::requestOverlay,
+                                    onOpenCategory = { slug -> requestOverlay("category:$slug") },
                                 )
-                            } else if (overlay.startsWith("order:")) {
-                                OrderDetailScreen(
-                                    orderId = overlay.removePrefix("order:"),
+                            } else if (overlay.startsWith("shop:")) {
+                                ShopScreen(
+                                    shopSlugOrId = overlay.removePrefix("shop:"),
                                     onBack = ::closeOverlay,
+                                    onOpenProduct = ::requestOverlay,
                                 )
-                            } else if (overlay.startsWith("thread:")) {
-                                ConversationScreen(
-                                    threadId = overlay.removePrefix("thread:"),
-                                    onBack = { overlayKey = "messages" },
+                            } else if (overlay.startsWith("product:")) {
+                                ProductDetailScreen(
+                                    productId = overlay.removePrefix("product:"),
+                                    onBack = ::closeOverlay,
+                                    onOpenShop = { requestOverlay("shop:$it") },
+                                    onOpenProduct = ::requestOverlay,
+                                    onAddToCart = { product, variant, qty, imageUrl ->
+                                        cart.add(
+                                            productId = product.id,
+                                            name = product.name,
+                                            storeName = product.shopName,
+                                            imageUrl = imageUrl ?: product.images.firstOrNull()?.url,
+                                            variantId = variant?.id,
+                                            variantName = variant?.title ?: variant?.name,
+                                            price = variant?.price ?: product.displayPrice,
+                                            currency = product.currency,
+                                            quantity = qty,
+                                            maxStock = variant?.stock ?: product.availableStock,
+                                        )
+                                    },
+                                    onBuyNow = { product, variant, qty, imageUrl ->
+                                        cart.add(
+                                            productId = product.id,
+                                            name = product.name,
+                                            storeName = product.shopName,
+                                            imageUrl = imageUrl ?: product.images.firstOrNull()?.url,
+                                            variantId = variant?.id,
+                                            variantName = variant?.title ?: variant?.name,
+                                            price = variant?.price ?: product.displayPrice,
+                                            currency = product.currency,
+                                            quantity = qty,
+                                            maxStock = variant?.stock ?: product.availableStock,
+                                        )
+                                        requestOverlay("checkout")
+                                    },
+                                    onOpenCart = {
+                                        closeOverlay()
+                                        requestTab(AppTab.Cart)
+                                    },
                                 )
                             } else {
-                                PlaceholderDestination(
-                                    overlayKey = overlay,
-                                    onBack = ::closeOverlay,
-                                )
+                                val page = SettingsPage.fromKey(overlay)
+                                if (page != null) {
+                                    // A child page always returns to the Settings hub; the
+                                    // hub's own Back is the one that closes the overlay.
+                                    SettingsDetailScreen(
+                                        page = page,
+                                        onBack = { overlayKey = "settings" },
+                                    )
+                                } else if (overlay.startsWith("order:")) {
+                                    OrderDetailScreen(
+                                        orderId = overlay.removePrefix("order:"),
+                                        onBack = ::closeOverlay,
+                                    )
+                                } else if (overlay.startsWith("thread:")) {
+                                    ConversationScreen(
+                                        threadId = overlay.removePrefix("thread:"),
+                                        onBack = { overlayKey = "messages" },
+                                    )
+                                } else {
+                                    PlaceholderDestination(
+                                        overlayKey = overlay,
+                                        onBack = ::closeOverlay,
+                                    )
+                                }
                             }
                         }
                     }

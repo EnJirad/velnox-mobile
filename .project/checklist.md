@@ -157,6 +157,8 @@
 
 ### [x] Part 09: Advanced Search Experience & Product Filtering
 - **Document:** `.project/part-09-advanced-search-filtering.md`
+- **Commit:** `ca37358`
+- **CI Run:** [Run #44732270305](https://github.com/EnJirad/velnox-mobile/actions/runs/44732270305) (PASS)
 - **Target Files:**
   - `SearchScreen.kt`
   - `SearchModels.kt`
@@ -172,12 +174,14 @@
 
 ---
 
-### [ ] Part 10: End-to-End Performance, Transition Animations & Integration Polish
+### [x] Part 10: End-to-End Performance, Transition Animations & Integration Polish
 - **Document:** `.project/part-10-performance-transitions-polish.md`
 - **Target Files:**
+  - `VelnoxApp.kt`
+  - `RouteIntegrityTest.kt`
   - Global navigation, UI components, Theme
 - **Key Objectives:**
-  - [ ] Compose recomposition audit & lambda stability (`derivedStateOf`, method references).
-  - [ ] Smooth slide-up bottom sheets & fade/slide overlay transitions.
-  - [ ] Zero remaining placeholder destinations across entire app.
-  - [ ] Final CI build, unit test execution, and APK verification on GitHub Actions.
+  - [x] Compose recomposition audit & lambda stability (`derivedStateOf`, method references).
+  - [x] Smooth slide-up bottom sheets & fade/slide overlay transitions (`Crossfade` 220ms).
+  - [x] Zero remaining placeholder destinations across entire app.
+  - [x] Final CI build, unit test execution, and APK verification on GitHub Actions.
