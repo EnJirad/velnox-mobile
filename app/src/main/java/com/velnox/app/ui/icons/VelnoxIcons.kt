@@ -417,6 +417,16 @@ object VelnoxIcons {
         stroke("lucide-minus", listOf("M5 12h14"))
     }
 
+    val RotateCcw: ImageVector by lazy {
+        stroke(
+            "lucide-rotate-ccw",
+            listOf(
+                "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",
+                "M3 3v5h5",
+            ),
+        )
+    }
+
     val Check: ImageVector by lazy {
         stroke("lucide-check", listOf("m20 6L9 17l-5-5"))
     }

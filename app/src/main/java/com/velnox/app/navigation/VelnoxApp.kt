@@ -791,6 +791,7 @@ private fun TabContent(
                     onOpenOrders = { onOpenTab(AppTab.Orders) },
                     onOpenWishlist = { onOpenOverlay("wishlist") },
                     onOpenMessages = { onOpenOverlay("messages") },
+                    onSignOut = ::signOut,
                 )
             }
         }

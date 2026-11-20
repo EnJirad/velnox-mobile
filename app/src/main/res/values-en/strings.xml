@@ -198,9 +198,17 @@
     <string name="profile_demo_badge">Demo account</string>
     <string name="profile_role_label">Role: %1$s</string>
     <string name="profile_verified_badge">Verified</string>
+    <string name="profile_membership_tier">Silver Member</string>
     <string name="profile_stats_orders">Orders</string>
     <string name="profile_stats_wishlist">Wishlist</string>
     <string name="profile_stats_messages">Messages</string>
+    <string name="profile_stats_vouchers">Vouchers</string>
+    <string name="profile_shortcut_to_pay">To Pay</string>
+    <string name="profile_shortcut_to_ship">To Ship</string>
+    <string name="profile_shortcut_to_receive">To Receive</string>
+    <string name="profile_shortcut_to_review">To Review</string>
+    <string name="profile_shortcut_returns">Returns</string>
+    <string name="profile_orders_view_all">View all</string>
     <string name="profile_section_account">Account</string>
     <string name="profile_section_shortcuts">Shortcuts</string>
     <string name="profile_section_addresses">Addresses</string>

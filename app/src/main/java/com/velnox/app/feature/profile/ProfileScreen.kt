@@ -21,12 +21,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +46,7 @@ import com.velnox.app.R
 import com.velnox.app.core.auth.AuthUser
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
+import com.velnox.app.ui.components.DangerRow
 import com.velnox.app.ui.components.InitialsAvatar
 import com.velnox.app.ui.components.IconActionButton
 import com.velnox.app.ui.components.PageGutter
@@ -73,7 +79,10 @@ fun ProfileScreen(
     onOpenWishlist: () -> Unit,
     onOpenMessages: () -> Unit,
     modifier: Modifier = Modifier,
+    onSignOut: () -> Unit = {},
 ) {
+    var showSignOut by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -116,6 +125,10 @@ fun ProfileScreen(
             }
 
             item {
+                OrderShortcutsCard(onOpenOrders = onOpenOrders)
+            }
+
+            item {
                 SectionCard(title = stringResource(R.string.profile_section_account)) {
                     AccountRow(
                         icon = VelnoxIcons.Pencil,
@@ -133,6 +146,16 @@ fun ProfileScreen(
                         icon = VelnoxIcons.MapPin,
                         title = stringResource(R.string.profile_addresses),
                         onClick = onOpenAddresses,
+                    )
+                }
+            }
+
+            item {
+                SectionCard(title = stringResource(R.string.profile_section_shortcuts)) {
+                    SettingRow(
+                        icon = VelnoxIcons.Cog,
+                        title = stringResource(R.string.profile_settings),
+                        onClick = onOpenSettings,
                     )
                 }
             }
@@ -178,6 +201,16 @@ fun ProfileScreen(
             }
 
             item {
+                SectionCard {
+                    DangerRow(
+                        icon = VelnoxIcons.LogOut,
+                        title = stringResource(R.string.profile_sign_out),
+                        onClick = { showSignOut = true },
+                    )
+                }
+            }
+
+            item {
                 Text(
                     text = stringResource(R.string.common_preview_notice),
                     style = Text2xs,
@@ -186,6 +219,37 @@ fun ProfileScreen(
                 )
             }
         }
+    }
+
+    if (showSignOut) {
+        AlertDialog(
+            onDismissRequest = { showSignOut = false },
+            shape = Squircle,
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text(stringResource(R.string.settings_sign_out_title)) },
+            text = { Text(stringResource(R.string.settings_sign_out_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSignOut = false
+                        onSignOut()
+                    },
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_sign_out_confirm),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOut = false }) {
+                    Text(
+                        text = stringResource(R.string.common_close),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            },
+        )
     }
 }
 
@@ -217,12 +281,27 @@ private fun ProfileHeaderCard(user: AuthUser, onOpenEditProfile: () -> Unit) {
                     Spacer(Modifier.width(6.dp))
                     BrandBadge(text = stringResource(R.string.profile_verified_badge))
                 }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = stringResource(R.string.profile_demo_handle),
-                    style = TextXs,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Spacer(Modifier.height(3.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .clip(SquircleSm)
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.profile_membership_tier),
+                            style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.profile_demo_handle),
+                        style = Text2xs,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
                     text = stringResource(R.string.profile_role_label, user.role),
                     style = Text2xs,
@@ -272,6 +351,148 @@ private fun StatsRow(
             label = stringResource(R.string.profile_stats_messages),
             modifier = Modifier.weight(1f),
             onClick = onOpenMessages,
+        )
+        StatTile(
+            value = "5",
+            label = stringResource(R.string.profile_stats_vouchers),
+            modifier = Modifier.weight(1f),
+            onClick = {},
+        )
+    }
+}
+
+@Composable
+private fun OrderShortcutsCard(onOpenOrders: () -> Unit) {
+    SectionCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.profile_orders),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Row(
+                modifier = Modifier.velnoxClickable(role = Role.Button, onClick = onOpenOrders),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.profile_orders_view_all),
+                    style = TextXs,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    imageVector = VelnoxIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+        CardDivider()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            OrderShortcutItem(
+                icon = VelnoxIcons.Wallet,
+                label = stringResource(R.string.profile_shortcut_to_pay),
+                badge = 1,
+                onClick = onOpenOrders,
+                modifier = Modifier.weight(1f),
+            )
+            OrderShortcutItem(
+                icon = VelnoxIcons.Package,
+                label = stringResource(R.string.profile_shortcut_to_ship),
+                badge = 1,
+                onClick = onOpenOrders,
+                modifier = Modifier.weight(1f),
+            )
+            OrderShortcutItem(
+                icon = VelnoxIcons.Truck,
+                label = stringResource(R.string.profile_shortcut_to_receive),
+                badge = 1,
+                onClick = onOpenOrders,
+                modifier = Modifier.weight(1f),
+            )
+            OrderShortcutItem(
+                icon = VelnoxIcons.Star,
+                label = stringResource(R.string.profile_shortcut_to_review),
+                badge = 0,
+                onClick = onOpenOrders,
+                modifier = Modifier.weight(1f),
+            )
+            OrderShortcutItem(
+                icon = VelnoxIcons.RotateCcw,
+                label = stringResource(R.string.profile_shortcut_returns),
+                badge = 0,
+                onClick = onOpenOrders,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun OrderShortcutItem(
+    icon: ImageVector,
+    label: String,
+    badge: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .velnoxClickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(contentAlignment = Alignment.TopEnd) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(SquircleSm)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            if (badge > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clip(SquircleSm)
+                        .background(MaterialTheme.colorScheme.error),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = badge.toString(),
+                        style = Text2xs.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onError,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            style = Text2xs,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

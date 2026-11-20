@@ -198,9 +198,17 @@
     <string name="profile_demo_badge">บัญชีสาธิต</string>
     <string name="profile_role_label">บทบาท: %1$s</string>
     <string name="profile_verified_badge">ยืนยันแล้ว</string>
+    <string name="profile_membership_tier">สมาชิก Silver</string>
     <string name="profile_stats_orders">คำสั่งซื้อ</string>
     <string name="profile_stats_wishlist">รายการโปรด</string>
     <string name="profile_stats_messages">ข้อความ</string>
+    <string name="profile_stats_vouchers">คูปอง</string>
+    <string name="profile_shortcut_to_pay">รอชำระเงิน</string>
+    <string name="profile_shortcut_to_ship">ที่ต้องจัดส่ง</string>
+    <string name="profile_shortcut_to_receive">ที่ต้องได้รับ</string>
+    <string name="profile_shortcut_to_review">รอรีวิว</string>
+    <string name="profile_shortcut_returns">คืนสินค้า</string>
+    <string name="profile_orders_view_all">ดูทั้งหมด</string>
     <string name="profile_section_account">บัญชี</string>
     <string name="profile_section_shortcuts">ทางลัด</string>
     <string name="profile_section_addresses">ที่อยู่</string>

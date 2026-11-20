@@ -198,9 +198,17 @@
     <string name="profile_demo_badge">ဒီမိုအကောင့်</string>
     <string name="profile_role_label">အခန်းကဏ္ဍ: %1$s</string>
     <string name="profile_verified_badge">အတည်ပြုပြီး</string>
+    <string name="profile_membership_tier">ငွေအဆင့် အသင်းဝင်</string>
     <string name="profile_stats_orders">အမှာစာ</string>
     <string name="profile_stats_wishlist">နှစ်သက်စာရင်း</string>
     <string name="profile_stats_messages">စာ</string>
+    <string name="profile_stats_vouchers">ဘောင်ချာများ</string>
+    <string name="profile_shortcut_to_pay">ငွေပေးရန်</string>
+    <string name="profile_shortcut_to_ship">ပို့ဆောင်ရန်</string>
+    <string name="profile_shortcut_to_receive">လက်ခံရန်</string>
+    <string name="profile_shortcut_to_review">သုံးသပ်ရန်</string>
+    <string name="profile_shortcut_returns">ပြန်ပို့ရန်</string>
+    <string name="profile_orders_view_all">အားလုံးကြည့်ရန်</string>
     <string name="profile_section_account">အကောင့်</string>
     <string name="profile_section_shortcuts">အတိုကောက်</string>
     <string name="profile_section_addresses">လိပ်စာများ</string>
