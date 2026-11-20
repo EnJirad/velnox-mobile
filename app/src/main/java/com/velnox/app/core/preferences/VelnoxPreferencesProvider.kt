@@ -27,7 +27,14 @@ class PreferencesState(
 )
 
 val LocalPreferences = staticCompositionLocalOf<PreferencesState> {
-    error("LocalPreferences is not provided. Wrap the tree in VelnoxPreferencesProvider.")
+    PreferencesState(
+        current = UserPreferences(),
+        setLanguage = {},
+        setThemeMode = {},
+        setNotifyOrderUpdates = {},
+        setNotifyPromotions = {},
+        setNotifySecurity = {},
+    )
 }
 
 @Composable

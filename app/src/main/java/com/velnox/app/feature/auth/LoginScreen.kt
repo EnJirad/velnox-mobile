@@ -439,12 +439,8 @@ fun LoginLanguageSelector(
     currentLanguage: AppLanguage? = null,
     onLanguageSelected: ((AppLanguage) -> Unit)? = null,
 ) {
-    val preferences = try {
-        LocalPreferences.current
-    } catch (_: IllegalStateException) {
-        null
-    }
-    val activeLanguage = currentLanguage ?: preferences?.current?.language ?: AppLanguage.TH
+    val preferences = LocalPreferences.current
+    val activeLanguage = currentLanguage ?: preferences.current.language
     var expanded by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
@@ -526,7 +522,7 @@ fun LoginLanguageSelector(
                         if (onLanguageSelected != null) {
                             onLanguageSelected(lang)
                         } else {
-                            preferences?.setLanguage?.invoke(lang)
+                            preferences.setLanguage(lang)
                         }
                         expanded = false
                     },
