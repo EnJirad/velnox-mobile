@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
 /**
@@ -55,21 +56,28 @@ object ImageOptimizer {
         quality: Int = 85,
     ): OptimizedImage? = withContext(Dispatchers.IO) {
         runCatching {
-            // 1. Read EXIF orientation
+            // Read content resolver input stream EXACTLY ONCE into memory.
+            // Multiple openInputStream calls on content:// URIs fail on Android 11+
+            // due to transient single-read URI permission grants from PhotoPicker.
+            val rawBytes = context.contentResolver.openInputStream(uri)?.use { stream ->
+                stream.readBytes()
+            } ?: return@withContext null
+
+            if (rawBytes.isEmpty()) return@withContext null
+
+            // 1. Read EXIF orientation from in-memory stream
             val orientation = runCatching {
-                context.contentResolver.openInputStream(uri)?.use { stream ->
+                ByteArrayInputStream(rawBytes).use { stream ->
                     ExifInterface(stream).getAttributeInt(
                         ExifInterface.TAG_ORIENTATION,
                         ExifInterface.ORIENTATION_NORMAL,
                     )
-                } ?: ExifInterface.ORIENTATION_NORMAL
+                }
             }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
 
             // 2. Decode image bounds without allocating pixel memory
             val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream, null, boundsOptions)
-            } ?: return@withContext null
+            BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, boundsOptions)
 
             val origWidth = boundsOptions.outWidth
             val origHeight = boundsOptions.outHeight
@@ -86,9 +94,8 @@ object ImageOptimizer {
                 this.inSampleSize = inSampleSize
                 inPreferredConfig = Bitmap.Config.ARGB_8888
             }
-            val sampledBitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream, null, decodeOptions)
-            } ?: return@withContext null
+            val sampledBitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, decodeOptions)
+                ?: return@withContext null
 
             // 5. Apply EXIF rotation if needed
             val rotationDegrees = when (orientation) {

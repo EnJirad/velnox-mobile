@@ -90,12 +90,34 @@ class CustomerRemoteDataSource(
             client.newCall(putRequest).execute().use { response ->
                 response.isSuccessful
             }
-        } catch (e: Exception) {
-            return@withContext CustomerResult.Failed(CustomerError.Network, e.message)
+        } catch (_: Exception) {
+            false
         }
 
         if (!isPutSuccess) {
-            return@withContext CustomerResult.Failed(CustomerError.Server, "Storage upload failed")
+            // Robust direct upload fallback to backend if R2 pre-signed PUT fails
+            val base64Str = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            val directBody = JSONObject()
+                .put("kind", kind)
+                .put("base64", base64Str)
+                .put("mimeType", mimeType)
+            val directRaw = send(token, "POST", "/api/customer/profile-image/direct", directBody)
+            return@withContext when (directRaw) {
+                is Raw.Success -> {
+                    val directObj = directRaw.data as? JSONObject
+                    val serverUrl = if (kind == "avatar") {
+                        directObj?.optString("avatarUrl")?.takeIf { it.isNotBlank() }
+                    } else {
+                        directObj?.optString("coverUrl")?.takeIf { it.isNotBlank() }
+                    }
+                    val url = serverUrl
+                        ?: directObj?.optString("url")?.takeIf { it.isNotBlank() }
+                        ?: intentData.optString("cdnUrl").takeIf { it.isNotBlank() }
+                        ?: objectKey
+                    CustomerResult.Ok(url)
+                }
+                is Raw.Failure -> CustomerResult.Failed(directRaw.error, directRaw.message)
+            }
         }
 
         // Confirm upload and save to Neon PostgreSQL
