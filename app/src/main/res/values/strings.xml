@@ -565,4 +565,5 @@
     <string name="wishlist_removed">นำออกจากรายการโปรดแล้ว</string>
     <string name="wishlist_undo">เลิกทำ</string>
     <string name="wishlist_count">สินค้าทั้งหมด (%1$d ชิ้น)</string>
+    <string name="common_delete">ลบ</string>
 </resources>

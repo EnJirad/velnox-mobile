@@ -565,4 +565,5 @@
     <string name="wishlist_removed">နှစ်သက်စာရင်းမှ ဖယ်ရှားပြီးပါပြီ</string>
     <string name="wishlist_undo">ပြန်ပြင်မည်</string>
     <string name="wishlist_count">စုစုပေါင်း ပစ္စည်း (%1$d)</string>
+    <string name="common_delete">ဖျက်မည်</string>
 </resources>
