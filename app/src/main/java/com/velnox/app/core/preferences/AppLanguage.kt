@@ -19,6 +19,13 @@ enum class AppLanguage(
 
     val locale: Locale get() = Locale.forLanguageTag(tag)
 
+    val nativeName: String
+        get() = when (this) {
+            TH -> "ไทย"
+            EN -> "English"
+            MY -> "မြန်မာ"
+        }
+
     companion object {
         /** Stored tags are authoritative; unknown or absent falls back to the device language. */
         fun fromTag(tag: String?): AppLanguage {

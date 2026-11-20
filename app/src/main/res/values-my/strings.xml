@@ -395,6 +395,10 @@
     <string name="login_error_google_failed">Google ဖြင့် အကောင့်ဝင်၍ မရပါ။ ထပ်မံ ကြိုးစားပါ။</string>
     <string name="login_error_google_no_account">ဤစက်တွင် Google အကောင့် မတွေ့ပါ။ Settings တွင် ထည့်ပါ။</string>
     <string name="login_error_google_link_required">ဤအီးမေးလ်တွင် အကောင့် ရှိပြီးဖြစ်သည်။ စကားဝှက်ဖြင့် အရင် အကောင့်ဝင်ပြီးမှ Google ကို ချိတ်ဆက်ပါ။</string>
+    <string name="login_error_google_email_mismatch">ထို Google အီးမေးလ်သည် ဤအကောင့်နှင့် မကိုက်ညီသောကြောင့် ချိတ်ဆက်၍ မရပါ</string>
+    <string name="login_error_google_identity_conflict">ထို Google အကောင့်ကို အခြားအကောင့်တစ်ခုနှင့် ချိတ်ဆက်ပြီးဖြစ်သည်</string>
+    <string name="login_error_google_link_failed">Google ချိတ်ဆက်၍ မရပါ။ နောက်မှ ထပ်မံ ကြိုးစားပါ။</string>
+    <string name="google_link_success">Google အကောင့် ချိတ်ဆက်ပြီးပါပြီ</string>
     <string name="login_continue_browsing">အကောင့်မဝင်ဘဲ ဆက်လက်ကြည့်ရှုရန်</string>
     <string name="auth_reason_title">ဝင်ရန် လိုအပ်ပါသည်</string>
     <string name="auth_reason_cart">စျေးခြင်းသည် သင့်အကောင့်နှင့် ဆက်စပ်နေသည်။ ရွေးထားသော ပစ္စည်းများ သိမ်းထားရန် အကောင့်ဝင်ပါ။</string>

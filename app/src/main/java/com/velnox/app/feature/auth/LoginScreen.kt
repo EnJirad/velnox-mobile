@@ -42,7 +42,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -101,8 +100,6 @@ fun LoginScreen(
     onLanguageSelected: ((AppLanguage) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val showBrandBadge = screenWidth >= 360
 
     var email by rememberSaveable(emailPrefill) { mutableStateOf(emailPrefill) }
     var password by rememberSaveable { mutableStateOf("") }
@@ -112,8 +109,6 @@ fun LoginScreen(
     var emailTouched by rememberSaveable { mutableStateOf(false) }
     var passwordTouched by rememberSaveable { mutableStateOf(false) }
 
-    var showComingSoon by remember { mutableStateOf(false) }
-
     val emailError = CredentialRules.emailError(email)
     val passwordError = CredentialRules.loginPasswordError(password)
 
@@ -121,18 +116,13 @@ fun LoginScreen(
         if (isSubmitting) return
         emailTouched = true
         passwordTouched = true
-        if (emailError != null || passwordError != null) {
-            showComingSoon = false
-            return
-        }
+        if (emailError != null || passwordError != null) return
         focusManager.clearFocus()
-        showComingSoon = false
         onSubmit(email.trim(), password)
     }
 
     AuthScreenFrame {
         AuthBrandHeader(
-            showBadge = showBrandBadge,
             trailing = {
                 LoginLanguageSelector(
                     currentLanguage = currentLanguage,
@@ -141,24 +131,11 @@ fun LoginScreen(
             },
         )
 
-        Spacer(Modifier.height(28.dp))
-        Text(
-            text = stringResource(R.string.login_eyebrow),
-            style = TextXs.copy(fontWeight = FontWeight.Medium),
-            color = VelnoxBrand,
-        )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(24.dp))
         Text(
             text = stringResource(R.string.login_title),
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.login_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.widthIn(max = 340.dp),
         )
 
         if (reason != null) {
@@ -166,7 +143,7 @@ fun LoginScreen(
             SignInReasonCard(reason = reason)
         }
 
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(20.dp))
 
         Column(
             modifier = Modifier
@@ -190,7 +167,6 @@ fun LoginScreen(
                     onValueChange = {
                         email = it.trim()
                         emailTouched = true
-                        showComingSoon = false
                     },
                     placeholder = stringResource(R.string.login_email_placeholder),
                     isError = emailTouched && emailError != null,
@@ -214,7 +190,6 @@ fun LoginScreen(
                     onValueChange = {
                         password = it
                         passwordTouched = true
-                        showComingSoon = false
                     },
                     placeholder = stringResource(R.string.login_password_placeholder),
                     isError = passwordTouched && passwordError != null,
@@ -291,17 +266,6 @@ fun LoginScreen(
             }
         }
 
-        AnimatedVisibility(
-            visible = showComingSoon,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 3 }),
-            exit = fadeOut(),
-        ) {
-            Column {
-                Spacer(Modifier.height(12.dp))
-                NoticeBanner(stringResource(R.string.common_coming_soon))
-            }
-        }
-
         Spacer(Modifier.height(14.dp))
         SignUpRow(enabled = !isSubmitting, onClick = onRegister)
 
@@ -309,33 +273,17 @@ fun LoginScreen(
         OrDivider()
         Spacer(Modifier.height(16.dp))
 
-        Row(
+        SocialButton(
+            label = stringResource(R.string.login_continue_google),
+            glyph = "G",
+            enabled = googleButtonEnabled(
+                isSubmitting = isSubmitting,
+                googleBusy = googleBusy,
+                googleAvailable = googleAvailable,
+            ),
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            SocialButton(
-                label = stringResource(R.string.login_continue_google),
-                glyph = "G",
-                // Inert while a request is in flight, and disabled outright when
-                // the deployment has no Google client configured — tapping a
-                // button that cannot work is worse than showing it greyed out.
-                // See `googleButtonEnabled` for the three reasons, tested there.
-                enabled = googleButtonEnabled(
-                    isSubmitting = isSubmitting,
-                    googleBusy = googleBusy,
-                    googleAvailable = googleAvailable,
-                ),
-                modifier = Modifier.weight(1f),
-                onClick = onGoogleSignIn,
-            )
-            SocialButton(
-                label = stringResource(R.string.login_continue_line),
-                glyph = "LINE",
-                enabled = !isSubmitting,
-                modifier = Modifier.weight(1f),
-                onClick = { showComingSoon = true },
-            )
-        }
+            onClick = onGoogleSignIn,
+        )
 
         if (onDismiss != null) {
             Spacer(Modifier.height(14.dp))
@@ -359,9 +307,6 @@ fun LoginScreen(
                 )
             }
         }
-
-        Spacer(Modifier.height(20.dp))
-        AuthFooter()
     }
 }
 
@@ -399,7 +344,7 @@ fun AuthScreenFrame(content: @Composable () -> Unit) {
 
 @Composable
 fun AuthBrandHeader(
-    showBadge: Boolean = true,
+    showBadge: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
@@ -429,9 +374,12 @@ fun AuthBrandHeader(
 /**
  * Compact language selector located near the top-right corner of the Login screen.
  *
- * Provides immediate switching between Thai and English via the app's [VelnoxPreferencesProvider]
- * and [VelnoxLocaleProvider] architecture, persisting the selection to [PreferencesRepository]
- * while preserving all typed fields in the login form.
+ * Supports Thai (ไทย), English (English), and Burmese (မြန်မာ), with native language names
+ * and immediate switching across the composition tree via [VelnoxPreferencesProvider]
+ * and [VelnoxLocaleProvider] without resetting entered credentials.
+ *
+ * Designed to be future-expandable: adding new languages to [AppLanguage] automatically
+ * reflects in this selector without modifying the Login UI.
  */
 @Composable
 fun LoginLanguageSelector(
@@ -450,23 +398,19 @@ fun LoginLanguageSelector(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, SquircleSm)
                 .velnoxClickable(role = Role.Button) { expanded = true }
-                .padding(horizontal = 8.dp, vertical = 5.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
                 imageVector = VelnoxIcons.Globe,
                 contentDescription = stringResource(R.string.settings_language_title),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(15.dp),
             )
             Text(
-                text = when (activeLanguage) {
-                    AppLanguage.TH -> "ไทย"
-                    AppLanguage.EN -> "EN"
-                    else -> activeLanguage.tag.uppercase()
-                },
-                style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                text = stringResource(activeLanguage.nativeLabelRes),
+                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Icon(
@@ -485,8 +429,7 @@ fun LoginLanguageSelector(
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, SquircleLg),
             shape = SquircleLg,
         ) {
-            val supportedLanguages = listOf(AppLanguage.TH, AppLanguage.EN)
-            supportedLanguages.forEach { lang ->
+            AppLanguage.entries.forEach { lang ->
                 val isSelected = lang == activeLanguage
                 DropdownMenuItem(
                     text = {
