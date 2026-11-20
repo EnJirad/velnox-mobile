@@ -4,9 +4,6 @@ package com.velnox.app.feature.profile
 
 import android.content.Context
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -104,42 +101,34 @@ fun ProfileScreen(
     onOpenMessages: () -> Unit,
     onOpenHelpCenter: () -> Unit,
     modifier: Modifier = Modifier,
+    onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val preferences = LocalPreferences.current
     val scope = rememberCoroutineScope()
 
-    var activePhotoTarget by remember { mutableStateOf<PhotoTarget?>(null) }
     var showPhotoOptionsFor by remember { mutableStateOf<PhotoTarget?>(null) }
 
-    val mediaPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri: Uri? ->
-        val target = activePhotoTarget
-        activePhotoTarget = null
-        if (uri != null && target != null) {
-            scope.launch {
-                val savedPath = persistPickedImage(
-                    context = context,
-                    sourceUri = uri,
-                    prefix = if (target == PhotoTarget.Avatar) "profile_avatar" else "profile_cover",
-                )
-                if (savedPath != null) {
-                    if (target == PhotoTarget.Avatar) {
-                        preferences.setAvatarUri(savedPath)
-                    } else {
-                        preferences.setCoverUri(savedPath)
+    fun launchGallery(target: PhotoTarget) {
+        if (onPickImage == null) return
+        onPickImage { uri ->
+            if (uri != null) {
+                scope.launch {
+                    val savedPath = persistPickedImage(
+                        context = context,
+                        sourceUri = uri,
+                        prefix = if (target == PhotoTarget.Avatar) "profile_avatar" else "profile_cover",
+                    )
+                    if (savedPath != null) {
+                        if (target == PhotoTarget.Avatar) {
+                            preferences.setAvatarUri(savedPath)
+                        } else {
+                            preferences.setCoverUri(savedPath)
+                        }
                     }
                 }
             }
         }
-    }
-
-    fun launchGallery(target: PhotoTarget) {
-        activePhotoTarget = target
-        mediaPicker.launch(
-            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-        )
     }
 
     Column(
