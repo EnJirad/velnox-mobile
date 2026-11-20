@@ -67,6 +67,8 @@ import com.velnox.app.feature.notifications.NotificationsState
 import com.velnox.app.feature.orders.OrderDetailScreen
 import com.velnox.app.feature.orders.OrdersScreen
 import com.velnox.app.feature.profile.ProfileScreen
+import com.velnox.app.feature.search.SearchScreen
+import com.velnox.app.feature.search.SearchState
 import com.velnox.app.feature.settings.SettingsDetailScreen
 import com.velnox.app.feature.settings.SettingsPage
 import com.velnox.app.feature.settings.SettingsScreen
@@ -186,6 +188,7 @@ private fun VelnoxNavHost() {
     val authStep = AuthStep.fromKey(authStepKey)
     val cart = remember { CartState() }
     val notifications = remember { NotificationsState() }
+    val searchState = remember { SearchState() }
     val tabStateHolder = rememberSaveableStateHolder()
 
     fun openTab(next: AppTab) {
@@ -598,6 +601,12 @@ private fun VelnoxNavHost() {
                         },
                     )
 
+                    "search" -> SearchScreen(
+                        onBack = ::closeOverlay,
+                        onOpenProduct = ::requestOverlay,
+                        searchState = searchState,
+                    )
+
                     else -> {
                         if (overlay.startsWith("category:")) {
                             MarketScreen(
@@ -808,6 +817,7 @@ private fun TabContent(
             onOpenMessages = { onOpenOverlay("messages") },
             onOpenNotifications = { onOpenOverlay("notifications") },
             unreadNotificationsCount = notifications.unreadCount,
+            onOpenSearch = { onOpenOverlay("search") },
         )
 
         AppTab.Market -> MarketScreen(

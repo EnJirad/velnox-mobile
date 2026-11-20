@@ -575,4 +575,23 @@
     <string name="notifications_mark_all_read">အားလုံးဖတ်ပြီးသားမှတ်ရန်</string>
     <string name="notifications_clear_all">အသိပေးချက်အားလုံးရှင်းရန်</string>
     <string name="notifications_empty_filter">ဤအမျိုးအစားတွင် အသိပေးချက် မရှိပါ</string>
+    <string name="search_recent_title">မကြာသေးမီက ရှာဖွေမှုများ</string>
+    <string name="search_recent_clear">အားလုံးရှင်းရန်</string>
+    <string name="search_trending_title">ရေပန်းစားသော ရှာဖွေမှုများ</string>
+    <string name="search_filter_title">စစ်ထုတ်ရန်နှင့် စီရန်</string>
+    <string name="search_filter_price_range">ဈေးနှုန်းအကွာအဝေး</string>
+    <string name="search_filter_min_price">အနည်းဆုံးဈေး</string>
+    <string name="search_filter_max_price">အများဆုံးဈေး</string>
+    <string name="search_filter_categories">အမျိုးအစားများ</string>
+    <string name="search_filter_in_stock_only">ပစ္စည်းရှိသည်များသာ</string>
+    <string name="search_filter_verified_only">အသိအမှတ်ပြု ဆိုင်များသာ</string>
+    <string name="search_filter_reset">ပြန်လည်စတင်မည်</string>
+    <string name="search_filter_apply">စစ်ထုတ်မှု အသုံးပြုမည်</string>
+    <string name="search_sort_relevance">ကိုက်ညီမှု</string>
+    <string name="search_sort_top_sales">အရောင်းရဆုံး</string>
+    <string name="search_sort_price_low_high">ဈေးနှုန်း: အနိမ့်မှ အမြင့်</string>
+    <string name="search_sort_price_high_low">ဈေးနှုန်း: အမြင့်မှ အနိမ့်</string>
+    <string name="search_sort_rating">အဆင့်သတ်မှတ်ချက် အမြင့်ဆုံး</string>
+    <string name="search_no_results">ပစ္စည်း မတွေ့ရှိပါ</string>
+    <string name="search_no_results_hint">စာလုံးပေါင်း စစ်ဆေးပါ သို့မဟုတ် အခြားစာလုံးဖြင့် ရှာပါ</string>
 </resources>

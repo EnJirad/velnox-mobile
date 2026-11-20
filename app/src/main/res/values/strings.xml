@@ -575,4 +575,23 @@
     <string name="notifications_mark_all_read">อ่านทั้งหมดแล้ว</string>
     <string name="notifications_clear_all">ล้างการแจ้งเตือนทั้งหมด</string>
     <string name="notifications_empty_filter">ไม่มีการแจ้งเตือนในหมวดหมู่นี้</string>
+    <string name="search_recent_title">ประวัติการค้นหา</string>
+    <string name="search_recent_clear">ล้างประวัติ</string>
+    <string name="search_trending_title">คำค้นหายอดนิยม</string>
+    <string name="search_filter_title">ตัวกรองสินค้า</string>
+    <string name="search_filter_price_range">ช่วงราคา (บาท)</string>
+    <string name="search_filter_min_price">ราคาต่ำสุด</string>
+    <string name="search_filter_max_price">ราคาสูงสุด</string>
+    <string name="search_filter_categories">หมวดหมู่</string>
+    <string name="search_filter_in_stock_only">เฉพาะสินค้าที่มีในสต็อก</string>
+    <string name="search_filter_verified_only">ร้านค้ายืนยันตัวตนแล้วเท่านั้น</string>
+    <string name="search_filter_reset">รีเซ็ต</string>
+    <string name="search_filter_apply">นำตัวกรองไปใช้</string>
+    <string name="search_sort_relevance">ความเกี่ยวข้อง</string>
+    <string name="search_sort_top_sales">ขายดีที่สุด</string>
+    <string name="search_sort_price_low_high">ราคา: ต่ำไปสูง</string>
+    <string name="search_sort_price_high_low">ราคา: สูงไปต่ำ</string>
+    <string name="search_sort_rating">คะแนนรีวิวสูงสุด</string>
+    <string name="search_no_results">ไม่พบสินค้าที่ตรงกับการค้นหา</string>
+    <string name="search_no_results_hint">ลองตรวจสอบคำสะกด หรือใช้คำค้นหาที่กว้างขึ้น</string>
 </resources>

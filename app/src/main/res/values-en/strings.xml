@@ -575,4 +575,23 @@
     <string name="notifications_mark_all_read">Mark all read</string>
     <string name="notifications_clear_all">Clear all notifications</string>
     <string name="notifications_empty_filter">No notifications in this category</string>
+    <string name="search_recent_title">Recent Searches</string>
+    <string name="search_recent_clear">Clear all</string>
+    <string name="search_trending_title">Trending Searches</string>
+    <string name="search_filter_title">Filter &amp; Sort</string>
+    <string name="search_filter_price_range">Price Range</string>
+    <string name="search_filter_min_price">Min Price</string>
+    <string name="search_filter_max_price">Max Price</string>
+    <string name="search_filter_categories">Categories</string>
+    <string name="search_filter_in_stock_only">In Stock Only</string>
+    <string name="search_filter_verified_only">Verified Stores Only</string>
+    <string name="search_filter_reset">Reset</string>
+    <string name="search_filter_apply">Apply Filters</string>
+    <string name="search_sort_relevance">Relevance</string>
+    <string name="search_sort_top_sales">Top Sales</string>
+    <string name="search_sort_price_low_high">Price: Low to High</string>
+    <string name="search_sort_price_high_low">Price: High to Low</string>
+    <string name="search_sort_rating">Highest Rating</string>
+    <string name="search_no_results">No products found</string>
+    <string name="search_no_results_hint">Try checking your spelling or use more general keywords</string>
 </resources>

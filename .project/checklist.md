@@ -155,18 +155,20 @@
 
 ---
 
-### [ ] Part 09: Advanced Search Experience & Product Filtering
+### [x] Part 09: Advanced Search Experience & Product Filtering
 - **Document:** `.project/part-09-advanced-search-filtering.md`
 - **Target Files:**
   - `SearchScreen.kt`
-  - `MarketScreen.kt`
+  - `SearchModels.kt`
+  - `HomeScreen.kt`
   - `VelnoxApp.kt`
+  - `SearchStateTest.kt`
 - **Key Objectives:**
-  - [ ] Replace `PlaceholderDestination("search")` with interactive `SearchScreen`.
-  - [ ] Recent search history chips with individual delete and clear all.
-  - [ ] Trending search tag cloud.
-  - [ ] Debounced real-time auto-suggestions as user types.
-  - [ ] Multi-criteria filter & sort sheet (price range, ratings, categories).
+  - [x] Replace `PlaceholderDestination("search")` with interactive `SearchScreen`.
+  - [x] Recent search history chips with individual delete and clear all.
+  - [x] Trending search tag cloud.
+  - [x] Debounced real-time auto-suggestions as user types.
+  - [x] Multi-criteria filter & sort sheet (price range, ratings, categories).
 
 ---
 

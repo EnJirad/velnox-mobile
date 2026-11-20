@@ -138,6 +138,7 @@ fun HomeScreen(
     onOpenMessages: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
     unreadNotificationsCount: Int = 0,
+    onOpenSearch: () -> Unit = {},
 ) {
     val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
     val isThai = LocalConfiguration.current.locales[0].language == "th"
@@ -221,6 +222,7 @@ fun HomeScreen(
             unreadNotificationsCount = unreadNotificationsCount,
             onOpenNotifications = onOpenNotifications,
             onOpenMessages = onOpenMessages,
+            onOpenSearch = onOpenSearch,
         )
 
         BoxWithConstraints(
@@ -528,6 +530,7 @@ private fun HomeToolbar(
     unreadNotificationsCount: Int,
     onOpenNotifications: () -> Unit,
     onOpenMessages: () -> Unit,
+    onOpenSearch: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -549,6 +552,7 @@ private fun HomeToolbar(
                 query = query,
                 onQueryChange = onQueryChange,
                 onClearQuery = onClearQuery,
+                onOpenSearch = onOpenSearch,
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(VelnoxSpacing.xs))
@@ -593,19 +597,16 @@ private fun HomeSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
+    onOpenSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val focusManager = LocalFocusManager.current
-    val interactionSource = remember { MutableInteractionSource() }
-    val focused by interactionSource.collectIsFocusedAsState()
-    val borderColor = if (focused) VelnoxBrand else MaterialTheme.colorScheme.outline
-
     Row(
         modifier = modifier
             .heightIn(min = 44.dp)
             .clip(Squircle)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.dp, borderColor, Squircle)
+            .border(1.dp, MaterialTheme.colorScheme.outline, Squircle)
+            .velnoxClickable(role = Role.Button, onClick = onOpenSearch)
             .padding(start = VelnoxSpacing.md, end = VelnoxSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -616,36 +617,16 @@ private fun HomeSearchField(
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(VelnoxSpacing.sm))
-        // CenterStart, not the default TopStart: the text field carries vertical
-        // padding, so a top-aligned placeholder sat ~12dp above the typed text and
-        // the 18dp search icon. Centering makes all three share one baseline box.
         Box(
             modifier = Modifier.weight(1f),
             contentAlignment = Alignment.CenterStart,
         ) {
-            if (query.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.home_search_placeholder),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
-                cursorBrush = SolidColor(VelnoxBrand),
-                interactionSource = interactionSource,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = VelnoxSpacing.md),
+            Text(
+                text = if (query.isEmpty()) stringResource(R.string.home_search_placeholder) else query,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (query.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         if (query.isNotEmpty()) {
