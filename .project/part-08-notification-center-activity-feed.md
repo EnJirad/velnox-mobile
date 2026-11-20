@@ -23,4 +23,7 @@ Replace the empty notification popover and placeholder destination with an inter
    - GitHub Actions CI build & verification.
 
 ## Status
-- Implementation complete, unit tests added, pushed to GitHub Actions for verification.
+- **Commit:** `3f605b8`
+- **GitHub Actions Run:** [Run #44730363828](https://github.com/EnJirad/velnox-mobile/actions/runs/44730363828) (PASS)
+- **APK Artifact:** `velnox-debug-apk` (ID: 14625483350, 12.5 MB)
+- Implementation complete, unit tests passed, remotely verified on GitHub Actions CI.
