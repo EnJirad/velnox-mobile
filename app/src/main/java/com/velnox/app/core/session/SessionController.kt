@@ -166,4 +166,14 @@ class SessionController(
         }
         return result
     }
+
+    /**
+     * Update the authenticated user's profile details in the active session.
+     */
+    fun updateProfile(name: String, email: String) {
+        val current = state
+        if (current is SessionState.Authenticated) {
+            state = SessionState.Authenticated(current.user.copy(name = name, email = email))
+        }
+    }
 }

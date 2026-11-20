@@ -524,4 +524,19 @@
     <string name="orders_tracking_number">Tracking Number</string>
     <string name="orders_tracking_copy">Copy</string>
     <string name="orders_tracking_copied">Tracking number copied</string>
+    <string name="address_recipient_name">Recipient Name</string>
+    <string name="address_phone">Phone Number</string>
+    <string name="address_line">Address (House no., Street)</string>
+    <string name="address_subdistrict">Sub-district</string>
+    <string name="address_district">District</string>
+    <string name="address_province">Province</string>
+    <string name="address_postal_code">Postal Code</string>
+    <string name="address_set_default">Set as default delivery address</string>
+    <string name="address_edit">Edit</string>
+    <string name="address_delete">Delete Address</string>
+    <string name="address_delete_confirm">Are you sure you want to delete this address?</string>
+    <string name="address_empty">No delivery addresses saved</string>
+    <string name="address_save">Save Address</string>
+    <string name="address_validation_error">Please fill in all required fields accurately</string>
+    <string name="address_select_title">Select Delivery Address</string>
 </resources>

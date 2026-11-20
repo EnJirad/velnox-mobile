@@ -64,6 +64,8 @@ import com.velnox.app.feature.home.ProductArtTile
 import com.velnox.app.feature.orders.DemoOrder
 import com.velnox.app.feature.orders.OrderStatus
 import com.velnox.app.feature.orders.OrdersDemo
+import com.velnox.app.feature.profile.AddressBookState
+import com.velnox.app.feature.profile.UserAddress
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.PageGutter
@@ -161,6 +163,13 @@ fun CheckoutScreen(
     var isOrderSuccess by remember { mutableStateOf(false) }
     var createdOrderId by remember { mutableStateOf("") }
 
+    var showAddressPicker by remember { mutableStateOf(false) }
+    var selectedAddressId by remember { mutableStateOf<String?>(null) }
+    val addresses = AddressBookState.addresses
+    val activeAddress = remember(addresses.toList(), selectedAddressId) {
+        addresses.firstOrNull { it.id == selectedAddressId } ?: AddressBookState.defaultAddress
+    }
+
     val itemsSubtotal = remember(selectedItems) {
         selectedItems.sumOf { (it.price ?: 450.0) * it.quantity }
     }
@@ -188,11 +197,11 @@ fun CheckoutScreen(
             // 1. Delivery Address Card
             item {
                 AddressCard(
-                    recipient = "สมชาย ใจดี",
-                    phone = "081-234-5678",
-                    address = "123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110",
-                    isDefault = true,
-                    onChange = { /* Future: Address selection sheet */ },
+                    recipient = activeAddress?.recipientName ?: "สมชาย ใจดี",
+                    phone = activeAddress?.phone ?: "081-234-5678",
+                    address = activeAddress?.fullAddressText ?: "123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110",
+                    isDefault = activeAddress?.isDefault ?: true,
+                    onChange = { showAddressPicker = true },
                 )
             }
 
@@ -303,6 +312,7 @@ fun CheckoutScreen(
                                 customStore = firstItem.storeName,
                                 totalPrice = grandTotal,
                                 imageUrl = firstItem.imageUrl,
+                                deliveryAddress = activeAddress?.shortSummary ?: activeAddress?.fullAddressText,
                             ),
                         )
 
@@ -313,6 +323,87 @@ fun CheckoutScreen(
                 )
             }
         }
+    }
+
+    if (showAddressPicker) {
+        AlertDialog(
+            onDismissRequest = { showAddressPicker = false },
+            shape = SquircleLg,
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = stringResource(R.string.address_select_title),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            },
+            text = {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(addresses, key = { it.id }) { addr ->
+                        val isSelected = addr.id == activeAddress?.id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(Squircle)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isSelected) VelnoxBrand else MaterialTheme.colorScheme.outlineVariant,
+                                    Squircle,
+                                )
+                                .velnoxClickable(role = Role.RadioButton) {
+                                    selectedAddressId = addr.id
+                                    showAddressPicker = false
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = addr.recipientName,
+                                        style = TextXs.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = addr.phone,
+                                        style = Text2xs,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (addr.isDefault) {
+                                        Spacer(Modifier.width(6.dp))
+                                        BrandBadge(text = stringResource(R.string.settings_address_default))
+                                    }
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = addr.fullAddressText,
+                                    style = Text2xs,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAddressPicker = false }) {
+                    Text(
+                        text = stringResource(R.string.common_close),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            },
+        )
     }
 
     if (isOrderSuccess) {

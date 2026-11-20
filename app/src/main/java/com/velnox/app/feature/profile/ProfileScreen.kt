@@ -165,18 +165,27 @@ fun ProfileScreen(
 
             item {
                 SectionCard(title = stringResource(R.string.profile_section_addresses)) {
-                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                        AddressLine(
-                            label = stringResource(R.string.profile_address_default),
-                            detail = stringResource(R.string.orders_demo_address),
-                            isDefault = true,
+                    val addresses = AddressBookState.addresses
+                    if (addresses.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.address_empty),
+                            style = TextXs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         )
-                        Spacer(Modifier.height(10.dp))
-                        AddressLine(
-                            label = stringResource(R.string.profile_address_secondary),
-                            detail = stringResource(R.string.profile_address_secondary_detail),
-                            isDefault = false,
-                        )
+                    } else {
+                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                            addresses.forEachIndexed { index, addr ->
+                                AddressLine(
+                                    label = addr.recipientName + if (addr.isDefault) " (${stringResource(R.string.profile_address_default)})" else "",
+                                    detail = addr.fullAddressText,
+                                    isDefault = addr.isDefault,
+                                )
+                                if (index < addresses.lastIndex) {
+                                    Spacer(Modifier.height(10.dp))
+                                }
+                            }
+                        }
                     }
                     CardDivider()
                     Row(

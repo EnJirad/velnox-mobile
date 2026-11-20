@@ -524,4 +524,19 @@
     <string name="orders_tracking_number">ပါဆယ်နံပါတ်</string>
     <string name="orders_tracking_copy">ကူးယူမည်</string>
     <string name="orders_tracking_copied">ပါဆယ်နံပါတ် ကူးယူပြီးပါပြီ</string>
+    <string name="address_recipient_name">လက်ခံသူအမည်</string>
+    <string name="address_phone">ဖုန်းနံပါတ်</string>
+    <string name="address_line">လိပ်စာ (အိမ်အမှတ်၊ လမ်း)</string>
+    <string name="address_subdistrict">ရပ်ကွက်/ကျေးရွာ</string>
+    <string name="address_district">မြို့နယ်</string>
+    <string name="address_province">တိုင်းဒေသကြီး/ပြည်နယ်</string>
+    <string name="address_postal_code">စာတိုက်သင်္ကေတ</string>
+    <string name="address_set_default">မူလလိပ်စာအဖြစ် သတ်မှတ်မည်</string>
+    <string name="address_edit">ပြင်ဆင်မည်</string>
+    <string name="address_delete">လိပ်စာဖျက်မည်</string>
+    <string name="address_delete_confirm">ဤလိပ်စာကို ဖျက်ရန် သေချာပါသလား?</string>
+    <string name="address_empty">လိပ်စာမရှိသေးပါ</string>
+    <string name="address_save">လိပ်စာသိမ်းမည်</string>
+    <string name="address_validation_error">အချက်အလက်များ ပြည့်စုံစွာ ဖြည့်ပါ</string>
+    <string name="address_select_title">ပို့ဆောင်မည့်လိပ်စာ ရွေးပါ</string>
 </resources>

@@ -7,6 +7,7 @@ import com.velnox.app.ui.components.velnoxClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,14 +17,19 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -44,9 +51,15 @@ import com.velnox.app.R
 import com.velnox.app.core.preferences.AppLanguage
 import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.preferences.ThemeMode
+import com.velnox.app.core.session.LocalSession
+import com.velnox.app.core.session.SessionState
+import com.velnox.app.feature.profile.AddressBookState
+import com.velnox.app.feature.profile.UserAddress
+import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
 import com.velnox.app.ui.components.ChoiceRow
 import com.velnox.app.ui.components.DetailLine
+import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.PageTitle
 import com.velnox.app.ui.components.PrimaryPill
 import com.velnox.app.ui.components.SectionCard
@@ -54,6 +67,8 @@ import com.velnox.app.ui.components.SettingRow
 import com.velnox.app.ui.components.StandaloneScreen
 import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.Squircle
+import com.velnox.app.ui.theme.SquircleLg
+import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
@@ -254,11 +269,20 @@ private fun ToggleRow(
 
 @Composable
 private fun EditProfilePage() {
-    var name by rememberSaveable { mutableStateOf("") }
-    var handle by rememberSaveable { mutableStateOf("") }
-    var email by rememberSaveable { mutableStateOf("") }
-    var phone by rememberSaveable { mutableStateOf("") }
+    val session = LocalSession.current
+    val currentAuthUser = (session.state as? SessionState.Authenticated)?.user
+
+    var name by rememberSaveable(currentAuthUser?.name) {
+        mutableStateOf(currentAuthUser?.name ?: "")
+    }
+    var handle by rememberSaveable { mutableStateOf("@somchai.j") }
+    var email by rememberSaveable(currentAuthUser?.email) {
+        mutableStateOf(currentAuthUser?.email ?: "")
+    }
+    var phone by rememberSaveable { mutableStateOf("081-234-5678") }
     var saved by remember { mutableStateOf(false) }
+    var validationError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     Text(
         text = stringResource(R.string.settings_edit_profile_body),
@@ -275,34 +299,52 @@ private fun EditProfilePage() {
                 label = stringResource(R.string.settings_field_name),
                 value = name,
                 placeholder = stringResource(R.string.profile_demo_name),
-                onValueChange = { name = it; saved = false },
+                onValueChange = { name = it; saved = false; validationError = null },
             )
             LabeledField(
                 label = stringResource(R.string.settings_field_handle),
                 value = handle,
                 placeholder = stringResource(R.string.profile_demo_handle),
-                onValueChange = { handle = it; saved = false },
+                onValueChange = { handle = it; saved = false; validationError = null },
             )
             LabeledField(
                 label = stringResource(R.string.settings_field_email),
                 value = email,
                 placeholder = stringResource(R.string.profile_demo_email),
                 keyboardType = KeyboardType.Email,
-                onValueChange = { email = it; saved = false },
+                onValueChange = { email = it; saved = false; validationError = null },
             )
             LabeledField(
                 label = stringResource(R.string.settings_field_phone),
                 value = phone,
                 placeholder = stringResource(R.string.settings_field_phone_placeholder),
                 keyboardType = KeyboardType.Phone,
-                onValueChange = { phone = it; saved = false },
+                onValueChange = { phone = it; saved = false; validationError = null },
             )
         }
+    }
+    if (validationError != null) {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = validationError ?: "",
+            style = Text2xs,
+            color = MaterialTheme.colorScheme.error,
+        )
     }
     Spacer(Modifier.height(14.dp))
     PrimaryPill(
         label = stringResource(R.string.settings_save),
-        onClick = { saved = true },
+        onClick = {
+            if (name.isBlank()) {
+                validationError = context.getString(R.string.address_validation_error)
+            } else if (!email.contains("@") || !email.contains(".")) {
+                validationError = context.getString(R.string.address_validation_error)
+            } else {
+                session.updateProfile(name = name.trim(), email = email.trim())
+                saved = true
+                validationError = null
+            }
+        },
     )
     if (saved) {
         Spacer(Modifier.height(10.dp))
@@ -333,13 +375,16 @@ private fun EditProfilePage() {
 
 @Composable
 private fun PersonalInfoPage() {
+    val session = LocalSession.current
+    val authUser = (session.state as? SessionState.Authenticated)?.user
+
     SectionCard {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-            DetailLine(stringResource(R.string.settings_field_name), stringResource(R.string.profile_demo_name))
+            DetailLine(stringResource(R.string.settings_field_name), authUser?.name ?: stringResource(R.string.profile_demo_name))
             CardDivider()
             DetailLine(stringResource(R.string.settings_field_handle), stringResource(R.string.profile_demo_handle))
             CardDivider()
-            DetailLine(stringResource(R.string.settings_field_email), stringResource(R.string.profile_demo_email))
+            DetailLine(stringResource(R.string.settings_field_email), authUser?.email ?: stringResource(R.string.profile_demo_email))
             CardDivider()
             DetailLine(
                 stringResource(R.string.settings_field_phone),
@@ -366,38 +411,358 @@ private fun PersonalInfoPage() {
 
 @Composable
 private fun AddressesPage() {
-    SectionCard {
-        SettingRow(
-            icon = VelnoxIcons.MapPin,
-            title = stringResource(R.string.settings_address_default),
-            subtitle = stringResource(R.string.orders_demo_address),
-            value = null,
-            showChevron = false,
-            onClick = {},
-        )
-        CardDivider()
-        SettingRow(
-            icon = VelnoxIcons.MapPin,
-            title = stringResource(R.string.profile_address_secondary),
-            subtitle = stringResource(R.string.profile_address_secondary_detail),
-            showChevron = false,
-            onClick = {},
-        )
+    var showAddDialog by remember { mutableStateOf(false) }
+    var editingAddress by remember { mutableStateOf<UserAddress?>(null) }
+    var deletingAddressId by remember { mutableStateOf<String?>(null) }
+    val addresses = AddressBookState.addresses
+
+    Text(
+        text = stringResource(R.string.settings_addresses_title),
+        style = TextXs,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(12.dp))
+
+    if (addresses.isEmpty()) {
+        SectionCard {
+            Text(
+                text = stringResource(R.string.address_empty),
+                style = TextXs,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+    } else {
+        addresses.forEach { addr ->
+            SectionCard {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = addr.recipientName,
+                            style = TextXs.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = addr.phone,
+                            style = Text2xs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (addr.isDefault) {
+                            BrandBadge(text = stringResource(R.string.settings_address_default))
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = addr.fullAddressText,
+                        style = TextXs,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = MaterialTheme.typography.bodySmall.lineHeight,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    CardDivider()
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (!addr.isDefault) {
+                            Text(
+                                text = stringResource(R.string.address_set_default),
+                                style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                                color = VelnoxBrand,
+                                modifier = Modifier
+                                    .velnoxClickable(role = Role.Button) {
+                                        AddressBookState.setDefault(addr.id)
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = stringResource(R.string.address_edit),
+                            style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .velnoxClickable(role = Role.Button) {
+                                    editingAddress = addr
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.address_delete),
+                            style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier
+                                .velnoxClickable(role = Role.Button) {
+                                    deletingAddressId = addr.id
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
     }
-    Spacer(Modifier.height(8.dp))
+
     SectionCard {
         SettingRow(
             icon = VelnoxIcons.Plus,
             title = stringResource(R.string.settings_address_add),
             showChevron = false,
-            onClick = {},
+            onClick = { showAddDialog = true },
         )
     }
-    Spacer(Modifier.height(10.dp))
-    Text(
-        text = stringResource(R.string.common_preview_notice),
-        style = Text2xs,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+    if (showAddDialog) {
+        AddressFormDialog(
+            initialAddress = null,
+            onDismiss = { showAddDialog = false },
+            onSave = { newAddr ->
+                AddressBookState.add(newAddr)
+                showAddDialog = false
+            },
+        )
+    }
+
+    if (editingAddress != null) {
+        AddressFormDialog(
+            initialAddress = editingAddress,
+            onDismiss = { editingAddress = null },
+            onSave = { updated ->
+                AddressBookState.update(updated)
+                editingAddress = null
+            },
+        )
+    }
+
+    if (deletingAddressId != null) {
+        val targetId = deletingAddressId
+        AlertDialog(
+            onDismissRequest = { deletingAddressId = null },
+            shape = SquircleLg,
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = stringResource(R.string.address_delete),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.address_delete_confirm),
+                    style = TextXs,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (targetId != null) {
+                            AddressBookState.delete(targetId)
+                        }
+                        deletingAddressId = null
+                    },
+                ) {
+                    Text(
+                        text = stringResource(R.string.address_delete),
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingAddressId = null }) {
+                    Text(
+                        text = stringResource(R.string.common_close),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun AddressFormDialog(
+    initialAddress: UserAddress?,
+    onDismiss: () -> Unit,
+    onSave: (UserAddress) -> Unit,
+) {
+    var recipientName by rememberSaveable { mutableStateOf(initialAddress?.recipientName ?: "") }
+    var phone by rememberSaveable { mutableStateOf(initialAddress?.phone ?: "") }
+    var addressLine by rememberSaveable { mutableStateOf(initialAddress?.addressLine ?: "") }
+    var subDistrict by rememberSaveable { mutableStateOf(initialAddress?.subDistrict ?: "") }
+    var district by rememberSaveable { mutableStateOf(initialAddress?.district ?: "") }
+    var province by rememberSaveable { mutableStateOf(initialAddress?.province ?: "") }
+    var postalCode by rememberSaveable { mutableStateOf(initialAddress?.postalCode ?: "") }
+    var isDefault by rememberSaveable { mutableStateOf(initialAddress?.isDefault ?: false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = SquircleLg,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = if (initialAddress != null) stringResource(R.string.address_edit) else stringResource(R.string.settings_address_add),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                LabeledField(
+                    label = stringResource(R.string.address_recipient_name),
+                    value = recipientName,
+                    placeholder = stringResource(R.string.profile_demo_name),
+                    onValueChange = { recipientName = it; errorMessage = null },
+                )
+                LabeledField(
+                    label = stringResource(R.string.address_phone),
+                    value = phone,
+                    placeholder = "081-234-5678",
+                    keyboardType = KeyboardType.Phone,
+                    onValueChange = { phone = it; errorMessage = null },
+                )
+                LabeledField(
+                    label = stringResource(R.string.address_line),
+                    value = addressLine,
+                    placeholder = "123/45 ซอย 8 ถนนหลัก",
+                    onValueChange = { addressLine = it; errorMessage = null },
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        LabeledField(
+                            label = stringResource(R.string.address_subdistrict),
+                            value = subDistrict,
+                            placeholder = "คลองเตย",
+                            onValueChange = { subDistrict = it; errorMessage = null },
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        LabeledField(
+                            label = stringResource(R.string.address_district),
+                            value = district,
+                            placeholder = "คลองเตย",
+                            onValueChange = { district = it; errorMessage = null },
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        LabeledField(
+                            label = stringResource(R.string.address_province),
+                            value = province,
+                            placeholder = "กรุงเทพฯ",
+                            onValueChange = { province = it; errorMessage = null },
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        LabeledField(
+                            label = stringResource(R.string.address_postal_code),
+                            value = postalCode,
+                            placeholder = "10110",
+                            keyboardType = KeyboardType.Number,
+                            onValueChange = { postalCode = it; errorMessage = null },
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Switch(
+                        checked = isDefault,
+                        onCheckedChange = { isDefault = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.onSecondary,
+                            checkedTrackColor = MaterialTheme.colorScheme.secondary,
+                        ),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.address_set_default),
+                        style = TextXs,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage ?: "",
+                        style = Text2xs,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (recipientName.isBlank() || phone.isBlank() || addressLine.isBlank() ||
+                        subDistrict.isBlank() || district.isBlank() || province.isBlank() || postalCode.isBlank() ||
+                        phone.trim().length < 9
+                    ) {
+                        errorMessage = context.getString(R.string.address_validation_error)
+                    } else {
+                        val newOrUpdated = (initialAddress ?: UserAddress(
+                            id = java.util.UUID.randomUUID().toString(),
+                            recipientName = "",
+                            phone = "",
+                            addressLine = "",
+                            subDistrict = "",
+                            district = "",
+                            province = "",
+                            postalCode = "",
+                        )).copy(
+                            recipientName = recipientName.trim(),
+                            phone = phone.trim(),
+                            addressLine = addressLine.trim(),
+                            subDistrict = subDistrict.trim(),
+                            district = district.trim(),
+                            province = province.trim(),
+                            postalCode = postalCode.trim(),
+                            isDefault = isDefault,
+                        )
+                        onSave(newOrUpdated)
+                    }
+                },
+            ) {
+                Text(
+                    text = stringResource(R.string.address_save),
+                    color = VelnoxBrand,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = stringResource(R.string.common_close),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
     )
 }
 

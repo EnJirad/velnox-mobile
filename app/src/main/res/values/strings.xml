@@ -524,4 +524,19 @@
     <string name="orders_tracking_number">หมายเลขพัสดุ</string>
     <string name="orders_tracking_copy">คัดลอก</string>
     <string name="orders_tracking_copied">คัดลอกหมายเลขพัสดุแล้ว</string>
+    <string name="address_recipient_name">ชื่อ-นามสกุล ผู้รับ</string>
+    <string name="address_phone">หมายเลขโทรศัพท์</string>
+    <string name="address_line">ที่อยู่ (บ้านเลขที่, ถนน)</string>
+    <string name="address_subdistrict">แขวง / ตำบล</string>
+    <string name="address_district">เขต / อำเภอ</string>
+    <string name="address_province">จังหวัด</string>
+    <string name="address_postal_code">รหัสไปรษณีย์</string>
+    <string name="address_set_default">ตั้งเป็นที่อยู่จัดส่งเริ่มต้น</string>
+    <string name="address_edit">แก้ไข</string>
+    <string name="address_delete">ลบที่อยู่</string>
+    <string name="address_delete_confirm">คุณต้องการลบที่อยู่นี้ใช่หรือไม่?</string>
+    <string name="address_empty">ยังไม่มีที่อยู่จัดส่ง</string>
+    <string name="address_save">บันทึกที่อยู่</string>
+    <string name="address_validation_error">กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง</string>
+    <string name="address_select_title">เลือกที่อยู่จัดส่ง</string>
 </resources>

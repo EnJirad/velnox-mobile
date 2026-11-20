@@ -96,6 +96,7 @@ data class DemoOrder(
     val customStore: String? = null,
     val totalPrice: Double? = null,
     val imageUrl: String? = null,
+    val deliveryAddress: String? = null,
 )
 
 object OrdersDemo {
@@ -396,7 +397,7 @@ fun OrderDetailScreen(
         Spacer(Modifier.height(12.dp))
         SectionCard(title = stringResource(R.string.orders_detail_shipping)) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                DetailLine(stringResource(R.string.orders_detail_shipping), stringResource(R.string.orders_demo_address))
+                DetailLine(stringResource(R.string.orders_detail_shipping), order.deliveryAddress ?: stringResource(R.string.orders_demo_address))
                 CardDivider()
                 DetailLine(stringResource(R.string.orders_detail_payment), stringResource(R.string.orders_demo_payment_method))
                 CardDivider()

@@ -3,7 +3,7 @@
 ## Progress Overview
 - [x] **Round 1 (Parts 1–16):** Full UI/UX Overhaul & Remote Verification Completed.
 - [ ] **Round 2 (Parts 01–10):** E-Commerce Engine, Flow Completeness, RAM Efficiency & Polish.
-  - Completed: 3 / 10 Parts (30%)
+  - Completed: 5 / 10 Parts (50%)
 
 ---
 
@@ -59,32 +59,41 @@
 
 ---
 
-### [ ] Part 04: Dynamic Order Management & Live Package Tracking
+### [x] Part 04: Dynamic Order Management & Live Package Tracking
 - **Document:** `.project/part-04-orders-tracking-lifecycle.md`
+- **Commit:** `e0b9b0b`
+- **CI Run:** [Run #44697947576](https://github.com/EnJirad/velnox-mobile/actions/runs/44697947576) (PASS)
 - **Target Files:**
   - `OrdersScreen.kt`
-  - `OrdersState.kt`
   - `OrderDetailScreen.kt`
+  - `ProfileScreen.kt`
+  - `OrdersStateTest.kt`
 - **Key Objectives:**
-  - [ ] Observable `OrdersState` reflecting orders placed from checkout.
-  - [ ] Category tabs (All, Pending, Processing, Shipping, Completed, Cancelled).
-  - [ ] Interactive delivery status timeline (Placed → Confirmed → Shipped → Out for Delivery → Delivered).
-  - [ ] Actions: Cancel Order, Buy Again (re-add to cart), Contact Seller direct chat.
-  - [ ] Synchronize order status counters with Profile screen badges.
+  - [x] Observable `OrdersState` / `OrdersDemo` with dynamic order additions and cancellations.
+  - [x] Category tabs (All, Pending, Processing, Shipping, Completed, Cancelled).
+  - [x] Interactive delivery status timeline (Placed → Confirmed → Shipped → Out for Delivery → Delivered).
+  - [x] Courier tracking info with tracking number and copy-to-clipboard action.
+  - [x] Cancel Order action with confirmation dialog for pending/processing orders.
+  - [x] Synchronized dynamic order counters with Profile screen badges.
 
 ---
 
-### [ ] Part 05: Interactive Address Book & User Profile Management
+### [x] Part 05: Interactive Address Book & User Profile Management
 - **Document:** `.project/part-05-address-book-profile-management.md`
 - **Target Files:**
   - `SettingsDetailScreen.kt` (AddressesPage & EditProfilePage)
   - `ProfileScreen.kt`
+  - `AddressModels.kt`
+  - `CheckoutScreen.kt`
+  - `OrdersScreen.kt`
+  - `AddressBookStateTest.kt`
+  - `SessionControllerTest.kt`
 - **Key Objectives:**
-  - [ ] Implement address management with Add/Edit/Delete address modal sheet.
-  - [ ] Default address badge toggle.
-  - [ ] Form validation (recipient name, phone digits, postal code).
-  - [ ] Real two-way binding of user profile data (`AuthUser`) with edit form.
-  - [ ] Address book immediate availability inside Checkout.
+  - [x] Implement address management with Add/Edit/Delete address modal sheet.
+  - [x] Default address badge toggle.
+  - [x] Form validation (recipient name, phone digits, postal code).
+  - [x] Real two-way binding of user profile data (`AuthUser`) with edit form.
+  - [x] Address book immediate availability inside Checkout.
 
 ---
 

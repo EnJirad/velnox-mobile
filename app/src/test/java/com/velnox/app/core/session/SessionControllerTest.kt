@@ -395,4 +395,33 @@ class SessionControllerTest {
         assertEquals(SessionState.Authenticated(user), controller.state)
         assertEquals(SessionNotice.GoogleLinkFailed, controller.notice)
     }
+
+    // -------------------------------------------------------- profile update
+
+    @Test
+    fun `updateProfile modifies authenticated user details in state`() = runBlocking {
+        val api = FakeApi().apply {
+            loginResult = ApiResult.Ok(AuthSession(tokenExpiringAt(1_900_000_000_000L), user))
+        }
+        val controller = controller(api, FakeStore())
+        controller.restoreOnce()
+        controller.signIn("a@b.co", "password12")
+
+        controller.updateProfile("Updated Name", "updated@b.co")
+
+        val state = controller.state as SessionState.Authenticated
+        assertEquals("Updated Name", state.user.name)
+        assertEquals("updated@b.co", state.user.email)
+    }
+
+    @Test
+    fun `updateProfile does nothing when guest`() = runBlocking {
+        val api = FakeApi()
+        val controller = controller(api, FakeStore())
+        controller.restoreOnce()
+
+        controller.updateProfile("Updated Name", "updated@b.co")
+
+        assertEquals(SessionState.Guest, controller.state)
+    }
 }
