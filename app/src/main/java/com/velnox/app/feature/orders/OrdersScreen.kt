@@ -136,8 +136,10 @@ fun OrdersScreen(
             modifier = Modifier.padding(bottom = 8.dp),
         ) {
             items(OrdersFilter.entries.toList()) { item ->
+                val count = if (item == OrdersFilter.All) null else OrdersDemo.forFilter(item).size
                 FilterPill(
                     label = stringResource(item.labelRes),
+                    count = count,
                     selected = item == activeFilter,
                     onClick = { filter = item.name },
                 )
@@ -169,7 +171,12 @@ fun OrdersScreen(
 }
 
 @Composable
-private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun FilterPill(
+    label: String,
+    count: Int?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .heightIn(min = 44.dp)
@@ -186,17 +193,29 @@ private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
             .velnoxClickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            style = Text2xs,
-            color = if (selected) {
-                MaterialTheme.colorScheme.onSecondaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            maxLines = 1,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        )
+        ) {
+            Text(
+                text = label,
+                style = Text2xs.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                maxLines = 1,
+            )
+            if (count != null && count > 0) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "($count)",
+                    style = Text2xs,
+                    color = if (selected) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
