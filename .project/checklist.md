@@ -2,12 +2,14 @@
 
 ## Progress Overview
 - [x] **Round 1 (Parts 1–16):** Full UI/UX Overhaul & Remote Verification Completed.
-- [ ] **Round 2:** E-Commerce Logic, Cart Variant Accuracy & Multi-Shop Flow.
+- [x] **Round 2:** Part 01 completed and verified (Commit `4342d6b`, Run #44684196825 — PASS).
 
 ---
 
 ### [x] Part 01: Cart Multi-Shop Grouping & Variant Image Sync
 - **Document:** `.project/part-01-cart-shop-grouping-variant-image.md`
+- **Commit:** `4342d6b`
+- **CI Run:** [Run #44684196825](https://github.com/EnJirad/velnox-mobile/actions/runs/44684196825) (PASS)
 - **Target Files:**
   - `ProductOptionsBottomSheet.kt`
   - `ProductDetailScreen.kt`
