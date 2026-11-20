@@ -27,9 +27,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
 import com.velnox.app.ui.icons.VelnoxIcons
+import com.velnox.app.ui.theme.Circle
 import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.VelnoxBrand
@@ -70,6 +72,8 @@ fun VelnoxBottomBar(
     selected: AppTab,
     onSelect: (AppTab) -> Unit,
     modifier: Modifier = Modifier,
+    cartCount: Int = 0,
+    ordersBadge: Int = 0,
 ) {
     Column(
         modifier = modifier
@@ -84,9 +88,15 @@ fun VelnoxBottomBar(
                 .padding(horizontal = 6.dp, vertical = 6.dp),
         ) {
             AppTab.entries.forEach { tab ->
+                val badge = when (tab) {
+                    AppTab.Cart -> cartCount
+                    AppTab.Orders -> ordersBadge
+                    else -> 0
+                }
                 BottomBarItem(
                     tab = tab,
                     selected = tab == selected,
+                    badge = badge,
                     onClick = { onSelect(tab) },
                     modifier = Modifier.weight(1f),
                 )
@@ -99,6 +109,7 @@ fun VelnoxBottomBar(
 private fun BottomBarItem(
     tab: AppTab,
     selected: Boolean,
+    badge: Int = 0,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -110,25 +121,44 @@ private fun BottomBarItem(
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            modifier = Modifier
-                .size(width = 44.dp, height = 26.dp)
-                .clip(SquircleSm)
-                .background(
-                    if (selected) {
-                        VelnoxBrand.copy(alpha = 0.16f)
-                    } else {
-                        androidx.compose.ui.graphics.Color.Transparent
-                    }
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = tab.icon,
-                contentDescription = null,
-                tint = if (selected) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(19.dp),
-            )
+        Box(contentAlignment = Alignment.TopEnd) {
+            Box(
+                modifier = Modifier
+                    .size(width = 44.dp, height = 26.dp)
+                    .clip(SquircleSm)
+                    .background(
+                        if (selected) {
+                            VelnoxBrand.copy(alpha = 0.16f)
+                        } else {
+                            androidx.compose.ui.graphics.Color.Transparent
+                        }
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = tab.icon,
+                    contentDescription = null,
+                    tint = if (selected) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            if (badge > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(15.dp)
+                        .clip(Circle)
+                        .background(MaterialTheme.colorScheme.error),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = if (badge > 9) "9+" else badge.toString(),
+                        style = Text2xs.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = MaterialTheme.colorScheme.onError,
+                    )
+                }
+            }
         }
         Spacer(Modifier.height(3.dp))
         Text(
@@ -149,12 +179,19 @@ private fun BottomBarItem(
 fun TabScaffold(
     selected: AppTab,
     onSelectTab: (AppTab) -> Unit,
+    cartCount: Int = 0,
+    ordersBadge: Int = 0,
     content: @Composable () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
             content()
         }
-        VelnoxBottomBar(selected = selected, onSelect = onSelectTab)
+        VelnoxBottomBar(
+            selected = selected,
+            onSelect = onSelectTab,
+            cartCount = cartCount,
+            ordersBadge = ordersBadge,
+        )
     }
 }

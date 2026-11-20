@@ -516,7 +516,12 @@ private fun VelnoxNavHost() {
                 }
             } else {
                 when (val overlay = overlayKey) {
-                    null -> TabScaffold(selected = tab, onSelectTab = ::requestTab) {
+                    null -> TabScaffold(
+                        selected = tab,
+                        onSelectTab = ::requestTab,
+                        cartCount = cart.items.size,
+                        ordersBadge = 1,
+                    ) {
                         tabStateHolder.SaveableStateProvider(tab.key) {
                             TabContent(
                                 tab = tab,

@@ -27,7 +27,7 @@
    - Generate debug APK artifact and present Round 1 completion report.
 
 ## Verification Checklist
-- [ ] No navigation bar or status bar overlaps on any screen.
-- [ ] Light and dark themes display readable, high-contrast text and crisp card outlines.
-- [ ] Touch targets are easy to tap on physical devices and emulators.
-- [ ] Full remote CI verification passes and APK artifact is generated.
+- [x] No navigation bar or status bar overlaps on any screen.
+- [x] Light and dark themes display readable, high-contrast text and crisp card outlines.
+- [x] Touch targets are easy to tap on physical devices and emulators.
+- [x] Full remote CI verification passes and APK artifact is generated.

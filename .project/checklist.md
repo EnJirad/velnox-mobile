@@ -99,11 +99,11 @@
   - [x] Polish message input field, send button, and keyboard safe area handling (`imePadding`).
   - [x] Clean up empty messages state.
 
-### [ ] Part 16: Global Navigation, Theme System & Mobile Insets Consistency
+### [x] Part 16: Global Navigation, Theme System & Mobile Insets Consistency
 - **Document:** `.project/part-16-global-navigation-theme-ui.md`
 - **Target Screens:** `VelnoxBottomBar.kt`, `VelnoxApp.kt`, Dialogs & Overlays
 - **Key Objectives:**
-  - [ ] Audit bottom navigation bar: active squircle indicator, badge indicators (cart/unread), navigation bar insets.
-  - [ ] Audit light/dark theme contrast across all screens (elevations, border strokes, outline colors).
-  - [ ] Verify touch targets (minimum 44dp/48dp) and keyboard dismissal interactions.
-  - [ ] Conduct final end-to-end visual QA and trigger remote verification via GitHub Actions.
+  - [x] Audit bottom navigation bar: active squircle indicator, badge indicators (cart/unread), navigation bar insets.
+  - [x] Audit light/dark theme contrast across all screens (elevations, border strokes, outline colors).
+  - [x] Verify touch targets (minimum 44dp/48dp) and keyboard dismissal interactions.
+  - [x] Conduct final end-to-end visual QA and trigger remote verification via GitHub Actions.
