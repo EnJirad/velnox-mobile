@@ -22,3 +22,9 @@ Replace the current placeholder destination for checkout with a production-grade
 4. **Verification & Tests:**
    - Unit tests for order total calculation, voucher application, and cart deduction.
    - GitHub Actions CI build & test verification.
+
+## Verification Summary
+- **Commit SHA:** `0a9e0b5`
+- **GitHub Actions Run:** [#44694691479](https://github.com/EnJirad/velnox-mobile/actions/runs/44694691479)
+- **Status:** PASS (Build debug APK, Run unit tests, APK integrity verification, Signing verification, Upload artifact all succeeded)
+- **Artifact:** `velnox-debug-apk` (ID: 14609997741)

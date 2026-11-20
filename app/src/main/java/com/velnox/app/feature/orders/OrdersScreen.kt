@@ -110,6 +110,13 @@ object OrdersDemo {
         orders.add(0, order)
     }
 
+    fun cancelOrder(orderId: String) {
+        val index = orders.indexOfFirst { it.id == orderId }
+        if (index >= 0) {
+            orders[index] = orders[index].copy(status = OrderStatus.Cancelled)
+        }
+    }
+
     fun forFilter(filter: OrdersFilter): List<DemoOrder> = when (filter) {
         OrdersFilter.All -> orders
         OrdersFilter.Pending -> orders.filter { it.status == OrderStatus.Pending }
@@ -293,8 +300,27 @@ fun OrderDetailScreen(
     orderId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onContactSeller: () -> Unit = {},
 ) {
     val order = OrdersDemo.orders.firstOrNull { it.id == orderId } ?: OrdersDemo.orders.first()
+    var showCancelDialog by remember { mutableStateOf(false) }
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copiedNotice by remember { mutableStateOf(false) }
+    val trackingNumber = remember(order.id) { "KEX${order.id.filter { it.isDigit() }.ifEmpty { "884129" }}TH" }
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+
+    val subtotalFormatted = if (order.totalPrice != null) {
+        val sub = (order.totalPrice - 35.0).coerceAtLeast(0.0)
+        com.velnox.app.core.catalog.PriceFormat.format(sub, "THB", locale) ?: "฿$sub"
+    } else {
+        stringResource(R.string.common_value_placeholder)
+    }
+
+    val totalFormatted = if (order.totalPrice != null) {
+        com.velnox.app.core.catalog.PriceFormat.format(order.totalPrice, "THB", locale) ?: "฿${order.totalPrice}"
+    } else {
+        stringResource(R.string.common_value_placeholder)
+    }
 
     StandaloneScreen(
         title = stringResource(R.string.orders_detail_title),
@@ -353,14 +379,14 @@ fun OrderDetailScreen(
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 DetailLine(
                     stringResource(R.string.cart_subtotal),
-                    stringResource(R.string.common_value_placeholder),
+                    subtotalFormatted,
                 )
                 CardDivider()
-                DetailLine(stringResource(R.string.cart_shipping), stringResource(R.string.cart_shipping_free))
+                DetailLine(stringResource(R.string.cart_shipping), "฿35.00")
                 CardDivider()
                 DetailLine(
                     stringResource(R.string.cart_total),
-                    stringResource(R.string.common_value_placeholder),
+                    totalFormatted,
                     strong = true,
                 )
             }
@@ -372,10 +398,91 @@ fun OrderDetailScreen(
                 DetailLine(stringResource(R.string.orders_detail_shipping), stringResource(R.string.orders_demo_address))
                 CardDivider()
                 DetailLine(stringResource(R.string.orders_detail_payment), stringResource(R.string.orders_demo_payment_method))
+                CardDivider()
+                DetailLine(stringResource(R.string.orders_tracking_courier), "Kerry Express")
+                CardDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.orders_tracking_number),
+                        style = TextXs,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = trackingNumber,
+                            style = TextXs.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (copiedNotice) stringResource(R.string.orders_tracking_copied) else stringResource(R.string.orders_tracking_copy),
+                            style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                            color = VelnoxBrand,
+                            modifier = Modifier.velnoxClickable(role = Role.Button) {
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(trackingNumber))
+                                copiedNotice = true
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
+        if (order.status == OrderStatus.Pending || order.status == OrderStatus.Processing) {
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(Squircle)
+                    .border(1.dp, MaterialTheme.colorScheme.error, Squircle)
+                    .velnoxClickable(role = Role.Button) { showCancelDialog = true },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = stringResource(R.string.orders_cancel_order),
+                    style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+
+    if (showCancelDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            shape = SquircleLg,
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text(stringResource(R.string.orders_cancel_order)) },
+            text = { Text(stringResource(R.string.orders_cancel_confirm)) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        OrdersDemo.cancelOrder(order.id)
+                        showCancelDialog = false
+                    },
+                ) {
+                    Text(
+                        text = stringResource(R.string.orders_cancel_order),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showCancelDialog = false }) {
+                    Text(stringResource(R.string.common_close))
+                }
+            },
+        )
     }
 }
 

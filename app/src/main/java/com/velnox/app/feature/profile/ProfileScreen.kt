@@ -44,6 +44,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.velnox.app.R
 import com.velnox.app.core.auth.AuthUser
+import com.velnox.app.feature.orders.OrdersDemo
+import com.velnox.app.feature.orders.OrdersFilter
+import com.velnox.app.feature.orders.OrderStatus
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
 import com.velnox.app.ui.components.DangerRow
@@ -335,7 +338,7 @@ private fun StatsRow(
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         StatTile(
-            value = "3",
+            value = OrdersDemo.orders.size.toString(),
             label = stringResource(R.string.profile_stats_orders),
             modifier = Modifier.weight(1f),
             onClick = onOpenOrders,
@@ -363,6 +366,12 @@ private fun StatsRow(
 
 @Composable
 private fun OrderShortcutsCard(onOpenOrders: () -> Unit) {
+    val toPayCount = OrdersDemo.forFilter(OrdersFilter.Pending).size
+    val toShipCount = OrdersDemo.forFilter(OrdersFilter.Processing).size
+    val toReceiveCount = OrdersDemo.forFilter(OrdersFilter.Shipping).size
+    val toReviewCount = OrdersDemo.forFilter(OrdersFilter.Completed).size
+    val returnsCount = OrdersDemo.orders.count { it.status == OrderStatus.Returned }
+
     SectionCard {
         Row(
             modifier = Modifier
@@ -405,35 +414,35 @@ private fun OrderShortcutsCard(onOpenOrders: () -> Unit) {
             OrderShortcutItem(
                 icon = VelnoxIcons.Wallet,
                 label = stringResource(R.string.profile_shortcut_to_pay),
-                badge = 1,
+                badge = toPayCount,
                 onClick = onOpenOrders,
                 modifier = Modifier.weight(1f),
             )
             OrderShortcutItem(
                 icon = VelnoxIcons.Package,
                 label = stringResource(R.string.profile_shortcut_to_ship),
-                badge = 1,
+                badge = toShipCount,
                 onClick = onOpenOrders,
                 modifier = Modifier.weight(1f),
             )
             OrderShortcutItem(
                 icon = VelnoxIcons.Truck,
                 label = stringResource(R.string.profile_shortcut_to_receive),
-                badge = 1,
+                badge = toReceiveCount,
                 onClick = onOpenOrders,
                 modifier = Modifier.weight(1f),
             )
             OrderShortcutItem(
                 icon = VelnoxIcons.Star,
                 label = stringResource(R.string.profile_shortcut_to_review),
-                badge = 0,
+                badge = toReviewCount,
                 onClick = onOpenOrders,
                 modifier = Modifier.weight(1f),
             )
             OrderShortcutItem(
                 icon = VelnoxIcons.RotateCcw,
                 label = stringResource(R.string.profile_shortcut_returns),
-                badge = 0,
+                badge = returnsCount,
                 onClick = onOpenOrders,
                 modifier = Modifier.weight(1f),
             )

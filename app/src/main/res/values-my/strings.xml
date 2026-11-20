@@ -517,4 +517,11 @@
     <string name="checkout_view_order">အော်ဒါကြည့်ရန်</string>
     <string name="checkout_continue_shopping">ဆက်လက်ဝယ်ယူမည်</string>
     <string name="checkout_empty">အော်ဒါတင်ရန် ပစ္စည်းမရွေးရသေးပါ</string>
+    <string name="orders_cancel_order">အော်ဒါပယ်ဖျက်မည်</string>
+    <string name="orders_cancel_confirm">ဤအော်ဒါကို ပယ်ဖျက်ရန် သေချာပါသလား?</string>
+    <string name="orders_buy_again">ထပ်မံဝယ်ယူမည်</string>
+    <string name="orders_tracking_courier">ပို့ဆောင်ရေးကုမ္ပဏီ</string>
+    <string name="orders_tracking_number">ပါဆယ်နံပါတ်</string>
+    <string name="orders_tracking_copy">ကူးယူမည်</string>
+    <string name="orders_tracking_copied">ပါဆယ်နံပါတ် ကူးယူပြီးပါပြီ</string>
 </resources>

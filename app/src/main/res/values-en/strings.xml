@@ -517,4 +517,11 @@
     <string name="checkout_view_order">View Order</string>
     <string name="checkout_continue_shopping">Continue Shopping</string>
     <string name="checkout_empty">No items selected for checkout</string>
+    <string name="orders_cancel_order">Cancel Order</string>
+    <string name="orders_cancel_confirm">Are you sure you want to cancel this order?</string>
+    <string name="orders_buy_again">Buy Again</string>
+    <string name="orders_tracking_courier">Courier</string>
+    <string name="orders_tracking_number">Tracking Number</string>
+    <string name="orders_tracking_copy">Copy</string>
+    <string name="orders_tracking_copied">Tracking number copied</string>
 </resources>

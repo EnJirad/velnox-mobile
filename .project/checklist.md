@@ -3,7 +3,7 @@
 ## Progress Overview
 - [x] **Round 1 (Parts 1–16):** Full UI/UX Overhaul & Remote Verification Completed.
 - [ ] **Round 2 (Parts 01–10):** E-Commerce Engine, Flow Completeness, RAM Efficiency & Polish.
-  - Completed: 2 / 10 Parts (20%)
+  - Completed: 3 / 10 Parts (30%)
 
 ---
 
@@ -40,20 +40,22 @@
 
 ---
 
-### [ ] Part 03: Complete Checkout Flow & Multi-Shop Order Placement
+### [x] Part 03: Complete Checkout Flow & Multi-Shop Order Placement
 - **Document:** `.project/part-03-checkout-flow-order-placement.md`
+- **Commit:** `0a9e0b5`
+- **CI Run:** [Run #44694691479](https://github.com/EnJirad/velnox-mobile/actions/runs/44694691479) (PASS)
 - **Target Files:**
   - `CheckoutScreen.kt`
   - `VelnoxApp.kt`
   - `CartScreen.kt`
   - `CartState.kt`
 - **Key Objectives:**
-  - [ ] Replace `PlaceholderDestination("checkout")` with a full-fledged `CheckoutScreen`.
-  - [ ] Recipient address selector card with quick switch action.
-  - [ ] Items breakdown grouped by store with variant details and shipping options per shop.
-  - [ ] Discount voucher code input & platform voucher selection.
-  - [ ] Payment method selector (PromptPay, Credit/Debit card, TrueMoney, COD).
-  - [ ] "Place Order" execution: clears cart items, creates active order, and transitions to order success.
+  - [x] Replace `PlaceholderDestination("checkout")` with a full-fledged `CheckoutScreen`.
+  - [x] Recipient address selector card with quick switch action.
+  - [x] Items breakdown grouped by store with variant details and shipping options per shop.
+  - [x] Discount voucher code input & platform voucher selection.
+  - [x] Payment method selector (PromptPay, Credit/Debit card, TrueMoney, COD).
+  - [x] "Place Order" execution: clears cart items, creates active order, and transitions to order success.
 
 ---
 

@@ -517,4 +517,11 @@
     <string name="checkout_view_order">ดูคำสั่งซื้อ</string>
     <string name="checkout_continue_shopping">เลือกซื้อสินค้าต่อ</string>
     <string name="checkout_empty">ไม่มีสินค้าที่เลือกสำหรับการสั่งซื้อ</string>
+    <string name="orders_cancel_order">ยกเลิกคำสั่งซื้อ</string>
+    <string name="orders_cancel_confirm">คุณต้องการยกเลิกคำสั่งซื้อนี้ใช่หรือไม่?</string>
+    <string name="orders_buy_again">ซื้ออีกครั้ง</string>
+    <string name="orders_tracking_courier">บริษัทขนส่ง</string>
+    <string name="orders_tracking_number">หมายเลขพัสดุ</string>
+    <string name="orders_tracking_copy">คัดลอก</string>
+    <string name="orders_tracking_copied">คัดลอกหมายเลขพัสดุแล้ว</string>
 </resources>
