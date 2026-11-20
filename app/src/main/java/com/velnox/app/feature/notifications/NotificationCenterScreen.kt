@@ -47,18 +47,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.velnox.app.R
 import com.velnox.app.ui.components.BrandBadge
+import com.velnox.app.ui.components.ContentMaxWidth
+import com.velnox.app.ui.components.PageGutter
+import com.velnox.app.ui.components.VelnoxSpacing
 import com.velnox.app.ui.components.velnoxClickable
 import com.velnox.app.ui.icons.VelnoxIcons
 import com.velnox.app.ui.theme.Circle
-import com.velnox.app.ui.theme.ContentMaxWidth
-import com.velnox.app.ui.theme.PageGutter
 import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.SquircleLg
 import com.velnox.app.ui.theme.SquircleSm
 import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
-import com.velnox.app.ui.theme.VelnoxSpacing
 
 @Composable
 fun NotificationCenterScreen(
