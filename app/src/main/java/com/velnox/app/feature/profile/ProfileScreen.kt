@@ -93,6 +93,19 @@ import java.io.File
 private enum class PhotoTarget { Avatar, Cover }
 
 /**
+ * Append a cache-busting version query param to a URL.
+ * The database stores the canonical URL without ?v=.
+ * Matches the Web contract (bust() in ShopProfile.tsx).
+ */
+private fun bust(url: String?, version: Long): String? {
+    if (url.isNullOrBlank()) return null
+    if (!url.startsWith("http://") && !url.startsWith("https://")) return url
+    val clean = url.replace(Regex("[?&]v=\\d+"), "").trimEnd('?')
+    val sep = if (clean.contains('?')) "&" else "?"
+    return "$clean${sep}v=$version"
+}
+
+/**
  * Profile tab — clean, focused account hub.
  *
  * Sign out lives exclusively in SettingsScreen (reached via the top-right Cog).
@@ -321,6 +334,7 @@ fun ProfileScreen(
                 }
             }
         }
+    }
 
     val targetForOptions = showPhotoOptionsFor
     if (targetForOptions != null) {
@@ -416,6 +430,7 @@ fun ProfileScreen(
             .align(Alignment.BottomCenter)
             .padding(bottom = 16.dp),
     )
+}
 }
 
 @Composable
@@ -865,19 +880,6 @@ private fun StatTile(
             maxLines = 1,
         )
     }
-}
-
-/**
- * Append a cache-busting version query param to a URL.
- * The database stores the canonical URL without ?v=.
- * Matches the Web contract (bust() in ShopProfile.tsx).
- */
-private fun bust(url: String?, version: Long): String? {
-    if (url.isNullOrBlank()) return null
-    if (!url.startsWith("http://") && !url.startsWith("https://")) return url
-    val clean = url.replace(Regex("[?&]v=\\d+"), "").trimEnd('?')
-    val sep = if (clean.contains('?')) "&" else "?"
-    return "$clean${sep}v=$version"
 }
 
 /**

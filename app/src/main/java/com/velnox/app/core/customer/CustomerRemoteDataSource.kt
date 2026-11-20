@@ -75,7 +75,11 @@ class CustomerRemoteDataSource(
         }
 
         // Upload binary directly to Cloudflare R2 via pre-signed PUT
-        val mediaType = mimeType.toMediaTypeOrNull() ?: "application/octet-stream".toMediaType()
+        val mediaType = try {
+            mimeType.toMediaType()
+        } catch (_: Exception) {
+            "application/octet-stream".toMediaType()
+        }
         val putRequest = Request.Builder()
             .url(uploadUrl)
             .header("Content-Type", mimeType)
