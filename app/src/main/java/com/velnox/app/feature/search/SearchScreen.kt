@@ -884,14 +884,19 @@ private fun SearchFilterBottomSheet(
                         .border(1.dp, MaterialTheme.colorScheme.outline, SquircleSm)
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     decorationBox = { innerTextField ->
-                        if (minPriceInput.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.search_filter_min_price),
-                                style = TextXs,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            if (minPriceInput.isEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.search_filter_min_price),
+                                    style = TextXs,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            innerTextField()
                         }
-                        innerTextField()
                     },
                 )
 
@@ -916,14 +921,19 @@ private fun SearchFilterBottomSheet(
                         .border(1.dp, MaterialTheme.colorScheme.outline, SquircleSm)
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     decorationBox = { innerTextField ->
-                        if (maxPriceInput.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.search_filter_max_price),
-                                style = TextXs,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            if (maxPriceInput.isEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.search_filter_max_price),
+                                    style = TextXs,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            innerTextField()
                         }
-                        innerTextField()
                     },
                 )
             }

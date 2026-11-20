@@ -25,13 +25,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -85,6 +90,8 @@ import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -398,7 +405,8 @@ private fun ThreadRow(
 }
 
 /**
- * Real server-backed conversation screen (`GET/POST /api/customer/conversations/:id/messages`).
+ * Real server-backed conversation screen (`GET/POST /api/customer/conversations/:id/messages`)
+ * with 2.5s live periodic polling, optimistic outgoing messages, and modern chat bubbles.
  */
 @Composable
 fun ConversationScreen(
@@ -429,7 +437,9 @@ fun ConversationScreen(
     var inputText by rememberSaveable { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     var sendError by remember { mutableStateOf<String?>(null) }
+    var lastScrolledCount by remember(threadId) { mutableIntStateOf(0) }
 
+    // Initial load + real-time live polling loop every 2.5s while conversation is open.
     LaunchedEffect(threadId, repository, reloadTick) {
         if (repository == null) {
             loading = false
@@ -442,22 +452,54 @@ fun ConversationScreen(
         }
         when (val res = MessagesState.loadMessages(repository, threadId)) {
             is CustomerResult.Ok -> {
+                val merged = MessagesState.mergePolledMessages(messages.toList(), res.value)
                 messages.clear()
-                messages.addAll(res.value)
+                messages.addAll(merged)
                 loadError = null
                 MessagesState.markRead(repository, threadId)
             }
 
             is CustomerResult.Failed -> {
-                loadError = res.userMessage(context)
+                if (messages.isEmpty()) {
+                    loadError = res.userMessage(context)
+                }
             }
         }
         loading = false
+
+        // Periodic silent live polling loop — cancels automatically on screen exit.
+        while (isActive) {
+            delay(MessagesState.CHAT_POLL_INTERVAL_MS)
+            when (val polled = MessagesState.loadMessages(repository, threadId)) {
+                is CustomerResult.Ok -> {
+                    val snapshot = messages.toList()
+                    val hasNewIncoming = MessagesState.hasNewIncomingMessages(snapshot, polled.value)
+                    val merged = MessagesState.mergePolledMessages(snapshot, polled.value)
+                    if (merged != snapshot) {
+                        messages.clear()
+                        messages.addAll(merged)
+                    }
+                    if (hasNewIncoming) {
+                        MessagesState.markRead(repository, threadId)
+                    }
+                }
+                is CustomerResult.Failed -> {
+                    // Silent failure during background polling; keep existing messages intact.
+                }
+            }
+        }
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
+    // Smooth auto-scroll to latest message whenever new messages arrive or are sent.
+    LaunchedEffect(messages.size, messages.lastOrNull()?.id) {
+        if (messages.isNotEmpty() && messages.size != lastScrolledCount) {
+            val wasInitial = lastScrolledCount == 0
+            lastScrolledCount = messages.size
+            if (wasInitial) {
+                listState.scrollToItem(messages.lastIndex)
+            } else {
+                listState.animateScrollToItem(messages.lastIndex)
+            }
         }
     }
 
@@ -467,17 +509,39 @@ fun ConversationScreen(
         sending = true
         sendError = null
         val clientId = UUID.randomUUID().toString()
+        val pendingId = "pending-$clientId"
+        val optimistic = CustomerMessage(
+            id = pendingId,
+            text = text,
+            fromCustomer = true,
+            createdAt = System.currentTimeMillis(),
+            isPending = true,
+        )
+        // Optimistically clear input and append bubble immediately.
+        inputText = ""
+        messages.add(optimistic)
+
         scope.launch {
+            listState.animateScrollToItem(messages.lastIndex.coerceAtLeast(0))
             when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
                 is CustomerResult.Ok -> {
-                    if (messages.none { it.id == res.value.id }) {
+                    val idx = messages.indexOfFirst { it.id == pendingId }
+                    val alreadyMerged = messages.any { it.id == res.value.id }
+                    if (idx >= 0) {
+                        if (alreadyMerged) {
+                            messages.removeAt(idx)
+                        } else {
+                            messages[idx] = res.value
+                        }
+                    } else if (!alreadyMerged) {
                         messages.add(res.value)
                     }
-                    inputText = ""
                     focusManager.clearFocus()
                 }
 
                 is CustomerResult.Failed -> {
+                    messages.removeAll { it.id == pendingId }
+                    if (inputText.isEmpty()) inputText = text
                     sendError = res.userMessage(context)
                 }
             }
@@ -485,62 +549,89 @@ fun ConversationScreen(
         }
     }
 
+    val inputInteractionSource = remember { MutableInteractionSource() }
+    val inputFocused by inputInteractionSource.collectIsFocusedAsState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // Header
-        Row(
+        // Refined Header
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .statusBarsPadding(),
         ) {
-            IconActionButton(
-                icon = VelnoxIcons.ChevronLeft,
-                contentDescription = stringResource(R.string.common_back),
-                onClick = onBack,
-            )
-            Spacer(Modifier.width(6.dp))
-            InitialsAvatar(initials = initials, size = 38, brand = true)
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (thread?.isSupport == true) {
-                        Spacer(Modifier.width(4.dp))
-                        BrandBadge(text = stringResource(R.string.profile_verified_badge))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconActionButton(
+                    icon = VelnoxIcons.ChevronLeft,
+                    contentDescription = stringResource(R.string.common_back),
+                    onClick = onBack,
+                )
+                Spacer(Modifier.width(4.dp))
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    InitialsAvatar(initials = initials, size = 40, brand = true)
+                    if (thread?.participantOnline == true) {
+                        Box(
+                            modifier = Modifier
+                                .size(11.dp)
+                                .clip(Circle)
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(1.5.dp)
+                                .clip(Circle)
+                                .background(VelnoxBrand),
+                        )
                     }
                 }
-                // Only show an online dot when the server explicitly reports participantOnline == true.
-                if (thread?.participantOnline == true) {
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (thread?.isSupport == true) {
+                            Spacer(Modifier.width(6.dp))
+                            BrandBadge(text = stringResource(R.string.profile_verified_badge))
+                        }
+                    }
                     Spacer(Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(Circle)
-                                .background(Color(0xFF10B981)),
+                                .background(
+                                    if (thread?.participantOnline == true) VelnoxBrand
+                                    else VelnoxBrand.copy(alpha = 0.6f),
+                                ),
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(5.dp))
                         Text(
-                            text = stringResource(R.string.messages_online),
+                            text = if (thread?.participantOnline == true) {
+                                stringResource(R.string.messages_online)
+                            } else {
+                                stringResource(R.string.messages_live_connected)
+                            },
                             style = Text2xs,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         }
 
         // Pinned Product Card — only shown when the server returned a real linked product.
@@ -600,7 +691,7 @@ fun ConversationScreen(
                             .fillMaxSize()
                             .padding(horizontal = PageGutter),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 10.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp),
                     ) {
                         items(messages, key = { it.id }) { msg ->
                             val timeLabel = formatChatTimestamp(msg.createdAt, locale)
@@ -611,6 +702,8 @@ fun ConversationScreen(
                                     text = msg.text,
                                     incoming = !msg.fromCustomer,
                                     timestamp = timeLabel,
+                                    isPending = msg.isPending,
+                                    isRead = msg.isRead,
                                     sellerInitials = initials,
                                 )
                             }
@@ -632,32 +725,22 @@ fun ConversationScreen(
             )
         }
 
-        // Message Input Bar
-        Row(
+        // Sleek Message Input Bar
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .imePadding()
-                .navigationBarsPadding()
-                .padding(horizontal = PageGutter, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .background(MaterialTheme.colorScheme.surface),
         ) {
-            Box(
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 42.dp)
-                    .clip(SquircleLg)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                contentAlignment = Alignment.CenterStart,
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = PageGutter, vertical = 10.dp),
+                verticalAlignment = Alignment.Bottom,
             ) {
-                if (inputText.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.messages_input_placeholder),
-                        style = TextXs,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                val inputBorder = if (inputFocused) VelnoxBrand else MaterialTheme.colorScheme.outline
                 BasicTextField(
                     value = inputText,
                     onValueChange = {
@@ -665,37 +748,69 @@ fun ConversationScreen(
                         sendError = null
                     },
                     enabled = !sending,
+                    maxLines = 4,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
                     cursorBrush = SolidColor(VelnoxBrand),
+                    interactionSource = inputInteractionSource,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { submitMessage() }),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 44.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, inputBorder, RoundedCornerShape(22.dp))
+                        .padding(horizontal = 16.dp, vertical = 11.dp),
+                    decorationBox = { innerTextField ->
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            if (inputText.isEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.messages_input_placeholder),
+                                    style = TextXs,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            innerTextField()
+                        }
+                    },
                 )
-            }
 
-            Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(10.dp))
 
-            val canSend = inputText.isNotBlank() && !sending && repository != null
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(SquircleSm)
-                    .background(if (canSend) VelnoxBrand else MaterialTheme.colorScheme.surfaceVariant)
-                    .velnoxClickable(
-                        role = Role.Button,
-                        enabled = canSend,
-                        onClick = { submitMessage() },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = VelnoxIcons.ArrowRight,
-                    contentDescription = stringResource(R.string.messages_send),
-                    tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
+                val canSend = inputText.isNotBlank() && !sending && repository != null
+                val sendBgModifier = if (canSend) {
+                    Modifier.background(
+                        Brush.linearGradient(
+                            colors = listOf(VelnoxBrand, Color(0xFF059669)),
+                        ),
+                    )
+                } else {
+                    Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                }
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(Circle)
+                        .then(sendBgModifier)
+                        .velnoxClickable(
+                            role = Role.Button,
+                            enabled = canSend,
+                            onClick = { submitMessage() },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = VelnoxIcons.Send,
+                        contentDescription = stringResource(R.string.messages_send),
+                        tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }
@@ -807,8 +922,16 @@ private fun Bubble(
     text: String,
     incoming: Boolean,
     timestamp: String,
+    isPending: Boolean = false,
+    isRead: Boolean = false,
     sellerInitials: String = "",
 ) {
+    val bubbleShape = if (incoming) {
+        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 4.dp, bottomEnd = 18.dp)
+    } else {
+        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp)
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (incoming) Alignment.Start else Alignment.End,
@@ -819,42 +942,89 @@ private fun Bubble(
         ) {
             if (incoming) {
                 InitialsAvatar(initials = sellerInitials, size = 28, brand = false)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.82f)
-                    .clip(SquircleLg)
-                    .background(
-                        if (incoming) {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        } else {
-                            VelnoxBrand
-                        },
-                    )
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            ) {
-                Text(
-                    text = text,
-                    style = TextXs.copy(
-                        fontWeight = if (incoming) FontWeight.Normal else FontWeight.Medium,
-                    ),
-                    color = if (incoming) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+            if (incoming) {
+                Surface(
+                    shape = bubbleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 1.dp,
+                    modifier = Modifier
+                        .fillMaxWidth(0.78f)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, bubbleShape),
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text(
+                            text = text,
+                            style = TextXs.copy(lineHeight = MaterialTheme.typography.bodyMedium.lineHeight),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        if (timestamp.isNotEmpty()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = timestamp,
+                                style = Text2xs,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            } else {
+                val outgoingGradient = Brush.linearGradient(
+                    colors = if (isPending) {
+                        listOf(VelnoxBrand.copy(alpha = 0.78f), Color(0xFF059669).copy(alpha = 0.78f))
                     } else {
-                        Color.White
+                        listOf(VelnoxBrand, Color(0xFF059669))
                     },
                 )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.78f)
+                        .shadow(2.dp, bubbleShape)
+                        .clip(bubbleShape)
+                        .background(outgoingGradient)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = text,
+                            style = TextXs.copy(
+                                fontWeight = FontWeight.Medium,
+                                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
+                            ),
+                            color = Color.White,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            if (timestamp.isNotEmpty()) {
+                                Text(
+                                    text = timestamp,
+                                    style = Text2xs,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                )
+                                Spacer(Modifier.width(5.dp))
+                            }
+                            val statusTick = when {
+                                isPending -> "✓"
+                                else -> "✓✓"
+                            }
+                            Text(
+                                text = statusTick,
+                                style = Text2xs.copy(fontWeight = FontWeight.Bold),
+                                color = when {
+                                    isPending -> Color.White.copy(alpha = 0.65f)
+                                    isRead -> Color(0xFFD1FAE5)
+                                    else -> Color.White.copy(alpha = 0.9f)
+                                },
+                            )
+                        }
+                    }
+                }
             }
-        }
-        if (timestamp.isNotEmpty()) {
-            Spacer(Modifier.height(3.dp))
-            Text(
-                text = timestamp,
-                style = Text2xs,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = if (incoming) 34.dp else 0.dp, end = 4.dp),
-            )
         }
     }
 }

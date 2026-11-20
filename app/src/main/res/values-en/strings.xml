@@ -621,4 +621,37 @@
     <string name="messages_empty_chat">Start a conversation</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_saving">Saving…</string>
+
+    <!-- ═══════════════════════ Round 3 UX Elevation ═══════════════════════ -->
+    <string name="address_tag_label">Address Tag</string>
+    <string name="address_tag_home">Home</string>
+    <string name="address_tag_office">Office</string>
+    <string name="address_tag_other">Other</string>
+    <string name="address_line2">Building / Floor / Unit / Landmark (Optional)</string>
+    <string name="address_line2_placeholder">e.g. Tower A, Floor 12, Unit 1204</string>
+    <string name="address_phone_invalid">Please enter a valid 10-digit phone number</string>
+    <string name="address_postal_invalid">Please enter a valid 5-digit postal code</string>
+    <string name="address_map_section_title">Pin Delivery Location</string>
+    <string name="address_map_pick_button">Pin location on map</string>
+    <string name="address_map_change_pin">Adjust map pin</string>
+    <string name="address_map_pinned_badge">Pinned</string>
+    <string name="address_map_picker_title">Select Delivery Pin</string>
+    <string name="address_map_instruction">Move the pin onto your rooftop</string>
+    <string name="address_map_current_location">Current Location</string>
+    <string name="address_map_confirm">Confirm Location</string>
+    <string name="address_map_coordinates_label">Selected Coordinates</string>
+    <string name="address_map_gps_updated">Centered on current location</string>
+    <string name="messages_live_connected">Live chat</string>
+    <string name="messages_status_sending">Sending</string>
+    <string name="messages_status_sent">Sent</string>
+    <string name="messages_status_read">Read</string>
+    <string name="profile_change_cover">Change cover</string>
+    <string name="profile_change_avatar">Change avatar</string>
+    <string name="profile_photo_picker_title">Profile Photo</string>
+    <string name="profile_photo_choose_gallery">Choose from gallery</string>
+    <string name="profile_photo_reset">Reset to default</string>
+    <string name="profile_section_services">Quick Services</string>
+    <string name="profile_help_center">Help Center</string>
+    <string name="profile_help_center_subtitle">FAQs &amp; customer support</string>
+    <string name="profile_addresses_subtitle">Manage delivery addresses &amp; map pins</string>
 </resources>

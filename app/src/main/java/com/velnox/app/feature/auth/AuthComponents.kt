@@ -121,7 +121,10 @@ fun VelnoxTextField(
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.weight(1f)) {
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+        ) {
             if (value.isEmpty()) {
                 Text(
                     text = placeholder,

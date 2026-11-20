@@ -264,16 +264,24 @@ fun ShopScreen(
                                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurface,
                                 ),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(VelnoxBrand),
                                 modifier = Modifier.weight(1f),
                                 decorationBox = { innerTextField ->
-                                    if (searchQuery.isEmpty()) {
-                                        Text(
-                                            text = stringResource(R.string.product_shop_search_hint),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = Alignment.CenterStart,
+                                    ) {
+                                        if (searchQuery.isEmpty()) {
+                                            Text(
+                                                text = stringResource(R.string.product_shop_search_hint),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        innerTextField()
                                     }
-                                    innerTextField()
                                 },
                             )
                             if (searchQuery.isNotEmpty()) {

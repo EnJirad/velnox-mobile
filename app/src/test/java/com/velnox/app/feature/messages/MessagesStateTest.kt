@@ -171,4 +171,24 @@ class MessagesStateTest {
         assertEquals("Rate limited", res.message)
         assertEquals("Old", MessagesState.conversations.single().lastMessage)
     }
+
+    @Test
+    fun `mergePolledMessages keeps in-flight optimistic messages and drops confirmed ones`() {
+        val existing = listOf(
+            CustomerMessage("m1", "Hello", fromCustomer = false, createdAt = 1000L),
+            CustomerMessage("pending-1", "On my way", fromCustomer = true, createdAt = 2000L, isPending = true),
+            CustomerMessage("pending-2", "Second msg", fromCustomer = true, createdAt = 3000L, isPending = true),
+        )
+        val remote = listOf(
+            CustomerMessage("m1", "Hello", fromCustomer = false, createdAt = 1000L),
+            CustomerMessage("m2", "On my way", fromCustomer = true, createdAt = 2100L, isRead = true),
+            CustomerMessage("m3", "Sure thing!", fromCustomer = false, createdAt = 2500L),
+        )
+
+        val merged = MessagesState.mergePolledMessages(existing, remote)
+
+        assertEquals(listOf("m1", "m2", "m3", "pending-2"), merged.map { it.id })
+        assertTrue(merged.last().isPending)
+        assertTrue(MessagesState.hasNewIncomingMessages(existing, remote))
+    }
 }

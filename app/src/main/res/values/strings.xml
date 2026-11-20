@@ -621,4 +621,37 @@
     <string name="messages_empty_chat">เริ่มต้นการสนทนาได้เลย</string>
     <string name="settings_saved">บันทึกข้อมูลเรียบร้อยแล้ว</string>
     <string name="settings_saving">กำลังบันทึก…</string>
+
+    <!-- ═══════════════════════ Round 3 UX Elevation ═══════════════════════ -->
+    <string name="address_tag_label">ป้ายกำกับที่อยู่</string>
+    <string name="address_tag_home">บ้าน</string>
+    <string name="address_tag_office">ที่ทำงาน</string>
+    <string name="address_tag_other">อื่นๆ</string>
+    <string name="address_line2">อาคาร / ชั้น / ห้อง / จุดสังเกต (ไม่บังคับ)</string>
+    <string name="address_line2_placeholder">เช่น อาคาร A ชั้น 12 ห้อง 1204</string>
+    <string name="address_phone_invalid">กรุณากรอกเบอร์โทรศัพท์ 10 หลักให้ถูกต้อง</string>
+    <string name="address_postal_invalid">กรุณากรอกรหัสไปรษณีย์ 5 หลักให้ถูกต้อง</string>
+    <string name="address_map_section_title">ปักหมุดตำแหน่งบนแผนที่</string>
+    <string name="address_map_pick_button">ปักหมุดพิกัดบนแผนที่</string>
+    <string name="address_map_change_pin">แก้ไขหมุดตำแหน่ง</string>
+    <string name="address_map_pinned_badge">ปักหมุดแล้ว</string>
+    <string name="address_map_picker_title">เลือกตำแหน่งจัดส่ง</string>
+    <string name="address_map_instruction">เลื่อนหมุดไปติดบนหลังคาบ้าน</string>
+    <string name="address_map_current_location">ตำแหน่งปัจจุบัน</string>
+    <string name="address_map_confirm">ยืนยันพิกัดนี้</string>
+    <string name="address_map_coordinates_label">พิกัดที่เลือก</string>
+    <string name="address_map_gps_updated">ปรับไปยังตำแหน่งปัจจุบันแล้ว</string>
+    <string name="messages_live_connected">แชทแบบเรียลไทม์</string>
+    <string name="messages_status_sending">กำลังส่ง</string>
+    <string name="messages_status_sent">ส่งแล้ว</string>
+    <string name="messages_status_read">อ่านแล้ว</string>
+    <string name="profile_change_cover">เปลี่ยนภาพปก</string>
+    <string name="profile_change_avatar">เปลี่ยนรูปโปรไฟล์</string>
+    <string name="profile_photo_picker_title">จัดการรูปภาพ</string>
+    <string name="profile_photo_choose_gallery">เลือกจากคลังรูปภาพ</string>
+    <string name="profile_photo_reset">ใช้ค่าเริ่มต้น</string>
+    <string name="profile_section_services">บริการสำคัญ</string>
+    <string name="profile_help_center">ศูนย์ช่วยเหลือ</string>
+    <string name="profile_help_center_subtitle">คำถามที่พบบ่อยและการสนับสนุน</string>
+    <string name="profile_addresses_subtitle">จัดการที่อยู่จัดส่งและหมุดแผนที่</string>
 </resources>

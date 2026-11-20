@@ -640,12 +640,15 @@ class CustomerRemoteDataSource(
                 (obj.flag("isMine", "fromCustomer", "isOwn", "is_mine")
                     ?: (sender in CUSTOMER_SENDERS))
             )
+        val isRead = obj.flag("isRead", "is_read", "read")
+            ?: (obj.str("readAt", "read_at") != null)
         return CustomerMessage(
             id = id,
             text = text,
             fromCustomer = fromCustomer,
             createdAt = obj.time("createdAt", "created_at", "sentAt"),
             isSystem = isSystem,
+            isRead = isRead,
         )
     }
 

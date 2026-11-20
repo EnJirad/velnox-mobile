@@ -621,4 +621,37 @@
     <string name="messages_empty_chat">စကားစပြောနိုင်ပါပြီ</string>
     <string name="settings_saved">သိမ်းဆည်းပြီးပါပြီ</string>
     <string name="settings_saving">သိမ်းဆည်းနေသည်…</string>
+
+    <!-- ═══════════════════════ Round 3 UX Elevation ═══════════════════════ -->
+    <string name="address_tag_label">လိပ်စာ တံဆိပ်</string>
+    <string name="address_tag_home">အိမ်</string>
+    <string name="address_tag_office">ရုံး</string>
+    <string name="address_tag_other">အခြား</string>
+    <string name="address_line2">အဆောက်အဦ / အထပ် / အခန်း (ရွေးချယ်နိုင်)</string>
+    <string name="address_line2_placeholder">ဥပမာ အဆောက်အဦ A အထပ် 12</string>
+    <string name="address_phone_invalid">ဂဏန်း ၁၀ လုံးပါ ဖုန်းနံပါတ်ကို မှန်ကန်စွာ ထည့်ပါ</string>
+    <string name="address_postal_invalid">ဂဏန်း ၅ လုံးပါ စာတိုက်သင်္ကေတကို မှန်ကန်စွာ ထည့်ပါ</string>
+    <string name="address_map_section_title">မြေပုံပေါ်တွင် တည်နေရာ ပင်ထိုးရန်</string>
+    <string name="address_map_pick_button">မြေပုံပေါ်တွင် ပင်ထိုးမည်</string>
+    <string name="address_map_change_pin">ပင်တည်နေရာ ပြင်မည်</string>
+    <string name="address_map_pinned_badge">ပင်ထိုးပြီး</string>
+    <string name="address_map_picker_title">ပို့ဆောင်မည့် တည်နေရာ ရွေးရန်</string>
+    <string name="address_map_instruction">ပင်ကို သင့်အိမ်ခေါင်မိုးပေါ်သို့ ရွှေ့ပါ</string>
+    <string name="address_map_current_location">လက်ရှိတည်နေရာ</string>
+    <string name="address_map_confirm">ဤတည်နေရာကို အတည်ပြုမည်</string>
+    <string name="address_map_coordinates_label">ရွေးချယ်ထားသော ကိုဩဒိနိတ်</string>
+    <string name="address_map_gps_updated">လက်ရှိတည်နေရာသို့ ချိန်ညှိပြီးပါပြီ</string>
+    <string name="messages_live_connected">တိုက်ရိုက်ချတ်</string>
+    <string name="messages_status_sending">ပို့နေသည်</string>
+    <string name="messages_status_sent">ပို့ပြီး</string>
+    <string name="messages_status_read">ဖတ်ပြီး</string>
+    <string name="profile_change_cover">မျက်နှာဖုံးပုံ ပြောင်းရန်</string>
+    <string name="profile_change_avatar">ပရိုဖိုင်ပုံ ပြောင်းရန်</string>
+    <string name="profile_photo_picker_title">ပုံ စီမံခန့်ခွဲရန်</string>
+    <string name="profile_photo_choose_gallery">ဓာတ်ပုံများမှ ရွေးရန်</string>
+    <string name="profile_photo_reset">မူလအတိုင်း ပြန်ထားရန်</string>
+    <string name="profile_section_services">အဓိက ဝန်ဆောင်မှုများ</string>
+    <string name="profile_help_center">အကူအညီ စင်တာ</string>
+    <string name="profile_help_center_subtitle">မေးလေ့ရှိသော မေးခွန်းများနှင့် ပံ့ပိုးမှု</string>
+    <string name="profile_addresses_subtitle">ပို့ဆောင်မည့်လိပ်စာနှင့် မြေပုံပင်များ စီမံရန်</string>
 </resources>

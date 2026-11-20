@@ -168,12 +168,18 @@ fun BrandBadge(text: String, modifier: Modifier = Modifier) {
 
 // --------------------------------------------------------------- trust badges
 
-/** Compact trust row reused under the hero on Home. */
+/** Compact, sleek trust strip placed cleanly right under the hero banner on Home. */
 @Composable
 fun TrustRow(modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(SquircleSm)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, SquircleSm)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         TrustItem(VelnoxIcons.Truck, stringResource(R.string.home_trust_delivery), Modifier.weight(1f))
         TrustItem(VelnoxIcons.ShieldCheck, stringResource(R.string.home_trust_secure), Modifier.weight(1f))
@@ -190,11 +196,12 @@ private fun TrustItem(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = VelnoxBrand,
             modifier = Modifier.size(14.dp),
         )
         Text(
@@ -203,6 +210,7 @@ private fun TrustItem(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 5.dp),
             maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     }
 }

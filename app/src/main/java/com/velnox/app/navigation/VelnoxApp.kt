@@ -571,7 +571,6 @@ private fun VelnoxNavHost() {
                                     sessionState = sessionState,
                                     onOpenOverlay = ::requestOverlay,
                                     onOpenTab = ::requestTab,
-                                    onSignOut = ::signOut,
                                 )
                             }
                         }
@@ -867,7 +866,6 @@ private fun TabContent(
     sessionState: SessionState,
     onOpenOverlay: (String) -> Unit,
     onOpenTab: (AppTab) -> Unit,
-    onSignOut: () -> Unit,
 ) {
     when (tab) {
         AppTab.Home -> HomeScreen(
@@ -915,12 +913,11 @@ private fun TabContent(
                     user = user,
                     onOpenSettings = { onOpenOverlay("settings") },
                     onOpenEditProfile = { onOpenOverlay(SettingsPage.EditProfile.key) },
-                    onOpenPersonalInfo = { onOpenOverlay(SettingsPage.PersonalInfo.key) },
                     onOpenAddresses = { onOpenOverlay(SettingsPage.Addresses.key) },
                     onOpenOrders = { onOpenTab(AppTab.Orders) },
                     onOpenWishlist = { onOpenOverlay("wishlist") },
                     onOpenMessages = { onOpenOverlay("messages") },
-                    onSignOut = onSignOut,
+                    onOpenHelpCenter = { onOpenOverlay(SettingsPage.HelpCenter.key) },
                 )
             }
         }

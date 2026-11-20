@@ -505,4 +505,59 @@ object VelnoxIcons {
             ),
         )
     }
+
+    val Camera: ImageVector by lazy {
+        stroke(
+            "lucide-camera",
+            listOf(
+                "M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z",
+                "M9 13a3 3 0 1 0 6 0a3 3 0 1 0 -6 0",
+            ),
+        )
+    }
+
+    val Send: ImageVector by lazy {
+        stroke(
+            "lucide-send",
+            listOf(
+                "M22 2L11 13",
+                "M22 2l-7 20-4-9-9-4 20-7z",
+            ),
+        )
+    }
+
+    val Crosshair: ImageVector by lazy {
+        stroke(
+            "lucide-locate-fixed",
+            listOf(
+                "M2 12h3",
+                "M19 12h3",
+                "M12 2v3",
+                "M12 19v3",
+                "M5 12a7 7 0 1 0 14 0a7 7 0 1 0 -14 0",
+                "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0",
+            ),
+        )
+    }
+
+    val Briefcase: ImageVector by lazy {
+        stroke(
+            "lucide-briefcase",
+            listOf(
+                "M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16",
+                "M2 8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8z",
+            ),
+        )
+    }
+
+    val Image: ImageVector by lazy {
+        stroke(
+            "lucide-image",
+            listOf(
+                "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z",
+                "M7 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
+                "m21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21",
+            ),
+        )
+    }
 }

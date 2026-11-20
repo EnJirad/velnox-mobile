@@ -112,6 +112,43 @@ object MessagesState {
         return result
     }
 
+    /** Polling interval for active conversations (2.5 seconds). */
+    const val CHAT_POLL_INTERVAL_MS = 2_500L
+
+    /**
+     * Silent in-place merge for live chat polling.
+     *
+     * Server-confirmed [remote] messages are authoritative; any local optimistic
+     * (`isPending == true`) messages not yet reflected in [remote] are preserved
+     * at the tail so a poll firing mid-send never flickers or drops a bubble.
+     */
+    fun mergePolledMessages(
+        current: List<CustomerMessage>,
+        remote: List<CustomerMessage>,
+    ): List<CustomerMessage> {
+        val remoteIds = remote.mapTo(HashSet(remote.size)) { it.id }
+        val remoteCustomerTexts = remote
+            .asSequence()
+            .filter { it.fromCustomer }
+            .map { it.text.trim() }
+            .toHashSet()
+        val remainingPending = current.filter { msg ->
+            msg.isPending &&
+                msg.id !in remoteIds &&
+                msg.text.trim() !in remoteCustomerTexts
+        }
+        return if (remainingPending.isEmpty()) remote else remote + remainingPending
+    }
+
+    /** True when [remote] contains an incoming message not yet present in [current]. */
+    fun hasNewIncomingMessages(
+        current: List<CustomerMessage>,
+        remote: List<CustomerMessage>,
+    ): Boolean {
+        val existingIds = current.mapTo(HashSet(current.size)) { it.id }
+        return remote.any { !it.fromCustomer && !it.isSystem && it.id !in existingIds }
+    }
+
     fun clear() {
         conversations.clear()
         status = LoadStatus.Idle

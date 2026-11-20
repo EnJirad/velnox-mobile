@@ -28,4 +28,6 @@ data class UserPreferences(
     val notifyOrderUpdates: Boolean = true,
     val notifyPromotions: Boolean = false,
     val notifySecurity: Boolean = true,
+    val avatarUri: String? = null,
+    val coverUri: String? = null,
 )

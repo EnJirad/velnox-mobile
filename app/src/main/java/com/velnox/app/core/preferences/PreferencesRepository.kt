@@ -33,6 +33,8 @@ class PreferencesRepository(context: Context) {
         val notifyOrders = booleanPreferencesKey("notify_order_updates")
         val notifyPromotions = booleanPreferencesKey("notify_promotions")
         val notifySecurity = booleanPreferencesKey("notify_security")
+        val avatarUri = stringPreferencesKey("profile_avatar_uri")
+        val coverUri = stringPreferencesKey("profile_cover_uri")
     }
 
     val preferences: Flow<UserPreferences> = store.data
@@ -47,6 +49,8 @@ class PreferencesRepository(context: Context) {
                 notifyOrderUpdates = values[Keys.notifyOrders] ?: true,
                 notifyPromotions = values[Keys.notifyPromotions] ?: false,
                 notifySecurity = values[Keys.notifySecurity] ?: true,
+                avatarUri = values[Keys.avatarUri]?.takeIf { it.isNotBlank() },
+                coverUri = values[Keys.coverUri]?.takeIf { it.isNotBlank() },
             )
         }
 
@@ -68,5 +72,17 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setNotifySecurity(enabled: Boolean) {
         store.edit { it[Keys.notifySecurity] = enabled }
+    }
+
+    suspend fun setAvatarUri(uri: String?) {
+        store.edit {
+            if (uri.isNullOrBlank()) it.remove(Keys.avatarUri) else it[Keys.avatarUri] = uri
+        }
+    }
+
+    suspend fun setCoverUri(uri: String?) {
+        store.edit {
+            if (uri.isNullOrBlank()) it.remove(Keys.coverUri) else it[Keys.coverUri] = uri
+        }
     }
 }

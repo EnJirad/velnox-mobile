@@ -13,8 +13,8 @@ import com.velnox.app.core.customer.LoadStatus
 /**
  * A user's shipping/delivery address, as stored on the server.
  *
- * [label], [addressLine2], [latitude] and [longitude] are not edited in the app;
- * they are carried so that saving an edit does not erase what the website set.
+ * Carries full standardized e-commerce fields including [label] (Home/Office/Other),
+ * [addressLine2] (building/floor/unit), and map pin coordinates ([latitude], [longitude]).
  */
 data class UserAddress(
     val id: String,
@@ -148,5 +148,50 @@ object AddressBookState {
     private fun replaceAll(items: List<UserAddress>) {
         addresses.clear()
         addresses.addAll(items)
+    }
+}
+
+/** Standard address tag values stored in [UserAddress.label]. */
+object AddressTags {
+    const val HOME = "Home"
+    const val OFFICE = "Office"
+    const val OTHER = "Other"
+}
+
+/** Validation outcome for the standardized e-commerce address form. */
+sealed interface AddressValidationResult {
+    data object Valid : AddressValidationResult
+    data object MissingRequired : AddressValidationResult
+    data object InvalidPhone : AddressValidationResult
+    data object InvalidPostalCode : AddressValidationResult
+}
+
+/** Pure validator for standardized Thai/international address fields. */
+object AddressFormValidator {
+    private val POSTAL_REGEX = Regex("^\\d{5}$")
+
+    /** Extracts only numeric digits from a user-entered phone string. */
+    fun normalizePhone(raw: String): String = raw.filter { it.isDigit() }
+
+    /** True when the phone number has exactly 10 numeric digits. */
+    fun isValidPhone(raw: String): Boolean = normalizePhone(raw).length == 10
+
+    /** True when the postal code is exactly 5 digits. */
+    fun isValidPostalCode(raw: String): Boolean = POSTAL_REGEX.matches(raw.trim())
+
+    fun validate(
+        recipientName: String,
+        phone: String,
+        addressLine: String,
+        province: String,
+        postalCode: String,
+    ): AddressValidationResult = when {
+        recipientName.isBlank() || addressLine.isBlank() || province.isBlank() ->
+            AddressValidationResult.MissingRequired
+        !isValidPhone(phone) ->
+            AddressValidationResult.InvalidPhone
+        !isValidPostalCode(postalCode) ->
+            AddressValidationResult.InvalidPostalCode
+        else -> AddressValidationResult.Valid
     }
 }

@@ -2,8 +2,12 @@
 
 package com.velnox.app.feature.profile
 
-import com.velnox.app.ui.components.velnoxClickable
-
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +19,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -31,35 +34,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.velnox.app.R
 import com.velnox.app.core.auth.AuthUser
+import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.feature.messages.MessagesState
+import com.velnox.app.feature.orders.OrderStatus
 import com.velnox.app.feature.orders.OrdersFilter
 import com.velnox.app.feature.orders.OrdersState
-import com.velnox.app.feature.orders.OrderStatus
 import com.velnox.app.feature.orders.uiStatus
 import com.velnox.app.feature.wishlist.WishlistState
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
-import com.velnox.app.ui.components.DangerRow
-import com.velnox.app.ui.components.InitialsAvatar
 import com.velnox.app.ui.components.IconActionButton
+import com.velnox.app.ui.components.InitialsAvatar
 import com.velnox.app.ui.components.PageGutter
 import com.velnox.app.ui.components.SectionCard
 import com.velnox.app.ui.components.SettingRow
-import com.velnox.app.ui.components.SoftIconTile
+import com.velnox.app.ui.components.velnoxClickable
 import com.velnox.app.ui.icons.VelnoxIcons
+import com.velnox.app.ui.theme.Circle
 import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.SquircleLg
 import com.velnox.app.ui.theme.SquircleSm
@@ -67,27 +79,68 @@ import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+
+private enum class PhotoTarget { Avatar, Cover }
 
 /**
- * Profile tab — the account hub.
+ * Profile tab — clean, focused account hub.
  *
- * Settings lives behind the icon in the top-right corner. Identity is clearly
- * labelled as a demo account, and no address, payment or order value is real.
+ * Sign out lives exclusively in SettingsScreen (reached via the top-right Cog).
+ * Supports customizable Cover Banner & Avatar photo selection persisted locally,
+ * summary stats, order status shortcuts, and essential services (Addresses & Help).
  */
 @Composable
 fun ProfileScreen(
     user: AuthUser,
     onOpenSettings: () -> Unit,
     onOpenEditProfile: () -> Unit,
-    onOpenPersonalInfo: () -> Unit,
     onOpenAddresses: () -> Unit,
     onOpenOrders: () -> Unit,
     onOpenWishlist: () -> Unit,
     onOpenMessages: () -> Unit,
+    onOpenHelpCenter: () -> Unit,
     modifier: Modifier = Modifier,
-    onSignOut: () -> Unit = {},
 ) {
-    var showSignOut by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val preferences = LocalPreferences.current
+    val scope = rememberCoroutineScope()
+
+    var activePhotoTarget by remember { mutableStateOf<PhotoTarget?>(null) }
+    var showPhotoOptionsFor by remember { mutableStateOf<PhotoTarget?>(null) }
+
+    val mediaPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri: Uri? ->
+        val target = activePhotoTarget
+        activePhotoTarget = null
+        if (uri != null && target != null) {
+            scope.launch {
+                val savedPath = persistPickedImage(
+                    context = context,
+                    sourceUri = uri,
+                    prefix = if (target == PhotoTarget.Avatar) "profile_avatar" else "profile_cover",
+                )
+                if (savedPath != null) {
+                    if (target == PhotoTarget.Avatar) {
+                        preferences.setAvatarUri(savedPath)
+                    } else {
+                        preferences.setCoverUri(savedPath)
+                    }
+                }
+            }
+        }
+    }
+
+    fun launchGallery(target: PhotoTarget) {
+        activePhotoTarget = target
+        mediaPicker.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+        )
+    }
 
     Column(
         modifier = modifier
@@ -120,7 +173,28 @@ fun ProfileScreen(
             contentPadding = PaddingValues(horizontal = PageGutter, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ProfileHeaderCard(user = user, onOpenEditProfile = onOpenEditProfile) }
+            item {
+                ProfileHeaderCard(
+                    user = user,
+                    avatarUri = preferences.current.avatarUri,
+                    coverUri = preferences.current.coverUri,
+                    onEditAvatar = {
+                        if (preferences.current.avatarUri != null) {
+                            showPhotoOptionsFor = PhotoTarget.Avatar
+                        } else {
+                            launchGallery(PhotoTarget.Avatar)
+                        }
+                    },
+                    onEditCover = {
+                        if (preferences.current.coverUri != null) {
+                            showPhotoOptionsFor = PhotoTarget.Cover
+                        } else {
+                            launchGallery(PhotoTarget.Cover)
+                        }
+                    },
+                    onOpenEditProfile = onOpenEditProfile,
+                )
+            }
 
             item {
                 StatsRow(
@@ -135,123 +209,106 @@ fun ProfileScreen(
             }
 
             item {
-                SectionCard(title = stringResource(R.string.profile_section_account)) {
-                    AccountRow(
-                        icon = VelnoxIcons.Pencil,
-                        title = stringResource(R.string.profile_edit),
-                        onClick = onOpenEditProfile,
-                    )
-                    CardDivider()
-                    AccountRow(
-                        icon = VelnoxIcons.User,
-                        title = stringResource(R.string.profile_personal_info),
-                        onClick = onOpenPersonalInfo,
-                    )
-                    CardDivider()
-                    AccountRow(
+                val addressCount = AddressBookState.addresses.size
+                SectionCard(title = stringResource(R.string.profile_section_services)) {
+                    SettingRow(
                         icon = VelnoxIcons.MapPin,
                         title = stringResource(R.string.profile_addresses),
+                        subtitle = stringResource(R.string.profile_addresses_subtitle),
+                        value = if (addressCount > 0) addressCount.toString() else null,
                         onClick = onOpenAddresses,
                     )
-                }
-            }
-
-            item {
-                SectionCard(title = stringResource(R.string.profile_section_shortcuts)) {
-                    SettingRow(
-                        icon = VelnoxIcons.Cog,
-                        title = stringResource(R.string.profile_settings),
-                        onClick = onOpenSettings,
-                    )
-                }
-            }
-
-            item {
-                SectionCard(title = stringResource(R.string.profile_section_addresses)) {
-                    val addresses = AddressBookState.addresses
-                    if (addresses.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.address_empty),
-                            style = TextXs,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        )
-                    } else {
-                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                            addresses.forEachIndexed { index, addr ->
-                                AddressLine(
-                                    label = addr.recipientName + if (addr.isDefault) " (${stringResource(R.string.profile_address_default)})" else "",
-                                    detail = addr.fullAddressText,
-                                    isDefault = addr.isDefault,
-                                )
-                                if (index < addresses.lastIndex) {
-                                    Spacer(Modifier.height(10.dp))
-                                }
-                            }
-                        }
-                    }
                     CardDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .velnoxClickable(role = Role.Button, onClick = onOpenAddresses)
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = VelnoxIcons.Plus,
-                            contentDescription = null,
-                            tint = VelnoxBrand,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.profile_add_address),
-                            style = TextXs.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                }
-            }
-
-            item {
-                SectionCard {
-                    DangerRow(
-                        icon = VelnoxIcons.LogOut,
-                        title = stringResource(R.string.profile_sign_out),
-                        onClick = { showSignOut = true },
+                    SettingRow(
+                        icon = VelnoxIcons.HelpCircle,
+                        title = stringResource(R.string.profile_help_center),
+                        subtitle = stringResource(R.string.profile_help_center_subtitle),
+                        onClick = onOpenHelpCenter,
                     )
                 }
             }
         }
     }
 
-    if (showSignOut) {
+    val targetForOptions = showPhotoOptionsFor
+    if (targetForOptions != null) {
         AlertDialog(
-            onDismissRequest = { showSignOut = false },
-            shape = Squircle,
+            onDismissRequest = { showPhotoOptionsFor = null },
+            shape = SquircleLg,
             containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text(stringResource(R.string.settings_sign_out_title)) },
-            text = { Text(stringResource(R.string.settings_sign_out_body)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showSignOut = false
-                        onSignOut()
+            title = {
+                Text(
+                    text = if (targetForOptions == PhotoTarget.Avatar) {
+                        stringResource(R.string.profile_change_avatar)
+                    } else {
+                        stringResource(R.string.profile_change_cover)
                     },
-                ) {
-                    Text(
-                        text = stringResource(R.string.settings_sign_out_confirm),
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(Squircle)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .velnoxClickable(role = Role.Button) {
+                                showPhotoOptionsFor = null
+                                launchGallery(targetForOptions)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = VelnoxIcons.Image,
+                            contentDescription = null,
+                            tint = VelnoxBrand,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = stringResource(R.string.profile_photo_choose_gallery),
+                            style = TextXs.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(Squircle)
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f))
+                            .velnoxClickable(role = Role.Button) {
+                                showPhotoOptionsFor = null
+                                if (targetForOptions == PhotoTarget.Avatar) {
+                                    preferences.setAvatarUri(null)
+                                } else {
+                                    preferences.setCoverUri(null)
+                                }
+                            }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = VelnoxIcons.RotateCcw,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = stringResource(R.string.profile_photo_reset),
+                            style = TextXs.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showSignOut = false }) {
+            confirmButton = {
+                TextButton(onClick = { showPhotoOptionsFor = null }) {
                     Text(
                         text = stringResource(R.string.common_close),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             },
@@ -260,67 +317,141 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileHeaderCard(user: AuthUser, onOpenEditProfile: () -> Unit) {
-    // Initials from the real account, never a hardcoded pair.
+private fun ProfileHeaderCard(
+    user: AuthUser,
+    avatarUri: String?,
+    coverUri: String?,
+    onEditAvatar: () -> Unit,
+    onEditCover: () -> Unit,
+    onOpenEditProfile: () -> Unit,
+) {
     val initials = remember(user.name, user.email) { initialsOf(user.name, user.email) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(SquircleLg)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
-            .padding(16.dp),
+            .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            InitialsAvatar(initials = initials, size = 56, brand = true)
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = user.name.ifBlank { user.email.substringBefore('@') },
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    BrandBadge(text = stringResource(R.string.profile_verified_badge))
-                }
-                Spacer(Modifier.height(3.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .clip(SquircleSm)
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.profile_membership_tier),
-                            style = Text2xs.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = user.email,
-                        style = Text2xs,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.profile_role_label, user.role),
-                    style = Text2xs,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        // Cover Banner + Overlapping Avatar container
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(152.dp),
+        ) {
+            // Cover Banner (top 116dp)
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .fillMaxWidth()
+                    .height(116.dp)
+                    .velnoxClickable(role = Role.Button, onClick = onEditCover),
+            ) {
+                if (!coverUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = coverUri,
+                        contentDescription = stringResource(R.string.profile_change_cover),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    // Subtle top-to-bottom scrim for legibility of cover edit chip
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Black.copy(alpha = 0.08f), Color.Black.copy(alpha = 0.28f)),
+                                ),
+                            ),
+                    )
+                } else {
+                    DefaultCoverBackdrop(modifier = Modifier.fillMaxSize())
+                }
+
+                // Change Cover Pill
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .clip(Circle)
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .velnoxClickable(role = Role.Button, onClick = onEditCover)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = VelnoxIcons.Camera,
+                        contentDescription = stringResource(R.string.profile_change_cover),
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = stringResource(R.string.profile_change_cover),
+                        style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                        color = Color.White,
+                    )
+                }
+            }
+
+            // Overlapping Circular Avatar with Camera Badge
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp),
+                contentAlignment = Alignment.BottomEnd,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(76.dp)
+                        .shadow(4.dp, Circle)
+                        .clip(Circle)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(3.dp)
+                        .clip(Circle)
+                        .velnoxClickable(role = Role.Button, onClick = onEditAvatar),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (!avatarUri.isNullOrBlank()) {
+                        AsyncImage(
+                            model = avatarUri,
+                            contentDescription = stringResource(R.string.profile_change_avatar),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        InitialsAvatar(initials = initials, size = 70, brand = true)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(Circle)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(2.dp)
+                        .clip(Circle)
+                        .background(VelnoxBrand)
+                        .velnoxClickable(role = Role.Button, onClick = onEditAvatar),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = VelnoxIcons.Camera,
+                        contentDescription = stringResource(R.string.profile_change_avatar),
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+            }
+
+            // Quick Edit Profile Action aligned to bottom-end of header overlap zone
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 2.dp)
+                    .size(36.dp)
                     .clip(SquircleSm)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, SquircleSm)
                     .velnoxClickable(role = Role.Button, onClick = onOpenEditProfile),
                 contentAlignment = Alignment.Center,
             ) {
@@ -328,9 +459,80 @@ private fun ProfileHeaderCard(user: AuthUser, onOpenEditProfile: () -> Unit) {
                     imageVector = VelnoxIcons.Pencil,
                     contentDescription = stringResource(R.string.profile_edit),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                 )
             }
+        }
+
+        // Identity & Tier Info
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = user.name.ifBlank { user.email.substringBefore('@') },
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(8.dp))
+                BrandBadge(text = stringResource(R.string.profile_verified_badge))
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .clip(SquircleSm)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.profile_membership_tier),
+                        style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = user.email,
+                    style = Text2xs,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DefaultCoverBackdrop(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.background(
+            Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF0F172A),
+                    Color(0xFF064E3B),
+                    VelnoxBrand,
+                ),
+            ),
+        ),
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                color = Color.White.copy(alpha = 0.08f),
+                radius = size.height * 0.85f,
+                center = Offset(size.width * 0.88f, size.height * 0.15f),
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.06f),
+                radius = size.height * 0.6f,
+                center = Offset(size.width * 0.12f, size.height * 0.95f),
+            )
         }
     }
 }
@@ -359,12 +561,6 @@ private fun StatsRow(
             label = stringResource(R.string.profile_stats_messages),
             modifier = Modifier.weight(1f),
             onClick = onOpenMessages,
-        )
-        StatTile(
-            value = AddressBookState.addresses.size.toString(),
-            label = stringResource(R.string.profile_section_addresses),
-            modifier = Modifier.weight(1f),
-            onClick = onOpenOrders,
         )
     }
 }
@@ -541,50 +737,26 @@ private fun StatTile(
     }
 }
 
-@Composable
-private fun AccountRow(
-    icon: ImageVector,
-    title: String,
-    onClick: () -> Unit,
-) {
-    SettingRow(icon = icon, title = title, onClick = onClick)
+/**
+ * Copies a user-picked image into app-private storage so the avatar/cover stays
+ * readable across restarts without depending on transient Photo Picker URI grants.
+ */
+private suspend fun persistPickedImage(
+    context: Context,
+    sourceUri: Uri,
+    prefix: String,
+): String? = withContext(Dispatchers.IO) {
+    runCatching {
+        val dir = File(context.filesDir, "profile_media").apply { mkdirs() }
+        // Remove previous files for this slot to keep storage tidy.
+        dir.listFiles()?.filter { it.name.startsWith("${prefix}_") }?.forEach { it.delete() }
+        val dest = File(dir, "${prefix}_${System.currentTimeMillis()}.jpg")
+        context.contentResolver.openInputStream(sourceUri)?.use { input ->
+            dest.outputStream().use { output -> input.copyTo(output) }
+        } ?: return@withContext null
+        Uri.fromFile(dest).toString()
+    }.getOrNull()
 }
-
-@Composable
-private fun AddressLine(label: String, detail: String, isDefault: Boolean) {
-    Row(verticalAlignment = Alignment.Top) {
-        SoftIconTile(icon = VelnoxIcons.MapPin, size = 28)
-        Spacer(Modifier.width(10.dp))
-        Column {
-            Text(
-                text = label,
-                style = TextXs.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = detail,
-                style = Text2xs,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        if (isDefault) {
-            Box(
-                modifier = Modifier
-                    .clip(SquircleSm)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.settings_address_default),
-                    style = Text2xs,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            }
-        }
-    }
-}
-
 
 /**
  * Two initials for the avatar.
@@ -618,28 +790,11 @@ private fun ProfilePreview() {
             user = PreviewUser,
             onOpenSettings = {},
             onOpenEditProfile = {},
-            onOpenPersonalInfo = {},
             onOpenAddresses = {},
             onOpenOrders = {},
             onOpenWishlist = {},
             onOpenMessages = {},
-        )
-    }
-}
-
-@Preview(name = "Profile 320dp", showBackground = true, widthDp = 320, heightDp = 760)
-@Composable
-private fun ProfileCompactPreview() {
-    VelnoxTheme(darkTheme = false) {
-        ProfileScreen(
-            user = PreviewUser,
-            onOpenSettings = {},
-            onOpenEditProfile = {},
-            onOpenPersonalInfo = {},
-            onOpenAddresses = {},
-            onOpenOrders = {},
-            onOpenWishlist = {},
-            onOpenMessages = {},
+            onOpenHelpCenter = {},
         )
     }
 }
@@ -652,11 +807,11 @@ private fun ProfileDarkPreview() {
             user = PreviewUser,
             onOpenSettings = {},
             onOpenEditProfile = {},
-            onOpenPersonalInfo = {},
             onOpenAddresses = {},
             onOpenOrders = {},
             onOpenWishlist = {},
             onOpenMessages = {},
+            onOpenHelpCenter = {},
         )
     }
 }

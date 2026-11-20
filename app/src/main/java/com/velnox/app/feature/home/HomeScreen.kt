@@ -312,9 +312,23 @@ fun HomeScreen(
                                         start = PageGutter,
                                         top = VelnoxSpacing.md,
                                         end = PageGutter,
-                                        bottom = VelnoxSpacing.sm,
+                                        bottom = VelnoxSpacing.xs,
                                     ),
                                 )
+                            }
+
+                            // 2b. Sleek Trust Bar right under the Hero Banner
+                            item(key = "trust", contentType = "trust") {
+                                Box(
+                                    Modifier.padding(
+                                        start = PageGutter,
+                                        end = PageGutter,
+                                        top = VelnoxSpacing.xs,
+                                        bottom = VelnoxSpacing.sm,
+                                    ),
+                                ) {
+                                    TrustRow()
+                                }
                             }
 
                             // 3. Quick Categories
@@ -414,18 +428,6 @@ fun HomeScreen(
                                         onOpenProduct = onOpenProduct,
                                         onViewAll = { onOpenListing(ALL_CATEGORY) },
                                     )
-                                }
-                            }
-
-                            // Trust Row for trust signals
-                            item(key = "trust", contentType = "trust") {
-                                Box(
-                                    Modifier.padding(
-                                        horizontal = PageGutter,
-                                        vertical = VelnoxSpacing.md,
-                                    ),
-                                ) {
-                                    TrustRow()
                                 }
                             }
 

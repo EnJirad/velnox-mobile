@@ -24,6 +24,8 @@ class PreferencesState(
     val setNotifyOrderUpdates: (Boolean) -> Unit,
     val setNotifyPromotions: (Boolean) -> Unit,
     val setNotifySecurity: (Boolean) -> Unit,
+    val setAvatarUri: (String?) -> Unit = {},
+    val setCoverUri: (String?) -> Unit = {},
 )
 
 val LocalPreferences = staticCompositionLocalOf<PreferencesState> {
@@ -34,6 +36,8 @@ val LocalPreferences = staticCompositionLocalOf<PreferencesState> {
         setNotifyOrderUpdates = {},
         setNotifyPromotions = {},
         setNotifySecurity = {},
+        setAvatarUri = {},
+        setCoverUri = {},
     )
 }
 
@@ -51,6 +55,8 @@ fun VelnoxPreferencesProvider(content: @Composable () -> Unit) {
         setNotifyOrderUpdates = { scope.launch { repository.setNotifyOrderUpdates(it) } },
         setNotifyPromotions = { scope.launch { repository.setNotifyPromotions(it) } },
         setNotifySecurity = { scope.launch { repository.setNotifySecurity(it) } },
+        setAvatarUri = { scope.launch { repository.setAvatarUri(it) } },
+        setCoverUri = { scope.launch { repository.setCoverUri(it) } },
     )
 
     CompositionLocalProvider(LocalPreferences provides state) {
