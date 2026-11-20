@@ -180,6 +180,7 @@
 
     <!-- ═════════════════════════════ cart ═════════════════════════════ -->
     <string name="cart_title">Your cart</string>
+    <string name="cart_default_shop">Official Store</string>
     <string name="cart_empty_title">Your cart is empty</string>
     <string name="cart_empty_body">Add products you like, then come back here to check out.</string>
     <string name="cart_empty_action">Browse products</string>

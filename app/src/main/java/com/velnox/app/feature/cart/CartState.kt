@@ -6,11 +6,7 @@ import com.velnox.app.R
 import com.velnox.app.feature.home.ProductArt
 
 /**
- * One line in the demo cart.
- *
- * Deliberately carries no price field: Phase 2 is a UI preview and the brief
- * forbids fabricated financial values. The summary renders placeholder amounts
- * until a real commerce backend supplies them.
+ * One line in the cart.
  */
 data class CartItem(
     val productId: String,
@@ -76,6 +72,11 @@ class CartState {
         items.replaceAll { it.copy(selected = target) }
     }
 
+    fun toggleShopSelection(shopItems: List<CartItem>, target: Boolean) {
+        val ids = shopItems.map { it.productId }.toSet()
+        items.replaceAll { if (it.productId in ids) it.copy(selected = target) else it }
+    }
+
     fun add(
         productId: String,
         name: String,
@@ -88,7 +89,12 @@ class CartState {
         quantity: Int,
         maxStock: Int?,
     ) {
-        val key = if (variantId != null) "${productId}_${variantId}" else productId
+        val key = when {
+            !variantId.isNullOrBlank() -> "${productId}_${variantId}"
+            !variantName.isNullOrBlank() -> "${productId}_${variantName.replace(" ", "_")}"
+            !imageUrl.isNullOrBlank() -> "${productId}_${imageUrl.hashCode()}"
+            else -> productId
+        }
         val existingIndex = items.indexOfFirst { it.productId == key }
         val stockLimit = maxStock ?: 99
         if (existingIndex >= 0) {
@@ -96,6 +102,7 @@ class CartState {
             items[existingIndex] = current.copy(
                 quantity = (current.quantity + quantity).coerceAtMost(stockLimit),
                 selected = true,
+                imageUrl = imageUrl ?: current.imageUrl,
             )
         } else {
             items.add(

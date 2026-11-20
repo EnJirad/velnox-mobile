@@ -180,6 +180,7 @@
 
     <!-- ═════════════════════════════ cart ═════════════════════════════ -->
     <string name="cart_title">ตะกร้าสินค้า</string>
+    <string name="cart_default_shop">ร้านค้าทั่วไป</string>
     <string name="cart_empty_title">ตะกร้าของคุณว่าง</string>
     <string name="cart_empty_body">เพิ่มสินค้าที่คุณสนใจ แล้วกลับมาที่นี่เพื่อดำเนินการสั่งซื้อ</string>
     <string name="cart_empty_action">เลือกซื้อสินค้า</string>

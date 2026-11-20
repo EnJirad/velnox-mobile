@@ -576,12 +576,12 @@ private fun VelnoxNavHost() {
                                 onBack = ::closeOverlay,
                                 onOpenShop = { requestOverlay("shop:$it") },
                                 onOpenProduct = ::requestOverlay,
-                                onAddToCart = { product, variant, qty ->
+                                onAddToCart = { product, variant, qty, imageUrl ->
                                     cart.add(
                                         productId = product.id,
                                         name = product.name,
                                         storeName = product.shopName,
-                                        imageUrl = product.images.firstOrNull()?.url,
+                                        imageUrl = imageUrl ?: product.imageUrl ?: product.images.firstOrNull()?.url,
                                         variantId = variant?.id,
                                         variantName = variant?.title ?: variant?.name,
                                         price = variant?.price ?: product.displayPrice,
@@ -590,12 +590,12 @@ private fun VelnoxNavHost() {
                                         maxStock = variant?.stock ?: product.availableStock,
                                     )
                                 },
-                                onBuyNow = { product, variant, qty ->
+                                onBuyNow = { product, variant, qty, imageUrl ->
                                     cart.add(
                                         productId = product.id,
                                         name = product.name,
                                         storeName = product.shopName,
-                                        imageUrl = product.images.firstOrNull()?.url,
+                                        imageUrl = imageUrl ?: product.imageUrl ?: product.images.firstOrNull()?.url,
                                         variantId = variant?.id,
                                         variantName = variant?.title ?: variant?.name,
                                         price = variant?.price ?: product.displayPrice,

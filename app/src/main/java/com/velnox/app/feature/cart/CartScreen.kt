@@ -3,7 +3,6 @@
 package com.velnox.app.feature.cart
 
 import com.velnox.app.ui.components.velnoxClickable
-import com.velnox.app.ui.components.velnoxToggleable
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,18 +23,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -61,9 +64,14 @@ import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
 
+data class ShopCartGroup(
+    val shopName: String,
+    val items: List<CartItem>,
+)
+
 /**
- * Cart tab: selectable lines, quantity steppers, removal, and a summary whose
- * amounts stay placeholders until a real commerce backend exists.
+ * Cart tab: selectable lines grouped by seller/shop, quantity steppers, removal,
+ * and a summary whose amounts reflect actual selected items.
  */
 @Composable
 fun CartScreen(
@@ -99,6 +107,19 @@ fun CartScreen(
         }
 
         val locale = LocalConfiguration.current.locales[0]
+        val context = LocalContext.current
+        val defaultShop = stringResource(R.string.cart_default_shop)
+
+        val shopGroups = remember(state.items.toList()) {
+            val map = LinkedHashMap<String, MutableList<CartItem>>()
+            for (item in state.items) {
+                val sName = item.storeName?.takeIf { it.isNotBlank() }
+                    ?: (if (item.storeRes != 0) context.getString(item.storeRes) else defaultShop)
+                map.getOrPut(sName) { mutableListOf() }.add(item)
+            }
+            map.entries.map { ShopCartGroup(it.key, it.value) }
+        }
+
         val totalPrice = state.selectedTotalPrice
         val formattedTotal = if (totalPrice != null) {
             PriceFormat.format(totalPrice, "THB", locale) ?: "฿${String.format(locale, "%.2f", totalPrice)}"
@@ -138,13 +159,11 @@ fun CartScreen(
                 }
             }
 
-            items(state.items, key = { it.productId }) { item ->
-                CartLine(
-                    item = item,
-                    onToggle = { state.toggleSelection(item.productId) },
-                    onIncrease = { state.increase(item.productId) },
-                    onDecrease = { state.decrease(item.productId) },
-                    onRemove = { state.remove(item.productId) },
+            // Grouped by Shop / Seller
+            items(shopGroups, key = { it.shopName }) { group ->
+                ShopCartSection(
+                    group = group,
+                    state = state,
                 )
             }
 
@@ -182,6 +201,71 @@ fun CartScreen(
 }
 
 @Composable
+private fun ShopCartSection(
+    group: ShopCartGroup,
+    state: CartState,
+) {
+    val isShopAllSelected = group.items.isNotEmpty() && group.items.all { it.selected }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(SquircleLg)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg),
+    ) {
+        // Shop Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SelectionBox(
+                checked = isShopAllSelected,
+                onClick = { state.toggleShopSelection(group.items, !isShopAllSelected) },
+            )
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector = VelnoxIcons.ShoppingBag,
+                contentDescription = null,
+                tint = VelnoxBrand,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = group.shopName,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            BrandBadge(text = stringResource(R.string.profile_verified_badge))
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Shop Items
+        group.items.forEachIndexed { index, item ->
+            CartLine(
+                item = item,
+                onToggle = { state.toggleSelection(item.productId) },
+                onIncrease = { state.increase(item.productId) },
+                onDecrease = { state.decrease(item.productId) },
+                onRemove = { state.remove(item.productId) },
+            )
+            if (index < group.items.lastIndex) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun CartLine(
     item: CartItem,
     onToggle: () -> Unit,
@@ -192,17 +276,14 @@ private fun CartLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(SquircleLg)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
-            .padding(10.dp),
+            .padding(12.dp),
     ) {
         Column {
             SelectionBox(checked = item.selected, onClick = onToggle)
             Spacer(Modifier.height(8.dp))
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(76.dp)
                     .clip(SquircleSm)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
@@ -226,26 +307,26 @@ private fun CartLine(
                 style = TextXs.copy(fontWeight = FontWeight.Medium),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            val store = item.storeName ?: if (item.storeRes != 0) stringResource(item.storeRes) else ""
-            if (store.isNotBlank()) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = store,
-                    style = Text2xs,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-            if (item.variantName != null) {
+            if (!item.variantName.isNullOrBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    text = item.variantName,
-                    style = Text2xs,
-                    color = VelnoxBrand,
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(SquircleXs)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = item.variantName,
+                        style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                        color = VelnoxBrand,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             if (item.price != null) {
                 PriceFormat.format(item.price, item.currency, LocalConfiguration.current.locales[0])?.let { p ->
                     Text(
@@ -260,7 +341,7 @@ private fun CartLine(
                     tone = StatusTone.Neutral,
                 )
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 QuantityStepper(
                     value = item.quantity,
@@ -298,37 +379,26 @@ private fun CartLine(
 /** Square check control; the box itself is a squircle, its states are explicit. */
 @Composable
 private fun SelectionBox(checked: Boolean, onClick: () -> Unit) {
-    val shape = SquircleXs
     Box(
         modifier = Modifier
-            .size(48.dp)
-            .velnoxToggleable(value = checked, role = Role.Checkbox, onValueChange = { onClick() }),
+            .size(24.dp)
+            .clip(SquircleXs)
+            .background(if (checked) VelnoxBrand else MaterialTheme.colorScheme.surfaceVariant)
+            .border(
+                1.dp,
+                if (checked) VelnoxBrand else MaterialTheme.colorScheme.outline,
+                SquircleXs,
+            )
+            .velnoxClickable(role = Role.Checkbox, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(shape)
-                .background(
-                    if (checked) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surface,
-                )
-                .border(
-                    width = 1.dp,
-                    color = if (checked) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.outline,
-                    shape = shape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (checked) {
-                Icon(
-                    imageVector = VelnoxIcons.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
+        if (checked) {
+            Icon(
+                imageVector = VelnoxIcons.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondary,
+                modifier = Modifier.size(14.dp),
+            )
         }
     }
 }
@@ -338,23 +408,19 @@ private fun SummaryRow(label: String, value: String, strong: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 5.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
-            style = if (strong) MaterialTheme.typography.titleSmall else TextXs,
-            color = if (strong) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            style = if (strong) TextXs.copy(fontWeight = FontWeight.SemiBold) else TextXs,
+            color = if (strong) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
         Text(
             text = value,
-            style = if (strong) MaterialTheme.typography.titleSmall else TextXs,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = if (strong) TextXs.copy(fontWeight = FontWeight.Bold) else TextXs,
+            color = if (strong) VelnoxBrand else MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -365,59 +431,43 @@ private fun CheckoutBar(
     totalPriceText: String,
     onCheckout: () -> Unit,
 ) {
-    val canCheckout = selectedCount > 0
-    val buttonBackground = if (canCheckout) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val buttonForeground = if (canCheckout) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline)
             .navigationBarsPadding()
             .padding(horizontal = PageGutter, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.cart_total),
-                    style = Text2xs,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = totalPriceText,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .height(48.dp)
-                    .clip(Squircle)
-                    .background(buttonBackground)
-                    .velnoxClickable(enabled = canCheckout, role = Role.Button, onClick = onCheckout)
-                    .padding(horizontal = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.cart_checkout),
-                    style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                    color = buttonForeground,
-                )
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    imageVector = VelnoxIcons.ArrowRight,
-                    contentDescription = null,
-                    tint = buttonForeground,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.cart_total),
+                style = Text2xs,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = totalPriceText,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = VelnoxBrand,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        val enabled = selectedCount > 0
+        Box(
+            modifier = Modifier
+                .height(48.dp)
+                .clip(Squircle)
+                .background(if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                .velnoxClickable(role = Role.Button, enabled = enabled, onClick = onCheckout)
+                .padding(horizontal = 20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.cart_checkout),
+                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                color = if (enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -425,14 +475,6 @@ private fun CheckoutBar(
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun CartPreview() {
-    VelnoxTheme(darkTheme = false) {
-        CartScreen(state = CartState(), onCheckout = {}, onBrowseProducts = {})
-    }
-}
-
-@Preview(name = "Cart 320dp", showBackground = true, widthDp = 320, heightDp = 720)
-@Composable
-private fun CartCompactPreview() {
     VelnoxTheme(darkTheme = false) {
         CartScreen(state = CartState(), onCheckout = {}, onBrowseProducts = {})
     }

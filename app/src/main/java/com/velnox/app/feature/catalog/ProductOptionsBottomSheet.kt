@@ -105,8 +105,8 @@ fun ProductOptionsBottomSheet(
     intent: ProductSelectionIntent = ProductSelectionIntent.SELECT_OPTIONS,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     onDismissRequest: () -> Unit,
-    onAddToCart: ((selectedVariant: ProductVariant?, quantity: Int) -> Unit)? = null,
-    onBuyNow: ((selectedVariant: ProductVariant?, quantity: Int) -> Unit)? = null,
+    onAddToCart: ((selectedVariant: ProductVariant?, quantity: Int, selectedImageUrl: String?) -> Unit)? = null,
+    onBuyNow: ((selectedVariant: ProductVariant?, quantity: Int, selectedImageUrl: String?) -> Unit)? = null,
     onConfirmSelection: ((selectedVariant: ProductVariant?, quantity: Int) -> Unit)? = null,
 ) {
     val locale = LocalConfiguration.current.locales[0]
@@ -624,7 +624,7 @@ fun ProductOptionsBottomSheet(
                         // User opened with Add to Cart intent -> ONLY Add to Cart button
                         Button(
                             onClick = {
-                                onAddToCart?.invoke(matchedVariant, currentQuantity)
+                                onAddToCart?.invoke(matchedVariant, currentQuantity, previewImage)
                                 onDismissRequest()
                             },
                             enabled = !isOutOfStock,
@@ -661,7 +661,7 @@ fun ProductOptionsBottomSheet(
                         // User opened with Buy Now intent -> ONLY Buy Now button
                         Button(
                             onClick = {
-                                onBuyNow?.invoke(matchedVariant, currentQuantity)
+                                onBuyNow?.invoke(matchedVariant, currentQuantity, previewImage)
                                 onDismissRequest()
                             },
                             enabled = !isOutOfStock,
@@ -695,7 +695,7 @@ fun ProductOptionsBottomSheet(
                             // Add to Cart
                             OutlinedButton(
                                 onClick = {
-                                    onAddToCart?.invoke(matchedVariant, currentQuantity)
+                                    onAddToCart?.invoke(matchedVariant, currentQuantity, previewImage)
                                     onDismissRequest()
                                 },
                                 enabled = !isOutOfStock,
@@ -730,7 +730,7 @@ fun ProductOptionsBottomSheet(
                             // Buy Now
                             Button(
                                 onClick = {
-                                    onBuyNow?.invoke(matchedVariant, currentQuantity)
+                                    onBuyNow?.invoke(matchedVariant, currentQuantity, previewImage)
                                     onDismissRequest()
                                 },
                                 enabled = !isOutOfStock,

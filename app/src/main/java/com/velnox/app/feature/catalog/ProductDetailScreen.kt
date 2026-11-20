@@ -120,8 +120,8 @@ import kotlinx.coroutines.launch
 fun ProductDetailScreen(
     productId: String,
     onBack: () -> Unit,
-    onAddToCart: ((ProductDetail, ProductVariant?, Int) -> Unit)? = null,
-    onBuyNow: ((ProductDetail, ProductVariant?, Int) -> Unit)? = null,
+    onAddToCart: ((ProductDetail, ProductVariant?, Int, String?) -> Unit)? = null,
+    onBuyNow: ((ProductDetail, ProductVariant?, Int, String?) -> Unit)? = null,
     onOpenCart: (() -> Unit)? = null,
     onOpenShop: ((String) -> Unit)? = null,
     onOpenProduct: ((String) -> Unit)? = null,
@@ -1161,12 +1161,12 @@ fun ProductDetailScreen(
                         initialQuantity = quantity,
                         intent = optionsPopupIntent,
                         onDismissRequest = { showOptionsSheet = false },
-                        onAddToCart = { variant, newQuantity ->
+                        onAddToCart = { variant, newQuantity, variantImageUrl ->
                             selectedVariantId = variant?.id
                             quantity = newQuantity
                             showOptionsSheet = false
                             if (canPurchase) {
-                                onAddToCart?.invoke(product, variant, newQuantity)
+                                onAddToCart?.invoke(product, variant, newQuantity, variantImageUrl)
                                 addedFeedbackMessage = product.name
                                 scope.launch {
                                     delay(2800)
@@ -1174,12 +1174,12 @@ fun ProductDetailScreen(
                                 }
                             }
                         },
-                        onBuyNow = { variant, newQuantity ->
+                        onBuyNow = { variant, newQuantity, variantImageUrl ->
                             selectedVariantId = variant?.id
                             quantity = newQuantity
                             showOptionsSheet = false
                             if (canPurchase) {
-                                onBuyNow?.invoke(product, variant, newQuantity)
+                                onBuyNow?.invoke(product, variant, newQuantity, variantImageUrl)
                             }
                         },
                         onConfirmSelection = { variant, newQuantity ->
@@ -1191,6 +1191,10 @@ fun ProductDetailScreen(
                 }
 
                 // 9. Bottom Action Area (Context-Aware Add to Cart & Buy Now)
+                val resolvedDirectVariantImage = selectedVariant?.options?.values?.firstNotNullOfOrNull { optVal ->
+                    product.optionGroups.flatMap { it.values }.firstOrNull { it.value == optVal && !it.imageUrl.isNullOrBlank() }?.imageUrl
+                } ?: product.images.firstOrNull()?.url
+
                 BottomPurchaseArea(
                     canPurchase = canPurchase,
                     isOutOfStock = isOutOfStock,
@@ -1200,7 +1204,7 @@ fun ProductDetailScreen(
                                 optionsPopupIntent = ProductSelectionIntent.ADD_TO_CART
                                 showOptionsSheet = true
                             } else {
-                                onAddToCart?.invoke(product, selectedVariant, quantity)
+                                onAddToCart?.invoke(product, selectedVariant, quantity, resolvedDirectVariantImage)
                                 addedFeedbackMessage = product.name
                                 scope.launch {
                                     delay(2800)
@@ -1215,7 +1219,7 @@ fun ProductDetailScreen(
                                 optionsPopupIntent = ProductSelectionIntent.BUY_NOW
                                 showOptionsSheet = true
                             } else {
-                                onBuyNow?.invoke(product, selectedVariant, quantity)
+                                onBuyNow?.invoke(product, selectedVariant, quantity, resolvedDirectVariantImage)
                             }
                         }
                     },

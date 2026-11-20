@@ -180,6 +180,7 @@
 
     <!-- ═════════════════════════════ cart ═════════════════════════════ -->
     <string name="cart_title">သင့်ကုန်တောင်း</string>
+    <string name="cart_default_shop">တရားဝင် ဆိုင်</string>
     <string name="cart_empty_title">ကုန်တောင်း ဗလာဖြစ်နေသည်</string>
     <string name="cart_empty_body">နှစ်သက်သော ပစ္စည်းများ ထည့်ပြီး ဤနေရာသို့ ပြန်လာပါ</string>
     <string name="cart_empty_action">ကုန်ပစ္စည်း ကြည့်ရန်</string>

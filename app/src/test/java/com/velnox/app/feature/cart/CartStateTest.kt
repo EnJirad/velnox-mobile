@@ -1,6 +1,7 @@
 package com.velnox.app.feature.cart
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -107,6 +108,124 @@ class CartStateTest {
         assertEquals(5, cart.items.size) // 3 demo items + 2 new variants
         assertEquals("prod-1_var-blue", cart.items[0].productId)
         assertEquals("prod-1_var-red", cart.items[1].productId)
+    }
+
+    @Test
+    fun `variants without variantId distinguish by variantName or imageUrl`() {
+        val cart = CartState()
+        cart.items.clear()
+
+        cart.add(
+            productId = "prod-shoes",
+            name = "Running Shoes",
+            storeName = "Sport Store",
+            imageUrl = "https://example.com/shoes-black.jpg",
+            variantId = null,
+            variantName = "Black",
+            price = 2500.0,
+            currency = "THB",
+            quantity = 1,
+            maxStock = 10,
+        )
+
+        cart.add(
+            productId = "prod-shoes",
+            name = "Running Shoes",
+            storeName = "Sport Store",
+            imageUrl = "https://example.com/shoes-white.jpg",
+            variantId = null,
+            variantName = "White",
+            price = 2500.0,
+            currency = "THB",
+            quantity = 1,
+            maxStock = 10,
+        )
+
+        // Different variant names without variantId should still be distinct lines
+        assertEquals(2, cart.items.size)
+        assertEquals("prod-shoes_White", cart.items[0].productId)
+        assertEquals("prod-shoes_Black", cart.items[1].productId)
+        assertEquals("https://example.com/shoes-white.jpg", cart.items[0].imageUrl)
+        assertEquals("https://example.com/shoes-black.jpg", cart.items[1].imageUrl)
+
+        // Adding exact same variant again increments quantity
+        cart.add(
+            productId = "prod-shoes",
+            name = "Running Shoes",
+            storeName = "Sport Store",
+            imageUrl = "https://example.com/shoes-white.jpg",
+            variantId = null,
+            variantName = "White",
+            price = 2500.0,
+            currency = "THB",
+            quantity = 2,
+            maxStock = 10,
+        )
+
+        assertEquals(2, cart.items.size)
+        assertEquals(3, cart.items[0].quantity)
+    }
+
+    @Test
+    fun `toggleShopSelection toggles selection of only specified shop items`() {
+        val cart = CartState()
+        cart.items.clear()
+
+        cart.add(
+            productId = "p-shopA-1",
+            name = "Shop A Item 1",
+            storeName = "Shop A",
+            imageUrl = null,
+            variantId = "v1",
+            variantName = null,
+            price = 100.0,
+            currency = "THB",
+            quantity = 1,
+            maxStock = 10,
+        )
+        cart.add(
+            productId = "p-shopA-2",
+            name = "Shop A Item 2",
+            storeName = "Shop A",
+            imageUrl = null,
+            variantId = "v2",
+            variantName = null,
+            price = 200.0,
+            currency = "THB",
+            quantity = 1,
+            maxStock = 10,
+        )
+        cart.add(
+            productId = "p-shopB-1",
+            name = "Shop B Item 1",
+            storeName = "Shop B",
+            imageUrl = null,
+            variantId = "v3",
+            variantName = null,
+            price = 300.0,
+            currency = "THB",
+            quantity = 1,
+            maxStock = 10,
+        )
+
+        val shopAItems = cart.items.filter { it.storeName == "Shop A" }
+        assertEquals(2, shopAItems.size)
+
+        // Deselect only Shop A items
+        cart.toggleShopSelection(shopAItems, target = false)
+
+        val itemA1 = cart.items.first { it.productId == "p-shopA-1_v1" }
+        val itemA2 = cart.items.first { it.productId == "p-shopA-2_v2" }
+        val itemB1 = cart.items.first { it.productId == "p-shopB-1_v3" }
+
+        assertFalse(itemA1.selected)
+        assertFalse(itemA2.selected)
+        assertTrue(itemB1.selected) // Shop B unaffected
+
+        // Select Shop A items back
+        cart.toggleShopSelection(shopAItems, target = true)
+        assertTrue(itemA1.let { cart.items.first { it.productId == "p-shopA-1_v1" }.selected })
+        assertTrue(itemA2.let { cart.items.first { it.productId == "p-shopA-2_v2" }.selected })
     }
 
     @Test
