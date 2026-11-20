@@ -55,6 +55,7 @@ import com.velnox.app.feature.cart.CartScreen
 import com.velnox.app.feature.cart.CartState
 import com.velnox.app.feature.catalog.ProductDetailScreen
 import com.velnox.app.feature.catalog.ShopScreen
+import com.velnox.app.feature.checkout.CheckoutScreen
 import com.velnox.app.feature.home.ALL_CATEGORY
 import com.velnox.app.feature.home.CategoryScreen
 import com.velnox.app.feature.home.HomeScreen
@@ -554,6 +555,14 @@ private fun VelnoxNavHost() {
                         onBack = ::closeOverlay,
                         onOpenProduct = ::requestOverlay,
                         onOpenCategory = { slug -> requestOverlay("category:$slug") },
+                    )
+
+                    "checkout" -> CheckoutScreen(
+                        cartState = cart,
+                        onBack = ::closeOverlay,
+                        onViewOrder = { orderId ->
+                            overlayKey = "order:$orderId"
+                        },
                     )
 
                     else -> {

@@ -279,4 +279,45 @@ class CartStateTest {
         cart.toggleSelection("prod-1_v1")
         assertEquals(0.0, cart.selectedTotalPrice!!, 0.001)
     }
+
+    @Test
+    fun `removeSelected removes only selected items and returns them`() {
+        val cart = CartState()
+        cart.items.clear()
+
+        cart.add(
+            productId = "item-1",
+            name = "Item 1",
+            storeName = "Store A",
+            imageUrl = null,
+            variantId = null,
+            variantName = null,
+            price = 100.0,
+            currency = "THB",
+            quantity = 1,
+            maxStock = 10,
+        )
+        cart.add(
+            productId = "item-2",
+            name = "Item 2",
+            storeName = "Store B",
+            imageUrl = null,
+            variantId = null,
+            variantName = null,
+            price = 200.0,
+            currency = "THB",
+            quantity = 2,
+            maxStock = 10,
+        )
+
+        // Deselect item 2
+        cart.toggleSelection("item-2")
+
+        val removed = cart.removeSelected()
+
+        assertEquals(1, removed.size)
+        assertEquals("item-1", removed[0].productId)
+        assertEquals(1, cart.items.size)
+        assertEquals("item-2", cart.items[0].productId)
+    }
 }

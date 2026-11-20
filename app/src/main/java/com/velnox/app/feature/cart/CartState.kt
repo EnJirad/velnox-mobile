@@ -77,6 +77,12 @@ class CartState {
         items.replaceAll { if (it.productId in ids) it.copy(selected = target) else it }
     }
 
+    fun removeSelected(): List<CartItem> {
+        val selected = items.filter { it.selected }
+        items.removeAll { it.selected }
+        return selected
+    }
+
     fun add(
         productId: String,
         name: String,

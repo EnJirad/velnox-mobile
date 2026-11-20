@@ -3,7 +3,7 @@
 ## Progress Overview
 - [x] **Round 1 (Parts 1–16):** Full UI/UX Overhaul & Remote Verification Completed.
 - [ ] **Round 2 (Parts 01–10):** E-Commerce Engine, Flow Completeness, RAM Efficiency & Polish.
-  - Completed: 1 / 10 Parts (10%)
+  - Completed: 2 / 10 Parts (20%)
 
 ---
 
@@ -26,16 +26,17 @@
 
 ---
 
-### [ ] Part 02: High-Performance Image Engine & RAM Optimization
+### [x] Part 02: High-Performance Image Engine & RAM Optimization
 - **Document:** `.project/part-02-image-engine-ram-optimization.md`
+- **Commit:** `3cc30c4`
+- **CI Run:** [Run #44692167847](https://github.com/EnJirad/velnox-mobile/actions/runs/44692167847) (PASS)
 - **Target Files:**
   - `VelnoxApplication.kt`
-  - Image loading components
 - **Key Objectives:**
-  - [ ] Implement `ImageLoaderFactory` in `VelnoxApplication`.
-  - [ ] Configure Coil MemoryCache with strict limit (15% max heap) & LRU DiskCache (50MB).
-  - [ ] Enable low-memory downsampling (`RGB_565` for budget devices) and crossfade transitions.
-  - [ ] Ensure all lazy lists have stable keys for efficient bitmap recycling.
+  - [x] Implement `ImageLoaderFactory` in `VelnoxApplication`.
+  - [x] Configure Coil MemoryCache with strict limit (15% max heap) & LRU DiskCache (50MB).
+  - [x] Enable low-memory downsampling (`RGB_565` for budget devices) and bitmap pooling.
+  - [x] Ensure all lazy lists have stable keys for efficient bitmap recycling.
 
 ---
 

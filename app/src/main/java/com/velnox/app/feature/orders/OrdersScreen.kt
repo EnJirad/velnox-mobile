@@ -86,20 +86,28 @@ enum class OrdersFilter(@StringRes val labelRes: Int) {
 data class DemoOrder(
     val id: String,
     val status: OrderStatus,
-    @StringRes val productNameRes: Int,
-    val productArt: ProductArt,
-    val itemCount: Int,
-    val daysAgo: Int,
+    @StringRes val productNameRes: Int = 0,
+    val productArt: ProductArt = ProductArt.Headphones,
+    val itemCount: Int = 1,
+    val daysAgo: Int = 0,
+    val customTitle: String? = null,
+    val customStore: String? = null,
+    val totalPrice: Double? = null,
+    val imageUrl: String? = null,
 )
 
 object OrdersDemo {
-    val orders = listOf(
+    val orders = androidx.compose.runtime.mutableStateListOf(
         DemoOrder("VLX-2401", OrderStatus.Shipping, R.string.product_2_name, ProductArt.Headphones, 1, 1),
         DemoOrder("VLX-2402", OrderStatus.Processing, R.string.product_3_name, ProductArt.Tote, 2, 2),
         DemoOrder("VLX-2403", OrderStatus.Pending, R.string.product_6_name, ProductArt.Lamp, 1, 3),
         DemoOrder("VLX-2404", OrderStatus.Completed, R.string.product_5_name, ProductArt.Mug, 3, 9),
         DemoOrder("VLX-2405", OrderStatus.Returned, R.string.product_1_name, ProductArt.Jacket, 1, 14),
     )
+
+    fun addOrder(order: DemoOrder) {
+        orders.add(0, order)
+    }
 
     fun forFilter(filter: OrdersFilter): List<DemoOrder> = when (filter) {
         OrdersFilter.All -> orders
@@ -241,13 +249,23 @@ private fun OrderCard(order: DemoOrder, onClick: () -> Unit) {
         }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(56.dp)) {
-                ProductArtTile(art = order.productArt, modifier = Modifier.fillMaxSize())
+            Box(modifier = Modifier.size(56.dp).clip(SquircleSm)) {
+                if (order.imageUrl != null) {
+                    coil.compose.AsyncImage(
+                        model = order.imageUrl,
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    ProductArtTile(art = order.productArt, modifier = Modifier.fillMaxSize())
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
+                val orderTitle = order.customTitle ?: if (order.productNameRes != 0) stringResource(order.productNameRes) else order.id
                 Text(
-                    text = stringResource(order.productNameRes),
+                    text = orderTitle,
                     style = TextXs.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
@@ -291,13 +309,23 @@ fun OrderDetailScreen(
                 modifier = Modifier.padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(modifier = Modifier.size(56.dp)) {
-                    ProductArtTile(art = order.productArt, modifier = Modifier.fillMaxSize())
+                Box(modifier = Modifier.size(56.dp).clip(SquircleSm)) {
+                    if (order.imageUrl != null) {
+                        coil.compose.AsyncImage(
+                            model = order.imageUrl,
+                            contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        ProductArtTile(art = order.productArt, modifier = Modifier.fillMaxSize())
+                    }
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
+                    val detailTitle = order.customTitle ?: if (order.productNameRes != 0) stringResource(order.productNameRes) else order.id
                     Text(
-                        text = stringResource(order.productNameRes),
+                        text = detailTitle,
                         style = TextXs.copy(fontWeight = FontWeight.Medium),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
