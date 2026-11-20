@@ -62,6 +62,13 @@ class VelnoxApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            android.util.Log.e("VelnoxCrash", "Uncaught exception on thread ${thread.name}", throwable)
+            runCatching {
+                val crashFile = java.io.File(filesDir, "crash.log")
+                crashFile.writeText("${System.currentTimeMillis()}: ${throwable.stackTraceToString()}\n")
+            }
+        }
         preferences = PreferencesRepository(this)
 
         val api = AuthRemoteDataSource()

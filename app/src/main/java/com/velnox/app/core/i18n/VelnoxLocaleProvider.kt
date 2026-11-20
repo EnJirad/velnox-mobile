@@ -1,6 +1,7 @@
 package com.velnox.app.core.i18n
 
 import android.content.res.Configuration
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -22,6 +23,7 @@ fun VelnoxLocaleProvider(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
+    val registryOwner = LocalActivityResultRegistryOwner.current
     val configuration = remember(language, context) {
         Configuration(context.resources.configuration).apply {
             setLocale(language.locale)
@@ -32,10 +34,20 @@ fun VelnoxLocaleProvider(
         context.createConfigurationContext(configuration)
     }
 
-    CompositionLocalProvider(
-        LocalConfiguration provides configuration,
-        LocalContext provides localizedContext,
-    ) {
-        content()
+    if (registryOwner != null) {
+        CompositionLocalProvider(
+            LocalConfiguration provides configuration,
+            LocalContext provides localizedContext,
+            LocalActivityResultRegistryOwner provides registryOwner,
+        ) {
+            content()
+        }
+    } else {
+        CompositionLocalProvider(
+            LocalConfiguration provides configuration,
+            LocalContext provides localizedContext,
+        ) {
+            content()
+        }
     }
 }

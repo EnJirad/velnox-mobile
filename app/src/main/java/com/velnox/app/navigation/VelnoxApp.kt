@@ -2,8 +2,6 @@ package com.velnox.app.navigation
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -108,7 +106,9 @@ private fun overlayDestination(key: String): String = OVERLAY_DESTINATION + key
  * allows. None of them recreate the activity.
  */
 @Composable
-fun VelnoxApp() {
+fun VelnoxApp(
+    onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
+) {
     VelnoxPreferencesProvider {
         val preferences = LocalPreferences.current.current
 
@@ -120,7 +120,7 @@ fun VelnoxApp() {
             }
             VelnoxTheme(darkTheme = darkTheme) {
                 VelnoxSessionProvider {
-                    VelnoxNavHost()
+                    VelnoxNavHost(onPickImage = onPickImage)
                 }
             }
         }
@@ -146,7 +146,9 @@ fun VelnoxApp() {
  * Home tab, then let the system exit.
  */
 @Composable
-private fun VelnoxNavHost() {
+private fun VelnoxNavHost(
+    onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
+) {
     val session = LocalSession.current
     val sessionState = session.state
     val scope = rememberCoroutineScope()
@@ -163,26 +165,6 @@ private fun VelnoxNavHost() {
     var resetToken by rememberSaveable { mutableStateOf("") }
     var authSucceeded by rememberSaveable { mutableStateOf(false) }
     var forgotSent by rememberSaveable { mutableStateOf(false) }
-
-    // Root-level ActivityResult launcher for image picking. Hoisted to the root of
-    // VelnoxNavHost so it is unconditionally registered at initial composition,
-    // avoiding lifecycle registration crashes in dynamic tabs or SaveableStateProvider.
-    var onImagePickedCallback by remember { mutableStateOf<((Uri?) -> Unit)?>(null) }
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri: Uri? ->
-        val callback = onImagePickedCallback
-        onImagePickedCallback = null
-        callback?.invoke(uri)
-    }
-    val onPickImage: ((Uri?) -> Unit) -> Unit = { callback ->
-        onImagePickedCallback = callback
-        try {
-            imagePickerLauncher.launch("image/*")
-        } catch (_: Exception) {
-            onImagePickedCallback = null
-        }
-    }
 
     // Google Sign-In availability and progress. Availability is a deployment
     // fact (is there a client id at all?), so it is resolved once per gate.
@@ -890,7 +872,7 @@ private fun TabContent(
     sessionState: SessionState,
     onOpenOverlay: (String) -> Unit,
     onOpenTab: (AppTab) -> Unit,
-    onPickImage: ((Uri?) -> Unit) -> Unit,
+    onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
 ) {
     when (tab) {
         AppTab.Home -> HomeScreen(
