@@ -176,6 +176,9 @@
 
 ### [x] Part 10: End-to-End Performance, Transition Animations & Integration Polish
 - **Document:** `.project/part-10-performance-transitions-polish.md`
+- **Commit:** `5f0cccb`
+- **CI Run:** [Run #44733393307](https://github.com/EnJirad/velnox-mobile/actions/runs/44733393307) (PASS)
+- **APK Artifact:** `velnox-debug-apk` (ID: 14628280278, 12.6 MB)
 - **Target Files:**
   - `VelnoxApp.kt`
   - `RouteIntegrityTest.kt`
