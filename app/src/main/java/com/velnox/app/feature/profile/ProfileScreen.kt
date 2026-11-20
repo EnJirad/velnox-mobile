@@ -515,11 +515,6 @@ private fun ProfileHeaderCard(
                     )
                 }
             }
-                        tint = Color.White,
-                        modifier = Modifier.size(13.dp),
-                    )
-                }
-            }
 
             // Quick Edit Profile Action aligned to bottom-end of header overlap zone
             Box(
