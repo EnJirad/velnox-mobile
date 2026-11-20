@@ -141,15 +141,23 @@ class CartStateTest {
             maxStock = 10,
         )
 
-        // Both are selected by default
+        // Both are selected by default: (150 * 2) + (200 * 1) = 500.0
+        assertEquals(500.0, cart.selectedTotalPrice!!, 0.001)
+
+        // When all items are selected, toggleAll() deselects all
+        cart.toggleAll()
+        assertEquals(0.0, cart.selectedTotalPrice!!, 0.001)
+
+        // toggleAll() again selects all
+        cart.toggleAll()
         assertEquals(500.0, cart.selectedTotalPrice!!, 0.001)
 
         // Unselect Item 2
         cart.toggleSelection("prod-2_v2")
         assertEquals(300.0, cart.selectedTotalPrice!!, 0.001)
 
-        // Toggle all off
-        cart.toggleAll()
+        // Unselect Item 1
+        cart.toggleSelection("prod-1_v1")
         assertEquals(0.0, cart.selectedTotalPrice!!, 0.001)
     }
 }
