@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.velnox.app.R
 import com.velnox.app.core.catalog.PriceFormat
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.rememberCustomerRepository
+import com.velnox.app.core.customer.userMessage
 import com.velnox.app.feature.cart.CartState
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.CardDivider
@@ -77,6 +81,8 @@ fun WishlistScreen(
 ) {
     val items = WishlistState.items
     val locale = LocalConfiguration.current.locales[0]
+    val context = LocalContext.current
+    val repository = rememberCustomerRepository()
     val scope = rememberCoroutineScope()
 
     var recentlyRemoved by remember { mutableStateOf<WishlistItem?>(null) }
@@ -118,24 +124,19 @@ fun WishlistScreen(
                         locale = locale,
                         onClick = { onOpenProduct(item.productId) },
                         onMoveToCart = {
-                            cartState.add(
-                                productId = item.productId,
-                                name = item.name,
-                                storeName = item.shopName,
-                                imageUrl = item.imageUrl,
-                                variantId = null,
-                                variantName = null,
-                                price = item.price,
-                                currency = item.currency,
-                                quantity = 1,
-                                maxStock = null,
-                            )
-                            actionNotice = "เพิ่ม ${item.name} ลงตะกร้าแล้ว"
                             scope.launch {
-                                delay(3000)
-                                if (actionNotice?.contains(item.name) == true) {
-                                    actionNotice = null
+                                val res = cartState.addRemote(
+                                    repository = repository,
+                                    productId = item.productId,
+                                    variantId = null,
+                                    quantity = 1,
+                                )
+                                actionNotice = when (res) {
+                                    is CustomerResult.Ok -> "เพิ่ม ${item.name} ลงตะกร้าแล้ว"
+                                    is CustomerResult.Failed -> res.userMessage(context)
                                 }
+                                delay(3000)
+                                actionNotice = null
                             }
                         },
                         onRemove = {

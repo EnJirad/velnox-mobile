@@ -43,6 +43,7 @@ import com.velnox.app.core.i18n.VelnoxLocaleProvider
 import com.velnox.app.core.preferences.LocalPreferences
 import com.velnox.app.core.preferences.ThemeMode
 import com.velnox.app.core.preferences.VelnoxPreferencesProvider
+import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.rememberCustomerRepository
 import com.velnox.app.core.session.LocalSession
 import com.velnox.app.core.session.SessionNotice
@@ -144,18 +145,6 @@ private fun VelnoxNavHost() {
     val sessionState = session.state
     val scope = rememberCoroutineScope()
 
-    // Server-backed customer data follows the session: loaded when an account is
-    // signed in, dropped the moment it is not, so one account's data is never
-    // shown to the next.
-    val customer = rememberCustomerRepository()
-    LaunchedEffect(sessionState.isAuthenticated) {
-        if (sessionState.isAuthenticated) {
-            AddressBookState.load(customer)
-        } else {
-            AddressBookState.clear()
-        }
-    }
-
     var tabKey by rememberSaveable { mutableStateOf(AppTab.Home.key) }
     var overlayKey by rememberSaveable { mutableStateOf<String?>(null) }
     var loginReasonKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -204,6 +193,20 @@ private fun VelnoxNavHost() {
     val notifications = remember { NotificationsState() }
     val searchState = remember { SearchState() }
     val tabStateHolder = rememberSaveableStateHolder()
+
+    // Server-backed customer data follows the session: loaded when an account is
+    // signed in, dropped the moment it is not, so one account's data is never
+    // shown to the next.
+    val customer = rememberCustomerRepository()
+    LaunchedEffect(sessionState.isAuthenticated) {
+        if (sessionState.isAuthenticated) {
+            AddressBookState.load(customer)
+            cart.syncLocalAndLoad(customer)
+        } else {
+            AddressBookState.clear()
+            cart.clear()
+        }
+    }
 
     fun openTab(next: AppTab) {
         tabKey = next.key
@@ -647,33 +650,58 @@ private fun VelnoxNavHost() {
                                     onOpenShop = { requestOverlay("shop:$it") },
                                     onOpenProduct = ::requestOverlay,
                                     onAddToCart = { product, variant, qty, imageUrl ->
-                                        cart.add(
-                                            productId = product.id,
-                                            name = product.name,
-                                            storeName = product.shopName,
-                                            imageUrl = imageUrl ?: product.images.firstOrNull()?.url,
-                                            variantId = variant?.id,
-                                            variantName = variant?.title ?: variant?.name,
-                                            price = variant?.price ?: product.displayPrice,
-                                            currency = product.currency,
-                                            quantity = qty,
-                                            maxStock = variant?.stock ?: product.availableStock,
-                                        )
+                                        if (sessionState.isAuthenticated) {
+                                            scope.launch {
+                                                cart.addRemote(
+                                                    repository = customer,
+                                                    productId = product.id,
+                                                    variantId = variant?.id,
+                                                    quantity = qty,
+                                                )
+                                            }
+                                        } else {
+                                            cart.add(
+                                                productId = product.id,
+                                                name = product.name,
+                                                storeName = product.shopName,
+                                                imageUrl = imageUrl ?: product.images.firstOrNull()?.url,
+                                                variantId = variant?.id,
+                                                variantName = variant?.title ?: variant?.name,
+                                                price = variant?.price ?: product.displayPrice,
+                                                currency = product.currency,
+                                                quantity = qty,
+                                                maxStock = variant?.stock ?: product.availableStock,
+                                            )
+                                        }
                                     },
                                     onBuyNow = { product, variant, qty, imageUrl ->
-                                        cart.add(
-                                            productId = product.id,
-                                            name = product.name,
-                                            storeName = product.shopName,
-                                            imageUrl = imageUrl ?: product.images.firstOrNull()?.url,
-                                            variantId = variant?.id,
-                                            variantName = variant?.title ?: variant?.name,
-                                            price = variant?.price ?: product.displayPrice,
-                                            currency = product.currency,
-                                            quantity = qty,
-                                            maxStock = variant?.stock ?: product.availableStock,
-                                        )
-                                        requestOverlay("checkout")
+                                        if (sessionState.isAuthenticated) {
+                                            scope.launch {
+                                                val added = cart.addRemote(
+                                                    repository = customer,
+                                                    productId = product.id,
+                                                    variantId = variant?.id,
+                                                    quantity = qty,
+                                                )
+                                                if (added is CustomerResult.Ok) {
+                                                    requestOverlay("checkout")
+                                                }
+                                            }
+                                        } else {
+                                            cart.add(
+                                                productId = product.id,
+                                                name = product.name,
+                                                storeName = product.shopName,
+                                                imageUrl = imageUrl ?: product.images.firstOrNull()?.url,
+                                                variantId = variant?.id,
+                                                variantName = variant?.title ?: variant?.name,
+                                                price = variant?.price ?: product.displayPrice,
+                                                currency = product.currency,
+                                                quantity = qty,
+                                                maxStock = variant?.stock ?: product.availableStock,
+                                            )
+                                            requestOverlay("checkout")
+                                        }
                                     },
                                     onOpenCart = {
                                         closeOverlay()

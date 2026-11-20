@@ -399,7 +399,7 @@ class CustomerRemoteDataSource(
             productId = productId,
             variantId = obj.str("variantId", "variant_id") ?: variant?.str("id"),
             name = obj.str("name", "productName", "product_name") ?: product?.str("name"),
-            variantName = obj.str("variantName", "variant_name") ?: variant?.str("name"),
+            variantName = obj.str("variantOptionLabels", "variantName", "variant_name") ?: variant?.str("name"),
             shopName = obj.str("shopName", "shop_name") ?: product?.str("shopName")
                 ?: obj.optJSONObject("shop")?.str("name"),
             imageUrl = imageOf(obj) ?: product?.let(::imageOf),

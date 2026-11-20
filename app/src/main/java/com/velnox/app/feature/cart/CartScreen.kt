@@ -28,7 +28,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,12 +48,16 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.velnox.app.R
+import com.velnox.app.VelnoxApplication
 import com.velnox.app.core.catalog.PriceFormat
+import com.velnox.app.core.customer.CustomerRepository
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.customer.userMessage
 import com.velnox.app.feature.home.ProductArtTile
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.PageGutter
-import com.velnox.app.ui.components.PreviewNotice
 import com.velnox.app.ui.components.QuantityStepper
 import com.velnox.app.ui.components.SectionCard
 import com.velnox.app.ui.components.StatusChip
@@ -63,6 +72,7 @@ import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
+import kotlinx.coroutines.launch
 
 data class ShopCartGroup(
     val shopName: String,
@@ -71,7 +81,7 @@ data class ShopCartGroup(
 
 /**
  * Cart tab: selectable lines grouped by seller/shop, quantity steppers, removal,
- * and a summary whose amounts reflect actual selected items.
+ * and a summary whose amounts reflect actual selected items from the server.
  */
 @Composable
 fun CartScreen(
@@ -80,6 +90,20 @@ fun CartScreen(
     onBrowseProducts: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val repository: CustomerRepository? = remember(context) {
+        (context.applicationContext as? VelnoxApplication)?.customer
+    }
+    val scope = rememberCoroutineScope()
+    var actionError by remember { mutableStateOf<String?>(null) }
+
+    // Refresh cart from server on screen entry so prices and stock are current.
+    LaunchedEffect(repository) {
+        if (repository != null) {
+            state.load(repository)
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -96,18 +120,48 @@ fun CartScreen(
         )
 
         if (state.items.isEmpty()) {
-            EmptyState(
-                icon = VelnoxIcons.ShoppingCart,
-                title = stringResource(R.string.cart_empty_title),
-                body = stringResource(R.string.cart_empty_body),
-                actionLabel = stringResource(R.string.cart_empty_action),
-                onAction = onBrowseProducts,
-            )
+            when (state.status) {
+                LoadStatus.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.customer_loading),
+                            style = TextXs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                LoadStatus.Failed -> {
+                    EmptyState(
+                        icon = VelnoxIcons.ShoppingCart,
+                        title = stringResource(R.string.cart_load_failed),
+                        body = stringResource(R.string.customer_error_network),
+                        actionLabel = stringResource(R.string.common_retry),
+                        onAction = {
+                            if (repository != null) {
+                                scope.launch { state.load(repository) }
+                            }
+                        },
+                    )
+                }
+
+                LoadStatus.Idle, LoadStatus.Ready -> {
+                    EmptyState(
+                        icon = VelnoxIcons.ShoppingCart,
+                        title = stringResource(R.string.cart_empty_title),
+                        body = stringResource(R.string.cart_empty_body),
+                        actionLabel = stringResource(R.string.cart_empty_action),
+                        onAction = onBrowseProducts,
+                    )
+                }
+            }
             return@Column
         }
 
         val locale = LocalConfiguration.current.locales[0]
-        val context = LocalContext.current
         val defaultShop = stringResource(R.string.cart_default_shop)
 
         val shopGroups = remember(state.items.toList()) {
@@ -132,9 +186,22 @@ fun CartScreen(
             contentPadding = PaddingValues(horizontal = PageGutter, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item {
-                PreviewNotice(text = stringResource(R.string.cart_demo_notice))
-                Spacer(Modifier.height(4.dp))
+            if (actionError != null) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(Squircle)
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = actionError.orEmpty(),
+                            style = Text2xs,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    }
+                }
             }
 
             item {
@@ -164,6 +231,45 @@ fun CartScreen(
                 ShopCartSection(
                     group = group,
                     state = state,
+                    onIncrease = { lineId ->
+                        actionError = null
+                        if (repository != null) {
+                            scope.launch {
+                                val res = state.increaseRemote(repository, lineId)
+                                if (res is CustomerResult.Failed) {
+                                    actionError = res.userMessage(context)
+                                }
+                            }
+                        } else {
+                            state.increase(lineId)
+                        }
+                    },
+                    onDecrease = { lineId ->
+                        actionError = null
+                        if (repository != null) {
+                            scope.launch {
+                                val res = state.decreaseRemote(repository, lineId)
+                                if (res is CustomerResult.Failed) {
+                                    actionError = res.userMessage(context)
+                                }
+                            }
+                        } else {
+                            state.decrease(lineId)
+                        }
+                    },
+                    onRemove = { lineId ->
+                        actionError = null
+                        if (repository != null) {
+                            scope.launch {
+                                val res = state.removeRemote(repository, lineId)
+                                if (res is CustomerResult.Failed) {
+                                    actionError = res.userMessage(context)
+                                }
+                            }
+                        } else {
+                            state.remove(lineId)
+                        }
+                    },
                 )
             }
 
@@ -175,17 +281,14 @@ fun CartScreen(
                             stringResource(R.string.cart_subtotal),
                             formattedTotal,
                         )
-                        SummaryRow(stringResource(R.string.cart_shipping), stringResource(R.string.cart_shipping_free))
+                        SummaryRow(
+                            stringResource(R.string.cart_shipping),
+                            stringResource(R.string.cart_shipping_at_checkout),
+                        )
                         SummaryRow(
                             stringResource(R.string.cart_total),
                             formattedTotal,
                             strong = true,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.cart_price_preview),
-                            style = Text2xs,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -204,6 +307,9 @@ fun CartScreen(
 private fun ShopCartSection(
     group: ShopCartGroup,
     state: CartState,
+    onIncrease: (String) -> Unit,
+    onDecrease: (String) -> Unit,
+    onRemove: (String) -> Unit,
 ) {
     val isShopAllSelected = group.items.isNotEmpty() && group.items.all { it.selected }
 
@@ -250,10 +356,10 @@ private fun ShopCartSection(
         group.items.forEachIndexed { index, item ->
             CartLine(
                 item = item,
-                onToggle = { state.toggleSelection(item.productId) },
-                onIncrease = { state.increase(item.productId) },
-                onDecrease = { state.decrease(item.productId) },
-                onRemove = { state.remove(item.productId) },
+                onToggle = { state.toggleSelection(item.id) },
+                onIncrease = { onIncrease(item.id) },
+                onDecrease = { onDecrease(item.id) },
+                onRemove = { onRemove(item.id) },
             )
             if (index < group.items.lastIndex) {
                 HorizontalDivider(
@@ -347,7 +453,7 @@ private fun CartLine(
                     value = item.quantity,
                     onDecrease = onDecrease,
                     onIncrease = onIncrease,
-                    increaseEnabled = item.quantity < (item.maxStock ?: 99),
+                    increaseEnabled = item.quantity < (item.maxStock ?: CartState.MAX_QTY),
                 )
                 Spacer(Modifier.weight(1f))
                 Row(

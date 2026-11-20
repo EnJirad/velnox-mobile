@@ -1,323 +1,250 @@
 package com.velnox.app.feature.cart
 
+import com.velnox.app.core.customer.CustomerError
+import com.velnox.app.core.customer.CustomerRepository
+import com.velnox.app.core.customer.CustomerResult
+import com.velnox.app.core.customer.FakeCustomerApi
+import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.customer.RemoteCart
+import com.velnox.app.core.customer.RemoteCartItem
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CartStateTest {
 
-    @Test
-    fun `adding real product adds item to cart with variant and price`() {
-        val cart = CartState()
-        val initialSize = cart.items.size
+    private class ServerCart(initial: List<RemoteCartItem> = emptyList()) : FakeCustomerApi() {
+        val rows = initial.toMutableList()
+        var failNext: CustomerError? = null
+        var addedCalls = mutableListOf<Triple<String, String?, Int>>()
+        private var nextId = 1
 
+        override suspend fun cart(token: String): CustomerResult<RemoteCart> {
+            failNext?.let { failNext = null; return CustomerResult.Failed(it) }
+            return CustomerResult.Ok(RemoteCart(rows.toList()))
+        }
+
+        override suspend fun addToCart(
+            token: String,
+            productId: String,
+            variantId: String?,
+            quantity: Int,
+        ): CustomerResult<RemoteCart> {
+            failNext?.let { failNext = null; return CustomerResult.Failed(it, "Out of stock") }
+            addedCalls += Triple(productId, variantId, quantity)
+            val idx = rows.indexOfFirst { it.productId == productId && it.variantId == variantId }
+            if (idx >= 0) {
+                val cur = rows[idx]
+                rows[idx] = cur.copy(quantity = (cur.quantity + quantity).coerceAtMost(cur.maxStock ?: 100))
+            } else {
+                rows.add(
+                    0,
+                    RemoteCartItem(
+                        id = "ci-${nextId++}",
+                        productId = productId,
+                        variantId = variantId,
+                        name = "Product $productId",
+                        variantName = variantId?.let { "Var $it" },
+                        shopName = "Server Shop",
+                        imageUrl = null,
+                        price = 199.0,
+                        currency = "THB",
+                        quantity = quantity,
+                        maxStock = 10,
+                    ),
+                )
+            }
+            return CustomerResult.Ok(RemoteCart(rows.toList()))
+        }
+
+        override suspend fun updateCartItem(
+            token: String,
+            itemId: String,
+            quantity: Int,
+        ): CustomerResult<RemoteCart> {
+            failNext?.let { failNext = null; return CustomerResult.Failed(it) }
+            val idx = rows.indexOfFirst { it.id == itemId }
+            if (idx >= 0) rows[idx] = rows[idx].copy(quantity = quantity)
+            return CustomerResult.Ok(RemoteCart(rows.toList()))
+        }
+
+        override suspend fun removeCartItem(token: String, itemId: String): CustomerResult<RemoteCart> {
+            failNext?.let { failNext = null; return CustomerResult.Failed(it) }
+            rows.removeAll { it.id == itemId }
+            return CustomerResult.Ok(RemoteCart(rows.toList()))
+        }
+    }
+
+    private fun repo(api: FakeCustomerApi) = CustomerRepository(api, token = { "tok" })
+
+    private fun remoteRow(
+        id: String,
+        productId: String,
+        variantId: String? = null,
+        qty: Int = 1,
+        price: Double = 100.0,
+        maxStock: Int = 10,
+    ) = RemoteCartItem(
+        id = id,
+        productId = productId,
+        variantId = variantId,
+        name = "Item $productId",
+        variantName = variantId,
+        shopName = "Shop A",
+        imageUrl = null,
+        price = price,
+        currency = "THB",
+        quantity = qty,
+        maxStock = maxStock,
+    )
+
+    @Test
+    fun `cart starts empty with zero mock items`() {
+        val cart = CartState()
+        assertTrue(cart.items.isEmpty())
+        assertEquals(LoadStatus.Idle, cart.status)
+        assertEquals(0, cart.selectedCount)
+        assertEquals(0.0, cart.selectedTotalPrice!!, 0.001)
+    }
+
+    @Test
+    fun `load mirrors server cart and preserves prior selection state`() = runBlocking {
+        val server = ServerCart(listOf(remoteRow("ci-1", "p1", qty = 2, price = 150.0), remoteRow("ci-2", "p2", qty = 1, price = 200.0)))
+        val cart = CartState()
+
+        val first = cart.load(repo(server))
+        assertTrue(first is CustomerResult.Ok)
+        assertEquals(LoadStatus.Ready, cart.status)
+        assertEquals(2, cart.items.size)
+        assertEquals("ci-1", cart.items[0].remoteItemId)
+        assertEquals("p1", cart.items[0].productId)
+        assertEquals(500.0, cart.selectedTotalPrice!!, 0.001)
+
+        // Deselect ci-2, reload from server: selection stays false
+        cart.toggleSelection("ci-2")
+        assertEquals(300.0, cart.selectedTotalPrice!!, 0.001)
+
+        cart.load(repo(server))
+        assertTrue(cart.items.first { it.id == "ci-1" }.selected)
+        assertFalse(cart.items.first { it.id == "ci-2" }.selected)
+    }
+
+    @Test
+    fun `remote add, increase, decrease and remove mirror server responses`() = runBlocking {
+        val server = ServerCart()
+        val cart = CartState()
+        val r = repo(server)
+
+        assertTrue(cart.addRemote(r, productId = "p1", variantId = "v1", quantity = 2) is CustomerResult.Ok)
+        assertEquals(1, cart.items.size)
+        val lineId = cart.items.single().id
+        assertEquals("ci-1", lineId)
+        assertEquals(2, cart.items.single().quantity)
+
+        assertTrue(cart.increaseRemote(r, lineId) is CustomerResult.Ok)
+        assertEquals(3, cart.items.single().quantity)
+
+        assertTrue(cart.decreaseRemote(r, lineId) is CustomerResult.Ok)
+        assertEquals(2, cart.items.single().quantity)
+
+        assertTrue(cart.removeRemote(r, lineId) is CustomerResult.Ok)
+        assertTrue(cart.items.isEmpty())
+    }
+
+    @Test
+    fun `syncLocalAndLoad pushes guest items to server then loads authoritative cart`() = runBlocking {
+        val server = ServerCart(listOf(remoteRow("ci-existing", "p-server", qty = 1)))
+        val cart = CartState()
         cart.add(
-            productId = "prod-1",
-            name = "Test Cable",
-            storeName = "Gadget Shop",
-            imageUrl = "https://example.com/cable.jpg",
-            variantId = "var-1",
-            variantName = "Red / 1m",
-            price = 144.53,
-            currency = "THB",
+            productId = "p-guest",
+            name = "Guest Item",
+            storeName = "Guest Shop",
+            imageUrl = null,
+            variantId = "v-g",
+            variantName = "M",
+            price = 50.0,
             quantity = 2,
-            maxStock = 10,
         )
+        assertNull(cart.items.single().remoteItemId)
 
-        assertEquals(initialSize + 1, cart.items.size)
-        val added = cart.items.first()
-        assertEquals("prod-1_var-1", added.productId)
-        assertEquals("Test Cable", added.name)
-        assertEquals("Gadget Shop", added.storeName)
-        assertEquals("https://example.com/cable.jpg", added.imageUrl)
-        assertEquals("var-1", added.variantId)
-        assertEquals("Red / 1m", added.variantName)
-        assertEquals(144.53, added.price!!, 0.001)
-        assertEquals("THB", added.currency)
-        assertEquals(2, added.quantity)
-        assertTrue(added.selected)
+        val result = cart.syncLocalAndLoad(repo(server))
+
+        assertTrue(result is CustomerResult.Ok)
+        assertEquals(listOf(Triple("p-guest", "v-g", 2)), server.addedCalls)
+        assertEquals(2, cart.items.size)
+        assertTrue(cart.items.all { it.remoteItemId != null })
     }
 
     @Test
-    fun `adding same variant increases quantity up to maxStock`() {
+    fun `failed remote load marks status Failed without discarding existing lines`() = runBlocking {
+        val server = ServerCart(listOf(remoteRow("ci-1", "p1")))
+        val cart = CartState()
+        cart.load(repo(server))
+        server.failNext = CustomerError.Network
+
+        val res = cart.load(repo(server))
+
+        assertEquals(CustomerResult.Failed(CustomerError.Network), res)
+        assertEquals(LoadStatus.Failed, cart.status)
+        assertEquals(1, cart.items.size)
+    }
+
+    @Test
+    fun `guest fallback adds variants locally, clamps to maxStock, and supports shop selection`() {
         val cart = CartState()
 
         cart.add(
             productId = "prod-1",
             name = "Test Cable",
-            storeName = "Gadget Shop",
-            imageUrl = null,
-            variantId = "var-1",
-            variantName = "Red / 1m",
-            price = 100.0,
-            currency = "THB",
-            quantity = 3,
-            maxStock = 5,
-        )
-
-        assertEquals(3, cart.items.first().quantity)
-
-        // Adding 4 more should clamp to maxStock (5)
-        cart.add(
-            productId = "prod-1",
-            name = "Test Cable",
-            storeName = "Gadget Shop",
-            imageUrl = null,
-            variantId = "var-1",
-            variantName = "Red / 1m",
-            price = 100.0,
-            currency = "THB",
-            quantity = 4,
-            maxStock = 5,
-        )
-
-        assertEquals(5, cart.items.first().quantity)
-    }
-
-    @Test
-    fun `different variants of same product are separate cart items`() {
-        val cart = CartState()
-
-        cart.add(
-            productId = "prod-1",
-            name = "Test Cable",
-            storeName = "Gadget Shop",
+            storeName = "Shop A",
             imageUrl = null,
             variantId = "var-red",
             variantName = "Red",
             price = 100.0,
-            currency = "THB",
-            quantity = 1,
-            maxStock = 10,
+            quantity = 3,
+            maxStock = 5,
         )
-
         cart.add(
             productId = "prod-1",
             name = "Test Cable",
-            storeName = "Gadget Shop",
-            imageUrl = null,
-            variantId = "var-blue",
-            variantName = "Blue",
-            price = 120.0,
-            currency = "THB",
-            quantity = 2,
-            maxStock = 10,
-        )
-
-        assertEquals(5, cart.items.size) // 3 demo items + 2 new variants
-        assertEquals("prod-1_var-blue", cart.items[0].productId)
-        assertEquals("prod-1_var-red", cart.items[1].productId)
-    }
-
-    @Test
-    fun `variants without variantId distinguish by variantName or imageUrl`() {
-        val cart = CartState()
-        cart.items.clear()
-
-        cart.add(
-            productId = "prod-shoes",
-            name = "Running Shoes",
-            storeName = "Sport Store",
-            imageUrl = "https://example.com/shoes-black.jpg",
-            variantId = null,
-            variantName = "Black",
-            price = 2500.0,
-            currency = "THB",
-            quantity = 1,
-            maxStock = 10,
-        )
-
-        cart.add(
-            productId = "prod-shoes",
-            name = "Running Shoes",
-            storeName = "Sport Store",
-            imageUrl = "https://example.com/shoes-white.jpg",
-            variantId = null,
-            variantName = "White",
-            price = 2500.0,
-            currency = "THB",
-            quantity = 1,
-            maxStock = 10,
-        )
-
-        // Different variant names without variantId should still be distinct lines
-        assertEquals(2, cart.items.size)
-        assertEquals("prod-shoes_White", cart.items[0].productId)
-        assertEquals("prod-shoes_Black", cart.items[1].productId)
-        assertEquals("https://example.com/shoes-white.jpg", cart.items[0].imageUrl)
-        assertEquals("https://example.com/shoes-black.jpg", cart.items[1].imageUrl)
-
-        // Adding exact same variant again increments quantity
-        cart.add(
-            productId = "prod-shoes",
-            name = "Running Shoes",
-            storeName = "Sport Store",
-            imageUrl = "https://example.com/shoes-white.jpg",
-            variantId = null,
-            variantName = "White",
-            price = 2500.0,
-            currency = "THB",
-            quantity = 2,
-            maxStock = 10,
-        )
-
-        assertEquals(2, cart.items.size)
-        assertEquals(3, cart.items[0].quantity)
-    }
-
-    @Test
-    fun `toggleShopSelection toggles selection of only specified shop items`() {
-        val cart = CartState()
-        cart.items.clear()
-
-        cart.add(
-            productId = "p-shopA-1",
-            name = "Shop A Item 1",
             storeName = "Shop A",
             imageUrl = null,
-            variantId = "v1",
-            variantName = null,
+            variantId = "var-red",
+            variantName = "Red",
             price = 100.0,
-            currency = "THB",
-            quantity = 1,
-            maxStock = 10,
+            quantity = 4,
+            maxStock = 5,
         )
-        cart.add(
-            productId = "p-shopA-2",
-            name = "Shop A Item 2",
-            storeName = "Shop A",
-            imageUrl = null,
-            variantId = "v2",
-            variantName = null,
-            price = 200.0,
-            currency = "THB",
-            quantity = 1,
-            maxStock = 10,
-        )
-        cart.add(
-            productId = "p-shopB-1",
-            name = "Shop B Item 1",
-            storeName = "Shop B",
-            imageUrl = null,
-            variantId = "v3",
-            variantName = null,
-            price = 300.0,
-            currency = "THB",
-            quantity = 1,
-            maxStock = 10,
-        )
-
-        val shopAItems = cart.items.filter { it.storeName == "Shop A" }
-        assertEquals(2, shopAItems.size)
-
-        // Deselect only Shop A items
-        cart.toggleShopSelection(shopAItems, target = false)
-
-        val itemA1 = cart.items.first { it.productId == "p-shopA-1_v1" }
-        val itemA2 = cart.items.first { it.productId == "p-shopA-2_v2" }
-        val itemB1 = cart.items.first { it.productId == "p-shopB-1_v3" }
-
-        assertFalse(itemA1.selected)
-        assertFalse(itemA2.selected)
-        assertTrue(itemB1.selected) // Shop B unaffected
-
-        // Select Shop A items back
-        cart.toggleShopSelection(shopAItems, target = true)
-        assertTrue(itemA1.let { cart.items.first { it.productId == "p-shopA-1_v1" }.selected })
-        assertTrue(itemA2.let { cart.items.first { it.productId == "p-shopA-2_v2" }.selected })
-    }
-
-    @Test
-    fun `selectedTotalPrice computes correct sum of selected items with prices`() {
-        val cart = CartState()
-        // clear demo items without prices
-        cart.items.clear()
-
-        cart.add(
-            productId = "prod-1",
-            name = "Item 1",
-            storeName = "Store 1",
-            imageUrl = null,
-            variantId = "v1",
-            variantName = null,
-            price = 150.0,
-            currency = "THB",
-            quantity = 2,
-            maxStock = 10,
-        )
-
         cart.add(
             productId = "prod-2",
-            name = "Item 2",
-            storeName = "Store 2",
-            imageUrl = null,
-            variantId = "v2",
-            variantName = null,
-            price = 200.0,
-            currency = "THB",
-            quantity = 1,
-            maxStock = 10,
-        )
-
-        // Both are selected by default: (150 * 2) + (200 * 1) = 500.0
-        assertEquals(500.0, cart.selectedTotalPrice!!, 0.001)
-
-        // When all items are selected, toggleAll() deselects all
-        cart.toggleAll()
-        assertEquals(0.0, cart.selectedTotalPrice!!, 0.001)
-
-        // toggleAll() again selects all
-        cart.toggleAll()
-        assertEquals(500.0, cart.selectedTotalPrice!!, 0.001)
-
-        // Unselect Item 2
-        cart.toggleSelection("prod-2_v2")
-        assertEquals(300.0, cart.selectedTotalPrice!!, 0.001)
-
-        // Unselect Item 1
-        cart.toggleSelection("prod-1_v1")
-        assertEquals(0.0, cart.selectedTotalPrice!!, 0.001)
-    }
-
-    @Test
-    fun `removeSelected removes only selected items and returns them`() {
-        val cart = CartState()
-        cart.items.clear()
-
-        cart.add(
-            productId = "item-1",
-            name = "Item 1",
-            storeName = "Store A",
-            imageUrl = null,
-            variantId = null,
-            variantName = null,
-            price = 100.0,
-            currency = "THB",
-            quantity = 1,
-            maxStock = 10,
-        )
-        cart.add(
-            productId = "item-2",
-            name = "Item 2",
-            storeName = "Store B",
+            name = "Charger",
+            storeName = "Shop B",
             imageUrl = null,
             variantId = null,
             variantName = null,
             price = 200.0,
-            currency = "THB",
-            quantity = 2,
+            quantity = 1,
             maxStock = 10,
         )
 
-        // Deselect item 2
-        cart.toggleSelection("item-2")
+        assertEquals(2, cart.items.size)
+        val red = cart.items.first { it.variantId == "var-red" }
+        assertEquals("prod-1", red.productId)
+        assertEquals(5, red.quantity)
+        assertEquals(700.0, cart.selectedTotalPrice!!, 0.001)
+
+        val shopAItems = cart.items.filter { it.storeName == "Shop A" }
+        cart.toggleShopSelection(shopAItems, target = false)
+        assertFalse(cart.items.first { it.variantId == "var-red" }.selected)
+        assertTrue(cart.items.first { it.productId == "prod-2" }.selected)
+        assertEquals(200.0, cart.selectedTotalPrice!!, 0.001)
 
         val removed = cart.removeSelected()
-
         assertEquals(1, removed.size)
-        assertEquals("item-1", removed[0].productId)
+        assertEquals("prod-2", removed.single().productId)
         assertEquals(1, cart.items.size)
-        assertEquals("item-2", cart.items[0].productId)
     }
 }

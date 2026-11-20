@@ -603,6 +603,8 @@
     <string name="customer_error_server">Something went wrong on our side. Please try again later.</string>
     <string name="customer_loading">Loading…</string>
     <string name="address_load_failed">Couldn\'t load your addresses</string>
+    <string name="cart_load_failed">Couldn\'t load your cart</string>
+    <string name="cart_shipping_at_checkout">Calculated at checkout</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_saving">Saving…</string>
 </resources>
