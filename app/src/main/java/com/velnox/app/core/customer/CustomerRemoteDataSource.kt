@@ -114,7 +114,7 @@ class CustomerRemoteDataSource(
                         ?: directObj?.optString("url")?.takeIf { it.isNotBlank() }
                         ?: intentData.optString("cdnUrl").takeIf { it.isNotBlank() }
                         ?: objectKey
-                    CustomerResult.Ok(url)
+                    CustomerResult.Ok(normalizeMediaUrl(url) ?: url)
                 }
                 is Raw.Failure -> CustomerResult.Failed(directRaw.error, directRaw.message)
             }
@@ -135,7 +135,7 @@ class CustomerRemoteDataSource(
                     ?: saveObj?.optString("url")?.takeIf { it.isNotBlank() }
                     ?: intentData.optString("cdnUrl").takeIf { it.isNotBlank() }
                     ?: objectKey
-                CustomerResult.Ok(url)
+                CustomerResult.Ok(normalizeMediaUrl(url) ?: url)
             }
             is Raw.Failure -> CustomerResult.Failed(saveRaw.error, saveRaw.message)
         }
@@ -489,12 +489,20 @@ class CustomerRemoteDataSource(
         return RemoteCart(array.objects().mapNotNull(::parseCartItem))
     }
 
+    private fun normalizeMediaUrl(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:") || url.startsWith("content://") || url.startsWith("file://")) return url
+        val cleanKey = url.trimStart('/')
+        val cleanBase = baseUrl.trimEnd('/')
+        return "$cleanBase/api/media/$cleanKey"
+    }
+
     private fun parseProfile(obj: JSONObject): CustomerProfile = CustomerProfile(
         name = obj.str("name"),
         email = obj.str("email"),
         phone = obj.str("phone"),
-        avatarUrl = obj.str("avatarUrl", "avatar"),
-        coverUrl = obj.str("coverUrl", "cover_url", "cover"),
+        avatarUrl = normalizeMediaUrl(obj.str("avatarUrl", "avatar")),
+        coverUrl = normalizeMediaUrl(obj.str("coverUrl", "cover_url", "cover")),
         memberSince = obj.time("memberSince", "createdAt"),
     )
 

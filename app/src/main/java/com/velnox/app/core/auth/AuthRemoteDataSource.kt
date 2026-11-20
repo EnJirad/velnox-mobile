@@ -286,17 +286,26 @@ class AuthRemoteDataSource(
             val id = user.optString("id")
             val email = user.optString("email")
             if (id.isEmpty() || email.isEmpty()) return null
-            val avatar = user.optString("avatar").takeIf { it.isNotBlank() }
+            val rawAvatar = user.optString("avatar").takeIf { it.isNotBlank() }
                 ?: user.optString("avatarUrl").takeIf { it.isNotBlank() }
-            val coverUrl = user.optString("coverUrl").takeIf { it.isNotBlank() }
+            val rawCover = user.optString("coverUrl").takeIf { it.isNotBlank() }
                 ?: user.optString("cover_url").takeIf { it.isNotBlank() }
+
+            fun normalize(u: String?): String? {
+                if (u.isNullOrBlank()) return null
+                if (u.startsWith("http://") || u.startsWith("https://") || u.startsWith("data:") || u.startsWith("content://") || u.startsWith("file://")) return u
+                val cleanKey = u.trimStart('/')
+                val cleanBase = baseUrl.trimEnd('/')
+                return "$cleanBase/api/media/$cleanKey"
+            }
+
             AuthUser(
                 id = id,
                 email = email,
                 name = user.optString("name"),
                 role = user.optString("role", "customer"),
-                avatar = avatar,
-                coverUrl = coverUrl,
+                avatar = normalize(rawAvatar),
+                coverUrl = normalize(rawCover),
             )
         } catch (_: JSONException) {
             null

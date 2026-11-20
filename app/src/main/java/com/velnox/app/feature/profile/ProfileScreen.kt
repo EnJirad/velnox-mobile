@@ -4,6 +4,8 @@ package com.velnox.app.feature.profile
 
 import android.content.Context
 import android.net.Uri
+import android.util.Base64
+import com.velnox.app.BuildConfig
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -99,10 +101,42 @@ private enum class PhotoTarget { Avatar, Cover }
  */
 private fun bust(url: String?, version: Long): String? {
     if (url.isNullOrBlank()) return null
-    if (!url.startsWith("http://") && !url.startsWith("https://")) return url
-    val clean = url.replace(Regex("[?&]v=\\d+"), "").trimEnd('?')
+    if (url.startsWith("data:")) return url
+    val fullUrl = if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("content://") && !url.startsWith("file://")) {
+        val cleanKey = url.trimStart('/')
+        "${BuildConfig.API_BASE_URL}/api/media/$cleanKey"
+    } else {
+        url
+    }
+    if (!fullUrl.startsWith("http://") && !fullUrl.startsWith("https://")) return fullUrl
+    val clean = fullUrl.replace(Regex("[?&]v=\\d+"), "").trimEnd('?')
     val sep = if (clean.contains('?')) "&" else "?"
     return "$clean${sep}v=$version"
+}
+
+/**
+ * Resolves an avatar or cover string to an object that Coil can natively display:
+ * - data: URL -> ByteArray (decoded from base64, rendered instantly in-memory)
+ * - relative storage path -> absolute API media URL (https://velnox-api.onrender.com/api/media/...)
+ * - http/https/content/file URI -> used directly
+ */
+private fun resolveImageModel(url: String?): Any? {
+    if (url.isNullOrBlank()) return null
+    if (url.startsWith("data:")) {
+        val base64Index = url.indexOf("base64,")
+        if (base64Index != -1) {
+            val base64Data = url.substring(base64Index + 7)
+            return runCatching {
+                Base64.decode(base64Data, Base64.DEFAULT)
+            }.getOrNull() ?: url
+        }
+        return url
+    }
+    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("content://") || url.startsWith("file://")) {
+        return url
+    }
+    val cleanKey = url.trimStart('/')
+    return "${BuildConfig.API_BASE_URL}/api/media/$cleanKey"
 }
 
 /**
@@ -207,7 +241,18 @@ fun ProfileScreen(
 
                                 // 3. Re-sync latest customer profile from backend to verify DB persistence
                                 customerRepository.call { api, token ->
-                                    api.profile(token)
+                                    val res = api.profile(token)
+                                    if (res is CustomerResult.Ok) {
+                                        val p = res.value
+                                        session.updateProfile(
+                                            name = p.name,
+                                            avatar = p.avatarUrl,
+                                            coverUrl = p.coverUrl,
+                                        )
+                                        if (!p.avatarUrl.isNullOrBlank()) preferences.setAvatarUri(p.avatarUrl)
+                                        if (!p.coverUrl.isNullOrBlank()) preferences.setCoverUri(p.coverUrl)
+                                        cacheBustVersion = System.currentTimeMillis()
+                                    }
                                 }
 
                                 snackbarHostState.showSnackbar(
@@ -468,7 +513,7 @@ private fun ProfileHeaderCard(
             ) {
                 if (!coverUri.isNullOrBlank()) {
                     AsyncImage(
-                        model = coverUri,
+                        model = resolveImageModel(coverUri),
                         contentDescription = stringResource(R.string.profile_change_cover),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
@@ -548,7 +593,7 @@ private fun ProfileHeaderCard(
                         )
                     } else if (!avatarUri.isNullOrBlank()) {
                         AsyncImage(
-                            model = avatarUri,
+                            model = resolveImageModel(avatarUri),
                             contentDescription = stringResource(R.string.profile_change_avatar),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
