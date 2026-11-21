@@ -1,14 +1,13 @@
 # Velnox Mobile — Agent Development Policy
 
-## Authorized Local Build Policy (PocketDev Environment)
+## Authorized Local Build & Mandatory Git Push Policy
 
-Local builds are authorized and performed directly in the PocketDev environment (`/workspace/clever-bose`).
-
-AI agents are responsible for:
-- modifying code,
-- building the debug APK locally using PocketDev's optimized build commands,
-- verifying build output and test results,
-- pushing changes to GitHub when requested.
+1. **Local Builds Only (No Remote Git Builds):**
+   - Builds, compilation, and verification are performed **exclusively locally** inside the PocketDev environment (`/workspace/clever-bose`).
+   - GitHub Actions remote builds are deactivated on push and will not be executed or waited on.
+2. **Mandatory Git Commit & Push Per Development Round:**
+   - Every time code modifications are completed and verified locally in PocketDev, the agent **MUST** commit all changes with a clear, descriptive message and immediately push to GitHub (`origin/main`).
+   - This maintains an exact, granular commit history so any past version can be inspected or rolled back in case of unexpected errors or regressions.
 
 ---
 
@@ -34,39 +33,46 @@ First check whether `app/build/outputs/apk/debug/` already contains an APK:
 
 ---
 
-## 2. AI Agent Responsibilities
+## 2. AI Agent Responsibilities & Required Workflow
 
-Follow this workflow for tasks:
+Every development task must follow this exact sequence:
 
 **Step 1 — Inspect**
-- Fetch or check the repository state.
-- Inspect working tree changes.
+- Fetch or check the repository state and git branch (`origin/main`).
+- Inspect working tree changes (`git status`, `git diff`).
 - Understand the requested task before editing.
 - Preserve unrelated user changes. Do not overwrite or discard uncommitted work.
 
 **Step 2 — Modify Code**
 - Implement requested changes cleanly and minimally.
 - Follow existing architecture and patterns.
-- Review diff before building.
+- Review diff before building (`git diff`).
 
 **Step 3 — Build and Verify Locally**
-- Execute the authorized PocketDev build command.
+- Execute the authorized PocketDev build command locally.
 - Verify APK output at `app/build/outputs/apk/debug/app-debug.apk`.
 - If build fails, inspect logs, identify root cause, and apply fixes.
 
-**Step 4 — Git Commit and Push**
-- When requested or after successful local verification, commit clean changes and push to GitHub.
+**Step 4 — Mandatory Commit and Push to GitHub**
+- After local verification passes, stage and commit the changes:
+  ```bash
+  git add <modified_files>
+  git commit -m "<type>(<scope>): <clear description of changes>"
+  git push origin main
+  ```
+- Always ensure changes are pushed to GitHub so commit history is preserved for future rollbacks.
+- Do NOT trigger or wait for remote builds on GitHub Actions.
 
 ---
 
 ## 3. Final Report Format
 
-After completing any development task, report:
-- Task completed
-- Files modified
-- Build status: PASS / FAIL
-- APK path & size
-- Verification details
+After completing any development round, report:
+- **Task Completed:** Summary of work done
+- **Files Modified:** List of all files changed
+- **Build Status:** PASS / FAIL (local PocketDev build)
+- **APK Path & Size:** Location and file size of generated debug APK
+- **Git Commit & Push:** Commit SHA, branch name, and push status
 
 ---
 
