@@ -644,6 +644,16 @@
     <string name="address_map_confirm">Confirm Location</string>
     <string name="address_map_coordinates_label">Selected Coordinates</string>
     <string name="address_map_gps_updated">Centered on current location</string>
+    <string name="address_map_layer_street">Street</string>
+    <string name="address_map_layer_satellite">Satellite</string>
+    <string name="address_map_search_placeholder">Search village, soi, street or place...</string>
+    <string name="address_map_searching">Searching places...</string>
+    <string name="address_map_no_results">No results found. Try road or district name.</string>
+    <string name="address_map_detecting">Detecting address...</string>
+    <string name="address_map_detected_location">Detected location</string>
+    <string name="address_map_autofill_checkbox">Auto-fill address fields from this pin</string>
+    <string name="address_map_zoom_hint">Zoom in closer to target your rooftop accurately</string>
+    <string name="address_map_permission_rationale">Please allow location access to jump to your current location</string>
     <string name="messages_live_connected">Live chat</string>
     <string name="messages_status_sending">Sending</string>
     <string name="messages_status_sent">Sent</string>

@@ -644,6 +644,16 @@
     <string name="address_map_confirm">ยืนยันพิกัดนี้</string>
     <string name="address_map_coordinates_label">พิกัดที่เลือก</string>
     <string name="address_map_gps_updated">ปรับไปยังตำแหน่งปัจจุบันแล้ว</string>
+    <string name="address_map_layer_street">ถนน</string>
+    <string name="address_map_layer_satellite">ดาวเทียม</string>
+    <string name="address_map_search_placeholder">ค้นหาหมู่บ้าน, ซอย, ถนน หรือสถานที่...</string>
+    <string name="address_map_searching">กำลังค้นหาสถานที่...</string>
+    <string name="address_map_no_results">ไม่พบสถานที่ ลองค้นหาด้วยชื่อถนนหรืออำเภอ</string>
+    <string name="address_map_detecting">กำลังระบุที่อยู่...</string>
+    <string name="address_map_detected_location">ตำแหน่งที่ตรวจพบ</string>
+    <string name="address_map_autofill_checkbox">กรอกที่อยู่อัตโนมัติจากตำแหน่งนี้</string>
+    <string name="address_map_zoom_hint">ซูมเข้าใกล้เพื่อเล็งหลังคาบ้านอย่างแม่นยำ</string>
+    <string name="address_map_permission_rationale">กรุณาอนุญาตตำแหน่งเพื่อไปยังจุดที่คุณอยู่ปัจจุบัน</string>
     <string name="messages_live_connected">แชทแบบเรียลไทม์</string>
     <string name="messages_status_sending">กำลังส่ง</string>
     <string name="messages_status_sent">ส่งแล้ว</string>

@@ -644,6 +644,16 @@
     <string name="address_map_confirm">ဤတည်နေရာကို အတည်ပြုမည်</string>
     <string name="address_map_coordinates_label">ရွေးချယ်ထားသော ကိုဩဒိနိတ်</string>
     <string name="address_map_gps_updated">လက်ရှိတည်နေရာသို့ ချိန်ညှိပြီးပါပြီ</string>
+    <string name="address_map_layer_street">လမ်း</string>
+    <string name="address_map_layer_satellite">ဂြိုဟ်တု</string>
+    <string name="address_map_search_placeholder">ရွာ၊ လမ်း၊ နေရာ ရှာဖွေပါ...</string>
+    <string name="address_map_searching">နေရာများ ရှာဖွေနေသည်...</string>
+    <string name="address_map_no_results">ရလဒ်မတွေ့ပါ။ လမ်း သို့မဟုတ် မြို့နယ်ဖြင့် ထပ်မံရှာဖွေပါ။</string>
+    <string name="address_map_detecting">လိပ်စာ စစ်ဆေးနေသည်...</string>
+    <string name="address_map_detected_location">တွေ့ရှိသော တည်နေရာ</string>
+    <string name="address_map_autofill_checkbox">ဤပင်မှ လိပ်စာအချက်အလက်ကို အလိုအလျောက် ဖြည့်ပါ</string>
+    <string name="address_map_zoom_hint">အိမ်ခေါင်မိုးပေါ် တိကျစွာ ပင်ထိုးရန် ချဲ့ကြည့်ပါ</string>
+    <string name="address_map_permission_rationale">လက်ရှိတည်နေရာသို့ သွားရန် တည်နေရာခွင့်ပြုချက် လိုအပ်ပါသည်</string>
     <string name="messages_live_connected">တိုက်ရိုက်ချတ်</string>
     <string name="messages_status_sending">ပို့နေသည်</string>
     <string name="messages_status_sent">ပို့ပြီး</string>

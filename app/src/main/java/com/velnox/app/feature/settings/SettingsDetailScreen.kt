@@ -1109,9 +1109,26 @@ private fun AddressFormDialog(
             initialLatitude = latitude,
             initialLongitude = longitude,
             onDismiss = { showMapPicker = false },
-            onConfirm = { lat, lng ->
+            onConfirmWithDetails = { lat, lng, geocoded, autoFill ->
                 latitude = lat
                 longitude = lng
+                if (autoFill && geocoded != null) {
+                    if (subDistrict.isBlank() && !geocoded.subDistrict.isNullOrBlank()) {
+                        subDistrict = geocoded.subDistrict
+                    }
+                    if (district.isBlank() && !geocoded.district.isNullOrBlank()) {
+                        district = geocoded.district
+                    }
+                    if (province.isBlank() && !geocoded.province.isNullOrBlank()) {
+                        province = geocoded.province
+                    }
+                    if (postalCode.isBlank() && !geocoded.postalCode.isNullOrBlank()) {
+                        postalCode = geocoded.postalCode.filter { it.isDigit() }.take(5)
+                    }
+                    if (addressLine.isBlank() && !geocoded.addressLine.isNullOrBlank()) {
+                        addressLine = geocoded.addressLine
+                    }
+                }
                 showMapPicker = false
             },
         )
