@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.velnox.app.core.customer.CustomerConversation
 import com.velnox.app.core.customer.CustomerMessage
+import com.velnox.app.core.customer.CustomerRemoteDataSource
 import com.velnox.app.core.customer.CustomerRepository
 import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.LoadStatus
@@ -120,7 +121,10 @@ object MessagesState {
      *
      * Server-confirmed [remote] messages are authoritative; any local optimistic
      * (`isPending == true`) messages not yet reflected in [remote] are preserved
-     * at the tail so a poll firing mid-send never flickers or drops a bubble.
+     * at their exact chronological position so a poll firing mid-send never flickers
+     * or drops a bubble.
+     *
+     * Guarantees a strictly interleaved, chronologically ascending timeline.
      */
     fun mergePolledMessages(
         current: List<CustomerMessage>,
@@ -145,7 +149,8 @@ object MessagesState {
                 msg.fromCustomer && (msg.createdAt == null || (now - msg.createdAt) < 15_000L)
             }
         }
-        return if (remainingLocal.isEmpty()) remote else remote + remainingLocal
+        val combined = if (remainingLocal.isEmpty()) remote else remote + remainingLocal
+        return CustomerRemoteDataSource.sortMessagesChronologically(combined.distinctBy { it.id })
     }
 
     /** True when [remote] contains an incoming message not yet present in [current]. */

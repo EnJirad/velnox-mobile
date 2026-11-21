@@ -368,12 +368,7 @@ class CustomerRemoteDataSource(
         send(token, "GET", "/api/customer/conversations/${encode(conversationId)}/messages").map { data ->
             val list = data.asArray("messages", "items")?.objects()?.mapNotNull { parseMessage(it, false) }
             list?.let { rawList ->
-                // Ensure messages are strictly chronological (oldest first).
-                if (rawList.size > 1 && (rawList.first().createdAt ?: 0L) > (rawList.last().createdAt ?: 0L)) {
-                    rawList.reversed()
-                } else {
-                    rawList
-                }
+                sortMessagesChronologically(rawList)
             }
         }
 
@@ -759,24 +754,44 @@ class CustomerRemoteDataSource(
         val isSystem = obj.flag("isSystem", "is_system") ?: (sender in setOf("system", "bot", "auto"))
         val direction = obj.str("direction")?.lowercase()
         val isOutgoing = direction in setOf("outgoing", "out", "sent")
+        val isIncoming = direction in setOf("incoming", "in", "received") ||
+            (sender in SELLER_SENDERS)
+
         val fromCustomer = !isSystem && (
             knownFromCustomer ||
                 isOutgoing ||
-                (obj.flag("isMine", "fromCustomer", "isOwn", "is_mine", "isCustomer", "is_customer")
-                    ?: (sender in CUSTOMER_SENDERS))
+                (!isIncoming && (
+                    (obj.flag("isMine", "is_mine", "fromCustomer", "from_customer", "isOwn", "is_own", "isCustomer", "is_customer", "isMe", "is_me")
+                        ?: senderObj?.flag("isMine", "is_mine", "fromCustomer", "from_customer", "isMe", "is_me")
+                        ?: (sender in CUSTOMER_SENDERS))
+                ))
             )
         val isRead = obj.flag("isRead", "is_read", "read")
             ?: (obj.str("readAt", "read_at") != null)
         val parsedClientId = obj.str("clientId", "client_id")
+        val timestamp = obj.time("createdAt", "created_at", "sentAt", "sent_at", "timestamp", "time", "date", "created")
+            ?: extractObjectIdTime(id)
+
         return CustomerMessage(
             id = id,
             text = text,
             fromCustomer = fromCustomer,
-            createdAt = obj.time("createdAt", "created_at", "sentAt"),
+            createdAt = timestamp,
             isSystem = isSystem,
             isRead = isRead,
             clientId = parsedClientId,
         )
+    }
+
+    private fun extractObjectIdTime(id: String): Long? {
+        if (id.length == 24 && id.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
+            return try {
+                id.substring(0, 8).toLong(16) * 1000L
+            } catch (_: Exception) {
+                null
+            }
+        }
+        return null
     }
 
     /** `primaryImage`, `images[]`, or a plain url field. */
@@ -862,15 +877,35 @@ class CustomerRemoteDataSource(
 
     private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
 
-    private companion object {
+    companion object {
         const val DEFAULT_CURRENCY = "THB"
 
         /** Anything below this is epoch *seconds* (year 5138 in millis, 1973 in seconds). */
         const val SECONDS_LIMIT = 100_000_000_000L
 
         val REJECTED_CODES = setOf(400, 403, 409, 422)
+        val SELLER_SENDERS = setOf("seller", "merchant", "shop", "support", "agent", "admin", "staff", "vendor", "store")
         val CUSTOMER_SENDERS = setOf("customer", "buyer", "user", "me", "client", "consumer", "member", "guest")
         val JSON = "application/json; charset=utf-8".toMediaType()
+
+        /**
+         * Strictly sorts messages in chronological order (oldest first).
+         * If the server returned messages in reverse-chronological order (newest first),
+         * it reverses them before stable sorting so that messages with equal timestamps
+         * preserve their natural relative order.
+         */
+        fun sortMessagesChronologically(list: List<CustomerMessage>): List<CustomerMessage> {
+            if (list.size <= 1) return list
+            val withTime = list.filter { it.createdAt != null && it.createdAt > 0L }
+            val isDescending = withTime.size >= 2 &&
+                (withTime.first().createdAt ?: 0L) > (withTime.last().createdAt ?: 0L)
+            val baseList = if (isDescending) list.reversed() else list
+
+            return baseList.sortedWith(
+                compareBy<CustomerMessage> { it.createdAt ?: 0L }
+                    .thenBy { if (it.isPending) 1 else 0 }
+            )
+        }
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)

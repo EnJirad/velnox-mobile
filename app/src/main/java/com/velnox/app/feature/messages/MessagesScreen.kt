@@ -2,6 +2,7 @@
 
 package com.velnox.app.feature.messages
 
+import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -54,6 +56,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -73,6 +76,7 @@ import com.velnox.app.VelnoxApplication
 import com.velnox.app.core.catalog.PriceFormat
 import com.velnox.app.core.customer.CustomerConversation
 import com.velnox.app.core.customer.CustomerMessage
+import com.velnox.app.core.customer.CustomerRemoteDataSource
 import com.velnox.app.core.customer.CustomerRepository
 import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.LoadStatus
@@ -97,6 +101,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -531,27 +536,22 @@ fun ConversationScreen(
             isPending = true,
             clientId = clientId,
         )
-        // Optimistically clear input and append bubble immediately.
+        // Optimistically clear input and append bubble immediately in sorted order.
         inputText = ""
-        messages.add(optimistic)
+        val updated = CustomerRemoteDataSource.sortMessagesChronologically(messages.toList() + optimistic)
+        messages.clear()
+        messages.addAll(updated)
 
         scope.launch {
             listState.animateScrollToItem(messages.lastIndex.coerceAtLeast(0))
             when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
                 is CustomerResult.Ok -> {
-                    val idx = messages.indexOfFirst {
-                        it.id == pendingId || (it.clientId != null && it.clientId == clientId)
+                    val remaining = messages.filterNot {
+                        it.id == pendingId || (it.clientId != null && it.clientId == clientId) || it.id == res.value.id
                     }
-                    val alreadyMerged = messages.any { it.id == res.value.id }
-                    if (idx >= 0) {
-                        if (alreadyMerged) {
-                            messages.removeAt(idx)
-                        } else {
-                            messages[idx] = res.value
-                        }
-                    } else if (!alreadyMerged) {
-                        messages.add(res.value)
-                    }
+                    val sorted = CustomerRemoteDataSource.sortMessagesChronologically(remaining + res.value)
+                    messages.clear()
+                    messages.addAll(sorted)
                     // Keep focus so user can continue typing seamlessly without keyboard bouncing
                 }
 
@@ -769,22 +769,68 @@ fun ConversationScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = PageGutter),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
                     ) {
-                        items(messages, key = { it.id }) { msg ->
-                            val timeLabel = formatChatTimestamp(msg.createdAt, locale)
+                        itemsIndexed(messages, key = { _, msg -> msg.id }) { index, msg ->
+                            val prev = messages.getOrNull(index - 1)
+                            val next = messages.getOrNull(index + 1)
+
+                            val showDateHeader = shouldShowDateHeader(prev, msg)
+                            if (showDateHeader) {
+                                DateSeparator(
+                                    timestamp = msg.createdAt,
+                                    locale = locale,
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                )
+                            }
+
                             if (msg.isSystem) {
                                 SystemBubble(text = msg.text)
                             } else {
-                                Bubble(
-                                    text = msg.text,
-                                    incoming = !msg.fromCustomer,
-                                    timestamp = timeLabel,
-                                    isPending = msg.isPending,
-                                    isRead = msg.isRead,
-                                    sellerInitials = initials,
-                                )
+                                val isIncoming = !msg.fromCustomer
+
+                                val isSameAsPrev = prev != null &&
+                                    !prev.isSystem &&
+                                    prev.fromCustomer == msg.fromCustomer &&
+                                    msg.createdAt != null &&
+                                    prev.createdAt != null &&
+                                    Math.abs(msg.createdAt - prev.createdAt) < 60_000L &&
+                                    !showDateHeader
+
+                                val nextShowsDate = next != null && shouldShowDateHeader(msg, next)
+                                val isSameAsNext = next != null &&
+                                    !next.isSystem &&
+                                    next.fromCustomer == msg.fromCustomer &&
+                                    msg.createdAt != null &&
+                                    next.createdAt != null &&
+                                    Math.abs(next.createdAt - msg.createdAt) < 60_000L &&
+                                    !nextShowsDate
+
+                                val isSolo = !isSameAsPrev && !isSameAsNext
+                                val isFirstInGroup = !isSameAsPrev && isSameAsNext
+                                val isMiddleInGroup = isSameAsPrev && isSameAsNext
+                                val isLastInGroup = isSameAsPrev && !isSameAsNext
+
+                                val topPadding = if (isFirstInGroup || isSolo) 8.dp else 2.dp
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = topPadding),
+                                ) {
+                                    InstagramBubble(
+                                        text = msg.text,
+                                        incoming = isIncoming,
+                                        isSolo = isSolo,
+                                        isFirstInGroup = isFirstInGroup,
+                                        isMiddleInGroup = isMiddleInGroup,
+                                        isLastInGroup = isLastInGroup,
+                                        timestamp = if (isLastInGroup || isSolo) formatChatTimestamp(msg.createdAt, locale) else "",
+                                        isPending = msg.isPending,
+                                        isRead = msg.isRead,
+                                        sellerInitials = initials,
+                                    )
+                                }
                             }
                         }
                     }
@@ -996,82 +1042,94 @@ private fun SystemBubble(text: String) {
 }
 
 @Composable
-private fun Bubble(
+private fun InstagramBubble(
     text: String,
     incoming: Boolean,
+    isSolo: Boolean,
+    isFirstInGroup: Boolean,
+    isMiddleInGroup: Boolean,
+    isLastInGroup: Boolean,
     timestamp: String,
     isPending: Boolean = false,
     isRead: Boolean = false,
     sellerInitials: String = "",
 ) {
-    val bubbleShape = if (incoming) {
-        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 4.dp, bottomEnd = 18.dp)
-    } else {
-        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp)
-    }
+    val bubbleShape = getInstagramBubbleShape(
+        incoming = incoming,
+        isSolo = isSolo,
+        isFirstInGroup = isFirstInGroup,
+        isMiddleInGroup = isMiddleInGroup,
+        isLastInGroup = isLastInGroup,
+    )
 
-    Column(
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (incoming) Alignment.Start else Alignment.End,
+        horizontalArrangement = if (incoming) Arrangement.Start else Arrangement.End,
+        verticalAlignment = Alignment.Bottom,
     ) {
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = if (incoming) Arrangement.Start else Arrangement.End,
-        ) {
-            if (incoming) {
+        if (incoming) {
+            // Instagram Direct: avatar ONLY on the bottom-most message of a cluster
+            if (isLastInGroup || isSolo) {
                 InitialsAvatar(initials = sellerInitials, size = 28, brand = false)
-                Spacer(Modifier.width(8.dp))
+            } else {
+                Spacer(Modifier.width(28.dp))
             }
-            if (incoming) {
-                Surface(
-                    shape = bubbleShape,
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 1.dp,
-                    modifier = Modifier
-                        .widthIn(min = 44.dp, max = 280.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, bubbleShape),
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+            Spacer(Modifier.width(8.dp))
+        }
+
+        if (incoming) {
+            Surface(
+                shape = bubbleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                modifier = Modifier
+                    .widthIn(min = 40.dp, max = 280.dp)
+                    .border(
+                        BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+                        shape = bubbleShape,
+                    ),
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                    Text(
+                        text = text,
+                        style = TextXs.copy(lineHeight = MaterialTheme.typography.bodyMedium.lineHeight),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (timestamp.isNotEmpty()) {
+                        Spacer(Modifier.height(3.dp))
                         Text(
-                            text = text,
-                            style = TextXs.copy(lineHeight = MaterialTheme.typography.bodyMedium.lineHeight),
-                            color = MaterialTheme.colorScheme.onSurface,
+                            text = timestamp,
+                            style = Text2xs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         )
-                        if (timestamp.isNotEmpty()) {
-                            Spacer(Modifier.height(3.dp))
-                            Text(
-                                text = timestamp,
-                                style = Text2xs,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
                     }
                 }
-            } else {
-                val outgoingGradient = Brush.linearGradient(
-                    colors = if (isPending) {
-                        listOf(VelnoxBrand.copy(alpha = 0.78f), Color(0xFF059669).copy(alpha = 0.78f))
-                    } else {
-                        listOf(VelnoxBrand, Color(0xFF059669))
-                    },
-                )
-                Box(
-                    modifier = Modifier
-                        .widthIn(min = 44.dp, max = 280.dp)
-                        .shadow(1.5.dp, bubbleShape)
-                        .clip(bubbleShape)
-                        .background(outgoingGradient)
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
-                ) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = text,
-                            style = TextXs.copy(
-                                fontWeight = FontWeight.Medium,
-                                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
-                            ),
-                            color = Color.White,
-                        )
+            }
+        } else {
+            val outgoingGradient = Brush.linearGradient(
+                colors = if (isPending) {
+                    listOf(VelnoxBrand.copy(alpha = 0.78f), Color(0xFF059669).copy(alpha = 0.78f))
+                } else {
+                    listOf(VelnoxBrand, Color(0xFF059669))
+                },
+            )
+            Box(
+                modifier = Modifier
+                    .widthIn(min = 40.dp, max = 280.dp)
+                    .shadow(0.5.dp, bubbleShape)
+                    .clip(bubbleShape)
+                    .background(outgoingGradient)
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+            ) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = text,
+                        style = TextXs.copy(
+                            fontWeight = FontWeight.Normal,
+                            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
+                        ),
+                        color = Color.White,
+                    )
+                    if (timestamp.isNotEmpty() || isPending) {
                         Spacer(Modifier.height(3.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1083,7 +1141,7 @@ private fun Bubble(
                                     style = Text2xs,
                                     color = Color.White.copy(alpha = 0.8f),
                                 )
-                                Spacer(Modifier.width(5.dp))
+                                Spacer(Modifier.width(4.dp))
                             }
                             val statusTick = when {
                                 isPending -> "✓"
@@ -1102,6 +1160,94 @@ private fun Bubble(
                     }
                 }
             }
+        }
+    }
+}
+
+private fun getInstagramBubbleShape(
+    incoming: Boolean,
+    isSolo: Boolean,
+    isFirstInGroup: Boolean,
+    isMiddleInGroup: Boolean,
+    isLastInGroup: Boolean,
+): Shape {
+    val rLarge = 18.dp
+    val rSmall = 4.dp
+    return if (incoming) {
+        when {
+            isSolo -> RoundedCornerShape(topStart = rLarge, topEnd = rLarge, bottomEnd = rLarge, bottomStart = rSmall)
+            isFirstInGroup -> RoundedCornerShape(topStart = rLarge, topEnd = rLarge, bottomEnd = rLarge, bottomStart = rSmall)
+            isMiddleInGroup -> RoundedCornerShape(topStart = rSmall, topEnd = rLarge, bottomEnd = rLarge, bottomStart = rSmall)
+            isLastInGroup -> RoundedCornerShape(topStart = rSmall, topEnd = rLarge, bottomEnd = rLarge, bottomStart = rLarge)
+            else -> RoundedCornerShape(rLarge)
+        }
+    } else {
+        when {
+            isSolo -> RoundedCornerShape(topStart = rLarge, topEnd = rLarge, bottomStart = rLarge, bottomEnd = rSmall)
+            isFirstInGroup -> RoundedCornerShape(topStart = rLarge, topEnd = rLarge, bottomStart = rLarge, bottomEnd = rSmall)
+            isMiddleInGroup -> RoundedCornerShape(topStart = rLarge, topEnd = rSmall, bottomStart = rLarge, bottomEnd = rSmall)
+            isLastInGroup -> RoundedCornerShape(topStart = rLarge, topEnd = rSmall, bottomStart = rLarge, bottomEnd = rLarge)
+            else -> RoundedCornerShape(rLarge)
+        }
+    }
+}
+
+private fun shouldShowDateHeader(prev: CustomerMessage?, current: CustomerMessage): Boolean {
+    if (prev == null) return current.createdAt != null && current.createdAt > 0L
+    val tPrev = prev.createdAt ?: return true
+    val tCurr = current.createdAt ?: return false
+    if (tCurr <= 0L || tPrev <= 0L) return false
+    val diff = Math.abs(tCurr - tPrev)
+    if (diff >= 15 * 60 * 1000L) return true
+    val cal1 = Calendar.getInstance().apply { timeInMillis = tPrev }
+    val cal2 = Calendar.getInstance().apply { timeInMillis = tCurr }
+    return cal1.get(Calendar.DAY_OF_YEAR) != cal2.get(Calendar.DAY_OF_YEAR) ||
+        cal1.get(Calendar.YEAR) != cal2.get(Calendar.YEAR)
+}
+
+@Composable
+private fun DateSeparator(
+    timestamp: Long?,
+    locale: Locale,
+    modifier: Modifier = Modifier,
+) {
+    if (timestamp == null || timestamp <= 0L) return
+    val context = LocalContext.current
+    val text = remember(timestamp, locale) {
+        formatDateSeparatorText(context, timestamp, locale)
+    }
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = Text2xs.copy(fontWeight = FontWeight.Medium),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+            modifier = Modifier
+                .clip(Circle)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+}
+
+private fun formatDateSeparatorText(context: Context, millis: Long, locale: Locale): String {
+    val calMsg = Calendar.getInstance().apply { timeInMillis = millis }
+    val calNow = Calendar.getInstance()
+    val isToday = calMsg.get(Calendar.YEAR) == calNow.get(Calendar.YEAR) &&
+        calMsg.get(Calendar.DAY_OF_YEAR) == calNow.get(Calendar.DAY_OF_YEAR)
+    calNow.add(Calendar.DAY_OF_YEAR, -1)
+    val isYesterday = calMsg.get(Calendar.YEAR) == calNow.get(Calendar.YEAR) &&
+        calMsg.get(Calendar.DAY_OF_YEAR) == calNow.get(Calendar.DAY_OF_YEAR)
+
+    val timeStr = SimpleDateFormat("HH:mm", locale).format(Date(millis))
+    return when {
+        isToday -> "${context.getString(R.string.messages_today)} $timeStr"
+        isYesterday -> "${context.getString(R.string.messages_yesterday)} $timeStr"
+        else -> {
+            val dateStr = SimpleDateFormat("d MMM", locale).format(Date(millis))
+            "$dateStr, $timeStr"
         }
     }
 }
