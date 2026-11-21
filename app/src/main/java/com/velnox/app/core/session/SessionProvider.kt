@@ -6,6 +6,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import com.velnox.app.VelnoxApplication
+import com.velnox.app.core.auth.RestoreOutcome
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * Session access for composables.
@@ -27,6 +30,19 @@ fun VelnoxSessionProvider(content: @Composable () -> Unit) {
     // network, and no Login screen can flash while the session is still unknown.
     LaunchedEffect(controller) {
         controller.restoreOnce()
+    }
+
+    // Silent background retry if session verification was unverified at launch (e.g. Render cold start)
+    LaunchedEffect(controller.notice, controller.state) {
+        if (controller.notice == SessionNotice.NetworkUnavailable && controller.state is SessionState.Guest) {
+            while (isActive && controller.notice == SessionNotice.NetworkUnavailable && controller.state is SessionState.Guest) {
+                delay(4_000L)
+                val outcome = controller.retryRestore()
+                if (outcome is RestoreOutcome.Active || outcome is RestoreOutcome.Expired || outcome is RestoreOutcome.NoSession) {
+                    break
+                }
+            }
+        }
     }
 
     CompositionLocalProvider(LocalSession provides controller) {

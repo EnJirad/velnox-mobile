@@ -25,6 +25,7 @@ git rev-parse origin/main   # authoritative remote SHA
 
 | File | Purpose | When to read |
 |------|---------|--------------|
+| `.ai/SYSTEM_INTEGRATION_GUIDE.md` | **System Architecture & Subsystem Integration** (Auth, Messaging, Commerce, Geolocation) | **Every session / before cross-system changes** |
 | `.ai/AI_RULES.md` | Core rules (startup sync, build, compile, reporting) | **Every session** |
 | `.ai/AI_HANDOFF.md` | Current snapshot: what works, what's broken, next steps | **Every session** |
 | `.ai/context/project-map.md` | Repo layout, module map, key paths | On first touch or area change |

@@ -853,7 +853,8 @@ private fun VelnoxNavHost(
         }
 
         val activeNotice = session.notice
-        if (activeNotice != null && !isSplashVisible && sessionState !is SessionState.Loading) {
+        // Do not display "session_unverified" (offline) to customers; it runs and retries silently in background
+        if (activeNotice != null && activeNotice != SessionNotice.NetworkUnavailable && !isSplashVisible && sessionState !is SessionState.Loading) {
             SessionStatusPill(
                 textRes = noticeMessage(activeNotice),
                 showSpinner = false,

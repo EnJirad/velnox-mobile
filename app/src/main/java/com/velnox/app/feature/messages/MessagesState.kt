@@ -1,5 +1,6 @@
 package com.velnox.app.feature.messages
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +11,9 @@ import com.velnox.app.core.customer.CustomerRemoteDataSource
 import com.velnox.app.core.customer.CustomerRepository
 import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.LoadStatus
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 
 /**
  * Shared server-backed messaging state across Messages inbox, Conversation
@@ -49,6 +53,17 @@ object MessagesState {
     suspend fun openSupportConversation(
         repository: CustomerRepository,
     ): CustomerResult<CustomerConversation> {
+        val existing = conversations.firstOrNull { it.isSupport }
+        if (existing != null) {
+            return CustomerResult.Ok(existing)
+        }
+        if (conversations.isEmpty()) {
+            loadConversations(repository)
+            val found = conversations.firstOrNull { it.isSupport }
+            if (found != null) {
+                return CustomerResult.Ok(found)
+            }
+        }
         val result = repository.call { api, token -> api.startSupportConversation(token) }
         if (result is CustomerResult.Ok) {
             upsert(result.value)
@@ -62,6 +77,10 @@ object MessagesState {
         shopId: String,
         productId: String? = null,
     ): CustomerResult<CustomerConversation> {
+        val existing = conversations.firstOrNull { it.shopId == shopId }
+        if (existing != null && productId == null) {
+            return CustomerResult.Ok(existing)
+        }
         val result = repository.call { api, token -> api.startConversation(token, shopId, productId) }
         if (result is CustomerResult.Ok) {
             upsert(result.value)
@@ -162,15 +181,108 @@ object MessagesState {
         return remote.any { !it.fromCustomer && !it.isSystem && it.id !in existingIds }
     }
 
+    // Thread ID -> in-memory cached message list
+    private val threadMessages = mutableMapOf<String, List<CustomerMessage>>()
+
+    /**
+     * Get cached messages for a thread (in-memory first, falling back to disk cache).
+     * Guarantees instantaneous loading when re-entering chat.
+     */
+    fun getCachedMessages(threadId: String, context: Context? = null): List<CustomerMessage> {
+        threadMessages[threadId]?.let { if (it.isNotEmpty()) return it }
+        if (context != null) {
+            val fromDisk = loadFromDisk(context, threadId)
+            if (fromDisk.isNotEmpty()) {
+                threadMessages[threadId] = fromDisk
+                return fromDisk
+            }
+        }
+        return emptyList()
+    }
+
+    /**
+     * Update cached messages for a thread in-memory and write to disk cache.
+     */
+    fun setCachedMessages(threadId: String, messages: List<CustomerMessage>, context: Context? = null) {
+        val sorted = CustomerRemoteDataSource.sortMessagesChronologically(messages.distinctBy { it.id })
+        threadMessages[threadId] = sorted
+        if (context != null) {
+            saveToDisk(context, threadId, sorted)
+        }
+    }
+
+    private fun cacheFile(context: Context, threadId: String): File {
+        val dir = File(context.filesDir, "chat_cache").apply { if (!exists()) mkdirs() }
+        val safeId = threadId.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+        return File(dir, "msg_$safeId.json")
+    }
+
+    private fun saveToDisk(context: Context, threadId: String, messages: List<CustomerMessage>) {
+        try {
+            val file = cacheFile(context, threadId)
+            val arr = JSONArray()
+            for (msg in messages) {
+                val obj = JSONObject()
+                    .put("id", msg.id)
+                    .put("text", msg.text)
+                    .put("fromCustomer", msg.fromCustomer)
+                    .put("createdAt", msg.createdAt ?: JSONObject.NULL)
+                    .put("isSystem", msg.isSystem)
+                    .put("isRead", msg.isRead)
+                    .put("isPending", msg.isPending)
+                    .put("clientId", msg.clientId ?: JSONObject.NULL)
+                arr.put(obj)
+            }
+            val temp = File(file.parentFile, "${file.name}.tmp")
+            temp.writeText(arr.toString())
+            if (file.exists()) file.delete()
+            temp.renameTo(file)
+        } catch (_: Exception) {
+            // Best effort, ignore errors
+        }
+    }
+
+    private fun loadFromDisk(context: Context, threadId: String): List<CustomerMessage> {
+        try {
+            val file = cacheFile(context, threadId)
+            if (!file.exists()) return emptyList()
+            val text = file.readText()
+            val arr = JSONArray(text)
+            val list = ArrayList<CustomerMessage>(arr.length())
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val id = obj.optString("id")
+                val body = obj.optString("text")
+                if (id.isNullOrBlank() || body.isNullOrBlank()) continue
+                list.add(
+                    CustomerMessage(
+                        id = id,
+                        text = body,
+                        fromCustomer = obj.optBoolean("fromCustomer", true),
+                        createdAt = if (obj.isNull("createdAt")) null else obj.optLong("createdAt"),
+                        isSystem = obj.optBoolean("isSystem", false),
+                        isRead = obj.optBoolean("isRead", false),
+                        isPending = obj.optBoolean("isPending", false),
+                        clientId = if (obj.isNull("clientId")) null else obj.optString("clientId"),
+                    )
+                )
+            }
+            return CustomerRemoteDataSource.sortMessagesChronologically(list)
+        } catch (_: Exception) {
+            return emptyList()
+        }
+    }
+
     fun clear() {
         conversations.clear()
+        threadMessages.clear()
         status = LoadStatus.Idle
     }
 
     /** Test seam: put conversations into a known state without the network. */
     fun reset(initial: List<CustomerConversation> = emptyList()) {
         conversations.clear()
-        conversations.addAll(initial)
+        threadMessages.clear()
         status = if (initial.isEmpty()) LoadStatus.Idle else LoadStatus.Ready
     }
 

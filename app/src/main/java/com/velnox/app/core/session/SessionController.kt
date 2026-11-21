@@ -61,6 +61,36 @@ class SessionController(
     }
 
     /**
+     * Silent background retry when session restoration failed because the API was
+     * unreachable at launch (e.g. Render server cold-sleep or transient offline).
+     *
+     * As soon as the server wakes up and answers, the session seamlessly becomes
+     * [SessionState.Authenticated] in the background without user intervention.
+     */
+    suspend fun retryRestore(): RestoreOutcome {
+        if (state is SessionState.Authenticated) return RestoreOutcome.NoSession
+        val outcome = repository.restore()
+        when (outcome) {
+            is RestoreOutcome.Active -> {
+                state = SessionState.Authenticated(outcome.user)
+                notice = null
+            }
+            RestoreOutcome.Expired -> {
+                state = SessionState.ExpiredSession
+                notice = null
+            }
+            RestoreOutcome.NoSession -> {
+                state = SessionState.Guest
+                notice = null
+            }
+            RestoreOutcome.Unverified -> {
+                // Keep trying in the background; stay in Guest with NetworkUnavailable notice
+            }
+        }
+        return outcome
+    }
+
+    /**
      * Email + password sign-in. Returns the failure so the caller can show a
      * message; the state only becomes [SessionState.Authenticated] on success.
      */

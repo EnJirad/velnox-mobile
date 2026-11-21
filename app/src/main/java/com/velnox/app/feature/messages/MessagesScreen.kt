@@ -437,8 +437,13 @@ fun ConversationScreen(
     val title = thread?.displayTitle(supportLabel) ?: supportLabel
     val initials = remember(title) { initialsOf(title) }
 
-    val messages = remember(threadId) { mutableStateListOf<CustomerMessage>() }
-    var loading by remember(threadId) { mutableStateOf(true) }
+    val initialCached = remember(threadId) {
+        MessagesState.getCachedMessages(threadId, context)
+    }
+    val messages = remember(threadId) {
+        mutableStateListOf<CustomerMessage>().apply { addAll(initialCached) }
+    }
+    var loading by remember(threadId) { mutableStateOf(initialCached.isEmpty()) }
     var loadError by remember(threadId) { mutableStateOf<String?>(null) }
     var reloadTick by remember { mutableIntStateOf(0) }
 
@@ -463,6 +468,7 @@ fun ConversationScreen(
                 val merged = MessagesState.mergePolledMessages(messages.toList(), res.value)
                 messages.clear()
                 messages.addAll(merged)
+                MessagesState.setCachedMessages(threadId, merged, context)
                 loadError = null
                 MessagesState.markRead(repository, threadId)
             }
@@ -486,6 +492,7 @@ fun ConversationScreen(
                     if (merged != snapshot) {
                         messages.clear()
                         messages.addAll(merged)
+                        MessagesState.setCachedMessages(threadId, merged, context)
                     }
                     if (hasNewIncoming) {
                         MessagesState.markRead(repository, threadId)
@@ -541,6 +548,7 @@ fun ConversationScreen(
         val updated = CustomerRemoteDataSource.sortMessagesChronologically(messages.toList() + optimistic)
         messages.clear()
         messages.addAll(updated)
+        MessagesState.setCachedMessages(threadId, updated, context)
 
         scope.launch {
             listState.animateScrollToItem(messages.lastIndex.coerceAtLeast(0))
@@ -552,11 +560,13 @@ fun ConversationScreen(
                     val sorted = CustomerRemoteDataSource.sortMessagesChronologically(remaining + res.value)
                     messages.clear()
                     messages.addAll(sorted)
+                    MessagesState.setCachedMessages(threadId, sorted, context)
                     // Keep focus so user can continue typing seamlessly without keyboard bouncing
                 }
 
                 is CustomerResult.Failed -> {
                     messages.removeAll { it.id == pendingId }
+                    MessagesState.setCachedMessages(threadId, messages.toList(), context)
                     if (inputText.isEmpty()) inputText = text
                     sendError = res.userMessage(context)
                 }
