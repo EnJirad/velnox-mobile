@@ -59,87 +59,86 @@ class CustomerRemoteDataSource(
         mimeType: String,
         filename: String,
     ): CustomerResult<String> = withContext(Dispatchers.IO) {
-        val base64Str = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-        val directBody = JSONObject()
-            .put("kind", kind)
-            .put("base64", base64Str)
-            .put("mimeType", mimeType)
-
-        // 1. Primary path: Direct upload to backend server (persisted in PostgreSQL, 100% reliable)
-        val directRaw = send(token, "POST", "/api/customer/profile-image/direct", directBody)
-        if (directRaw is Raw.Success) {
-            val directObj = directRaw.data as? JSONObject
-            val serverUrl = if (kind == "avatar") {
-                directObj?.optString("avatarUrl")?.takeIf { it.isNotBlank() }
-            } else {
-                directObj?.optString("coverUrl")?.takeIf { it.isNotBlank() }
-            }
-            val url = serverUrl
-                ?: directObj?.optString("url")?.takeIf { it.isNotBlank() }
-                ?: "data:$mimeType;base64,$base64Str"
-            return@withContext CustomerResult.Ok(normalizeMediaUrl(url) ?: url)
-        }
-
-        // 2. Secondary fallback: Storage presign flow
+        // 1. Storage presign flow (Upload intent -> PUT storage -> Save metadata)
         val intentBody = JSONObject()
             .put("kind", kind)
             .put("filename", filename)
             .put("mimeType", mimeType)
         val intentRaw = send(token, "POST", "/api/customer/profile-image/upload-intent", intentBody)
-        val intentData = (intentRaw as? Raw.Success)?.data as? JSONObject
-            ?: return@withContext (directRaw as? Raw.Failure)?.let { CustomerResult.Failed(it.error, it.message) }
-            ?: (intentRaw as? Raw.Failure)?.let { CustomerResult.Failed(it.error, it.message) }
-            ?: CustomerResult.Failed(CustomerError.Server)
+        var intentFailure: CustomerResult.Failed? = null
+        if (intentRaw is Raw.Success) {
+            val intentData = intentRaw.data as? JSONObject
+            val uploadUrl = intentData?.optString("uploadUrl")
+            val objectKey = intentData?.optString("objectKey")
+            if (!uploadUrl.isNullOrBlank() && !objectKey.isNullOrBlank()) {
+                val mediaType = try {
+                    mimeType.toMediaType()
+                } catch (_: Exception) {
+                    "application/octet-stream".toMediaType()
+                }
+                val putRequest = Request.Builder()
+                    .url(uploadUrl)
+                    .header("Content-Type", mimeType)
+                    .put(bytes.toRequestBody(mediaType))
+                    .build()
 
-        val uploadUrl = intentData.optString("uploadUrl")
-        val objectKey = intentData.optString("objectKey")
-        if (uploadUrl.isBlank() || objectKey.isBlank()) {
-            return@withContext CustomerResult.Failed(CustomerError.Server, "Invalid upload intent response")
-        }
+                val isPutSuccess = try {
+                    client.newCall(putRequest).execute().use { response ->
+                        response.isSuccessful
+                    }
+                } catch (_: Exception) {
+                    false
+                }
 
-        // Upload binary directly to Cloudflare R2 via pre-signed PUT
-        val mediaType = try {
-            mimeType.toMediaType()
-        } catch (_: Exception) {
-            "application/octet-stream".toMediaType()
-        }
-        val putRequest = Request.Builder()
-            .url(uploadUrl)
-            .header("Content-Type", mimeType)
-            .put(bytes.toRequestBody(mediaType))
-            .build()
-
-        val isPutSuccess = try {
-            client.newCall(putRequest).execute().use { response ->
-                response.isSuccessful
+                if (isPutSuccess) {
+                    // Confirm upload and save to Neon PostgreSQL
+                    val saveBody = JSONObject().put("objectKey", objectKey)
+                    val saveRaw = send(token, "POST", "/api/customer/profile-image/save", saveBody)
+                    if (saveRaw is Raw.Success) {
+                        val saveObj = saveRaw.data as? JSONObject
+                        val serverUrl = if (kind == "avatar") {
+                            saveObj?.optString("avatarUrl")?.takeIf { it.isNotBlank() }
+                        } else {
+                            saveObj?.optString("coverUrl")?.takeIf { it.isNotBlank() }
+                        }
+                        val url = serverUrl
+                            ?: saveObj?.optString("url")?.takeIf { it.isNotBlank() }
+                            ?: intentData.optString("cdnUrl").takeIf { it.isNotBlank() }
+                            ?: objectKey
+                        return@withContext CustomerResult.Ok(normalizeMediaUrl(url) ?: url)
+                    } else if (saveRaw is Raw.Failure) {
+                        intentFailure = CustomerResult.Failed(saveRaw.error, saveRaw.message)
+                    }
+                }
             }
-        } catch (_: Exception) {
-            false
+        } else if (intentRaw is Raw.Failure) {
+            intentFailure = CustomerResult.Failed(intentRaw.error, intentRaw.message)
         }
 
-        if (!isPutSuccess) {
-            return@withContext (directRaw as? Raw.Failure)?.let { CustomerResult.Failed(it.error, it.message) }
-                ?: CustomerResult.Failed(CustomerError.Server, "Storage upload failed")
-        }
+        // 2. Direct upload fallback to backend server (persisted in PostgreSQL, 100% reliable)
+        val base64Str = java.util.Base64.getEncoder().encodeToString(bytes)
+        val directBody = JSONObject()
+            .put("kind", kind)
+            .put("base64", base64Str)
+            .put("mimeType", mimeType)
 
-        // Confirm upload and save to Neon PostgreSQL
-        val saveBody = JSONObject().put("objectKey", objectKey)
-        val saveRaw = send(token, "POST", "/api/customer/profile-image/save", saveBody)
-        when (saveRaw) {
+        val directRaw = send(token, "POST", "/api/customer/profile-image/direct", directBody)
+        when (directRaw) {
             is Raw.Success -> {
-                val saveObj = saveRaw.data as? JSONObject
+                val directObj = directRaw.data as? JSONObject
                 val serverUrl = if (kind == "avatar") {
-                    saveObj?.optString("avatarUrl")?.takeIf { it.isNotBlank() }
+                    directObj?.optString("avatarUrl")?.takeIf { it.isNotBlank() }
                 } else {
-                    saveObj?.optString("coverUrl")?.takeIf { it.isNotBlank() }
+                    directObj?.optString("coverUrl")?.takeIf { it.isNotBlank() }
                 }
                 val url = serverUrl
-                    ?: saveObj?.optString("url")?.takeIf { it.isNotBlank() }
-                    ?: intentData.optString("cdnUrl").takeIf { it.isNotBlank() }
-                    ?: objectKey
+                    ?: directObj?.optString("url")?.takeIf { it.isNotBlank() }
+                    ?: "data:$mimeType;base64,$base64Str"
                 CustomerResult.Ok(normalizeMediaUrl(url) ?: url)
             }
-            is Raw.Failure -> CustomerResult.Failed(saveRaw.error, saveRaw.message)
+            is Raw.Failure -> {
+                intentFailure ?: CustomerResult.Failed(directRaw.error, directRaw.message)
+            }
         }
     }
 

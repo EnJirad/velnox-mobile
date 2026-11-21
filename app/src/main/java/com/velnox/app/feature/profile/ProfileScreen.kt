@@ -127,7 +127,11 @@ private fun resolveImageModel(url: String?): Any? {
         if (base64Index != -1) {
             val base64Data = url.substring(base64Index + 7)
             return runCatching {
-                Base64.decode(base64Data, Base64.DEFAULT)
+                try {
+                    java.util.Base64.getDecoder().decode(base64Data)
+                } catch (_: Throwable) {
+                    Base64.decode(base64Data, Base64.DEFAULT)
+                }
             }.getOrNull() ?: url
         }
         return url
