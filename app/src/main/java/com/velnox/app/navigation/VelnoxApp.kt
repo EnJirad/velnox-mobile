@@ -106,6 +106,7 @@ import com.velnox.app.ui.theme.Squircle
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.VelnoxApplication
 import com.velnox.app.ui.theme.VelnoxTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Prefixes used to remember a destination across the Login gate. */
@@ -204,6 +205,23 @@ private fun VelnoxNavHost(
     // "true" would leave the button spinning forever.
     var isSubmitting by remember { mutableStateOf(false) }
     var signInErrorRes by rememberSaveable { mutableStateOf<Int?>(null) }
+
+    // Brand Splash Screen state: guaranteed to remain visible for at least 1.8s
+    // during cold startup while the session is resolving, preventing any white screen
+    // flash and giving users the signature breathing pulse animation.
+    var isSplashVisible by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        val startMs = System.currentTimeMillis()
+        while (session.state is SessionState.Loading) {
+            delay(50)
+        }
+        val elapsed = System.currentTimeMillis() - startMs
+        val remaining = (1800L - elapsed).coerceAtLeast(0L)
+        if (remaining > 0) {
+            delay(remaining)
+        }
+        isSplashVisible = false
+    }
 
     val application = LocalContext.current.applicationContext as VelnoxApplication
     val activityContext = LocalContext.current
@@ -790,7 +808,7 @@ private fun VelnoxNavHost(
         }
 
         val activeNotice = session.notice
-        if (activeNotice != null && sessionState !is SessionState.Loading) {
+        if (activeNotice != null && !isSplashVisible && sessionState !is SessionState.Loading) {
             SessionStatusPill(
                 textRes = noticeMessage(activeNotice),
                 showSpinner = false,
@@ -799,9 +817,9 @@ private fun VelnoxNavHost(
         }
 
         AnimatedVisibility(
-            visible = sessionState is SessionState.Loading,
+            visible = isSplashVisible,
             enter = fadeIn(tween(0)),
-            exit = fadeOut(tween(400)),
+            exit = fadeOut(tween(500)),
         ) {
             VelnoxSplashScreen()
         }
@@ -816,7 +834,7 @@ private fun VelnoxSplashScreen() {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "velnoxSplashPulse",
@@ -833,32 +851,32 @@ private fun VelnoxSplashScreen() {
     ) {
         Column(
             modifier = Modifier.graphicsLayer {
-                val scale = 0.94f + 0.06f * pulse
+                val scale = 0.92f + 0.08f * pulse
                 scaleX = scale
                 scaleY = scale
-                alpha = 0.75f + 0.25f * pulse
+                alpha = 0.70f + 0.30f * pulse
             },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
                 modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White.copy(alpha = 0.16f)),
+                    .size(100.dp)
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(Color.White.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
                     painter = painterResource(R.drawable.ic_velnox_mark_white),
                     contentDescription = null,
-                    modifier = Modifier.size(width = 52.dp, height = 40.dp),
+                    modifier = Modifier.size(width = 56.dp, height = 44.dp),
                 )
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(22.dp))
             Text(
                 text = "VELNOX",
-                style = MaterialTheme.typography.headlineSmall.copy(
+                style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 6.sp,
+                    letterSpacing = 8.sp,
                 ),
                 color = Color.White,
             )
