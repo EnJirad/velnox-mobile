@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -205,17 +206,22 @@ fun CartScreen(
             }
 
             item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SquircleLg)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg)
+                        .velnoxClickable(role = Role.Checkbox) { state.toggleAll() }
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     SelectionBox(checked = state.allSelected, onClick = { state.toggleAll() })
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(12.dp))
                     Text(
                         text = stringResource(R.string.cart_select_all),
                         style = TextXs.copy(fontWeight = FontWeight.Medium),
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier
-                            .clip(SquircleXs)
-                            .velnoxClickable(role = Role.Checkbox) { state.toggleAll() }
-                            .padding(vertical = 6.dp, horizontal = 2.dp),
                     )
                     Spacer(Modifier.weight(1f))
                     Text(
@@ -311,8 +317,6 @@ private fun ShopCartSection(
     onDecrease: (String) -> Unit,
     onRemove: (String) -> Unit,
 ) {
-    val isShopAllSelected = group.items.isNotEmpty() && group.items.all { it.selected }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -327,11 +331,6 @@ private fun ShopCartSection(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SelectionBox(
-                checked = isShopAllSelected,
-                onClick = { state.toggleShopSelection(group.items, !isShopAllSelected) },
-            )
-            Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = VelnoxIcons.ShoppingBag,
                 contentDescription = null,
@@ -383,26 +382,25 @@ private fun CartLine(
         modifier = Modifier
             .fillMaxWidth()
             .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
-            SelectionBox(checked = item.selected, onClick = onToggle)
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .size(76.dp)
-                    .clip(SquircleSm)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                if (item.imageUrl != null) {
-                    AsyncImage(
-                        model = item.imageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    ProductArtTile(art = item.art, modifier = Modifier.fillMaxSize())
-                }
+        SelectionBox(checked = item.selected, onClick = onToggle)
+        Spacer(Modifier.width(12.dp))
+        Box(
+            modifier = Modifier
+                .size(76.dp)
+                .clip(SquircleSm)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            if (item.imageUrl != null) {
+                AsyncImage(
+                    model = item.imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                ProductArtTile(art = item.art, modifier = Modifier.fillMaxSize())
             }
         }
         Spacer(Modifier.width(12.dp))
@@ -489,10 +487,10 @@ private fun SelectionBox(checked: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .size(24.dp)
             .clip(SquircleXs)
-            .background(if (checked) VelnoxBrand else MaterialTheme.colorScheme.surfaceVariant)
+            .background(if (checked) VelnoxBrand else Color.Transparent)
             .border(
-                1.dp,
-                if (checked) VelnoxBrand else MaterialTheme.colorScheme.outline,
+                1.5.dp,
+                if (checked) VelnoxBrand else MaterialTheme.colorScheme.outlineVariant,
                 SquircleXs,
             )
             .velnoxClickable(role = Role.Checkbox, onClick = onClick),
@@ -502,7 +500,7 @@ private fun SelectionBox(checked: Boolean, onClick: () -> Unit) {
             Icon(
                 imageVector = VelnoxIcons.Check,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondary,
+                tint = Color.White,
                 modifier = Modifier.size(14.dp),
             )
         }

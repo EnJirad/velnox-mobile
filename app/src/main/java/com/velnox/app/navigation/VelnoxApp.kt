@@ -2,6 +2,24 @@ package com.velnox.app.navigation
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -772,16 +790,77 @@ private fun VelnoxNavHost(
         }
 
         val activeNotice = session.notice
-        if (sessionState is SessionState.Loading) {
-            SessionStatusPill(
-                textRes = R.string.session_checking,
-                showSpinner = true,
-            )
-        } else if (activeNotice != null) {
+        if (activeNotice != null && sessionState !is SessionState.Loading) {
             SessionStatusPill(
                 textRes = noticeMessage(activeNotice),
                 showSpinner = false,
                 onClick = session::acknowledgeNotice,
+            )
+        }
+
+        AnimatedVisibility(
+            visible = sessionState is SessionState.Loading,
+            enter = fadeIn(tween(0)),
+            exit = fadeOut(tween(400)),
+        ) {
+            VelnoxSplashScreen()
+        }
+    }
+}
+
+/** Full-screen emerald splash shown while a stored session is being verified. */
+@Composable
+private fun VelnoxSplashScreen() {
+    val transition = rememberInfiniteTransition(label = "velnoxSplash")
+    val pulse by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "velnoxSplashPulse",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(VelnoxBrand, Color(0xFF047857), Color(0xFF064E3B)),
+                ),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.graphicsLayer {
+                val scale = 0.94f + 0.06f * pulse
+                scaleX = scale
+                scaleY = scale
+                alpha = 0.75f + 0.25f * pulse
+            },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.White.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_velnox_mark_white),
+                    contentDescription = null,
+                    modifier = Modifier.size(width = 52.dp, height = 40.dp),
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = "VELNOX",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 6.sp,
+                ),
+                color = Color.White,
             )
         }
     }
