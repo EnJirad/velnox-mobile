@@ -131,7 +131,8 @@ fun ProductDetailScreen(
     onContactSeller: ((String, String?) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
+    val context = LocalContext.current
+    val catalog = (context.applicationContext as VelnoxApplication).catalog
 
     var state by remember(productId) {
         mutableStateOf<ProductState>(ProductState.Loading)
