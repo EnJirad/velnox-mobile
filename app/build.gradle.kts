@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.velnox.app"
-    compileSdk = 35
+    compileSdk = 36
+    buildToolsVersion = "35.0.0"
 
     defaultConfig {
         applicationId = "com.velnox.app"
