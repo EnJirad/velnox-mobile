@@ -128,6 +128,7 @@ fun ProductDetailScreen(
     onOpenCart: (() -> Unit)? = null,
     onOpenShop: ((String) -> Unit)? = null,
     onOpenProduct: ((String) -> Unit)? = null,
+    onContactSeller: ((String, String?) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val catalog = (LocalContext.current.applicationContext as VelnoxApplication).catalog
@@ -246,6 +247,30 @@ fun ProductDetailScreen(
                         tint = if (isFav) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(20.dp),
                     )
+                }
+                val currentProduct = (state as? ProductState.Content)?.product
+                if (currentProduct != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .velnoxClickable(role = Role.Button) {
+                                val shareText = "${currentProduct.name}\n${currentProduct.shopName.orEmpty()}\nhttps://velnox.app/product/${currentProduct.id}"
+                                val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(android.content.Intent.createChooser(sendIntent, null))
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = VelnoxIcons.Share2,
+                            contentDescription = stringResource(R.string.common_share),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
                 if (onOpenCart != null) {
                     Box(
@@ -1262,6 +1287,14 @@ fun ProductDetailScreen(
                             }
                         }
                     },
+                    onChatSeller = if (onContactSeller != null && (!product.shopId.isNullOrBlank() || !product.shopSlug.isNullOrBlank())) {
+                        {
+                            val target = product.shopId?.takeIf { it.isNotBlank() } ?: product.shopSlug.orEmpty()
+                            if (target.isNotBlank()) {
+                                onContactSeller.invoke(target, product.id)
+                            }
+                        }
+                    } else null,
                 )
 
                 // Full-screen zoom viewer for seller detail images
@@ -1677,6 +1710,7 @@ private fun BottomPurchaseArea(
     isOutOfStock: Boolean,
     onAddToCart: () -> Unit,
     onBuyNow: () -> Unit,
+    onChatSeller: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -1692,6 +1726,25 @@ private fun BottomPurchaseArea(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (onChatSeller != null) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(Squircle)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, Squircle)
+                        .velnoxClickable(role = Role.Button, onClick = onChatSeller),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = VelnoxIcons.MessageCircle,
+                        contentDescription = stringResource(R.string.product_chat_seller),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+
             // Add to Cart (Secondary style)
             Box(
                 modifier = Modifier

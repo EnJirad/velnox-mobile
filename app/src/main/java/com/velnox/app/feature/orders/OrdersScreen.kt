@@ -319,7 +319,8 @@ fun OrderDetailScreen(
     modifier: Modifier = Modifier,
     cartState: CartState? = null,
     onOpenCart: () -> Unit = {},
-    onContactSeller: () -> Unit = {},
+    onContactSeller: ((shopId: String, productId: String?) -> Unit)? = null,
+    onOpenProduct: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val repository: CustomerRepository? = remember(context) {
@@ -420,12 +421,35 @@ fun OrderDetailScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
+                    if (onContactSeller != null && !activeOrder.shopId.isNullOrBlank()) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.product_chat_seller),
+                            style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                            color = VelnoxBrand,
+                            modifier = Modifier.velnoxClickable(role = Role.Button) {
+                                onContactSeller.invoke(activeOrder.shopId, activeOrder.items.firstOrNull()?.productId)
+                            },
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
                     StatusChip(text = stringResource(uiStatus.labelRes), tone = uiStatus.tone)
                 }
 
                 activeOrder.items.forEachIndexed { idx, line ->
                     if (idx > 0) CardDivider()
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (onOpenProduct != null && !line.productId.isNullOrBlank()) {
+                                    Modifier.clip(SquircleSm).velnoxClickable(role = Role.Button) {
+                                        onOpenProduct.invoke(line.productId)
+                                    }
+                                } else Modifier
+                            ),
+                    ) {
                         Box(modifier = Modifier.size(52.dp).clip(SquircleSm)) {
                             if (line.imageUrl != null) {
                                 AsyncImage(

@@ -89,6 +89,7 @@ fun CartScreen(
     state: CartState,
     onCheckout: () -> Unit,
     onBrowseProducts: () -> Unit,
+    onOpenProduct: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -276,6 +277,7 @@ fun CartScreen(
                             state.remove(lineId)
                         }
                     },
+                    onOpenProduct = onOpenProduct,
                 )
             }
 
@@ -316,6 +318,7 @@ private fun ShopCartSection(
     onIncrease: (String) -> Unit,
     onDecrease: (String) -> Unit,
     onRemove: (String) -> Unit,
+    onOpenProduct: ((String) -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier
@@ -359,6 +362,7 @@ private fun ShopCartSection(
                 onIncrease = { onIncrease(item.id) },
                 onDecrease = { onDecrease(item.id) },
                 onRemove = { onRemove(item.id) },
+                onOpenProduct = onOpenProduct,
             )
             if (index < group.items.lastIndex) {
                 HorizontalDivider(
@@ -377,6 +381,7 @@ private fun CartLine(
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
     onRemove: () -> Unit,
+    onOpenProduct: ((String) -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -390,7 +395,14 @@ private fun CartLine(
             modifier = Modifier
                 .size(76.dp)
                 .clip(SquircleSm)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .then(
+                    if (onOpenProduct != null && item.productId.isNotBlank()) {
+                        Modifier.velnoxClickable(role = Role.Button) {
+                            onOpenProduct.invoke(item.productId)
+                        }
+                    } else Modifier
+                ),
         ) {
             if (item.imageUrl != null) {
                 AsyncImage(
@@ -404,7 +416,17 @@ private fun CartLine(
             }
         }
         Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .then(
+                    if (onOpenProduct != null && item.productId.isNotBlank()) {
+                        Modifier.velnoxClickable(role = Role.Button) {
+                            onOpenProduct.invoke(item.productId)
+                        }
+                    } else Modifier
+                ),
+        ) {
             val itemName = item.name ?: if (item.nameRes != 0) stringResource(item.nameRes) else ""
             Text(
                 text = itemName,

@@ -11,6 +11,7 @@
     <string name="common_retry">ลองอีกครั้ง</string>
     <string name="common_preview_notice">ข้อมูลตัวอย่างสำหรับการออกแบบ ไม่ใช่ข้อมูลจริง</string>
     <string name="common_demo_account">บัญชีสาธิตสำหรับการออกแบบ</string>
+    <string name="common_share">แชร์</string>
 
     <!-- ═════════════════════════════ navigation ═════════════════════════════ -->
     <string name="nav_home">หน้าแรก</string>
@@ -463,6 +464,8 @@
     <string name="product_full_screen_zoom">แตะเพื่อดูภาพขนาดเต็ม</string>
     <string name="product_select_options">เลือกตัวเลือกสินค้า</string>
     <string name="product_confirm_options">ยืนยัน</string>
+    <string name="product_chat_seller">คุยกับร้านค้า</string>
+    <string name="cart_view_product">ดูรายละเอียดสินค้า</string>
     <string name="product_select_all_options_warning">กรุณาเลือกตัวเลือกให้ครบถ้วน</string>
     <string name="product_shop_visit">ไปที่ร้านค้า</string>
     <string name="product_shop_verified">ร้านค้ายืนยันตัวตนแล้ว</string>

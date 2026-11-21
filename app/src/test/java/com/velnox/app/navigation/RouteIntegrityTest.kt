@@ -45,4 +45,15 @@ class RouteIntegrityTest {
         val unknownReason = AccessPolicy.reasonForOverlay("nonexistent_route_xyz")
         assertTrue(unknownReason == LoginReason.Account)
     }
+
+    @Test
+    fun `product route prefixing ensures public access`() {
+        val rawId = "prod_999"
+        val normalized = if (rawId.startsWith("product:")) rawId else "product:$rawId"
+        assertTrue(AccessPolicy.reasonForOverlay(normalized) == null)
+
+        val alreadyPrefixed = "product:prod_888"
+        val normalizedPrefixed = if (alreadyPrefixed.startsWith("product:")) alreadyPrefixed else "product:$alreadyPrefixed"
+        assertTrue(AccessPolicy.reasonForOverlay(normalizedPrefixed) == null)
+    }
 }

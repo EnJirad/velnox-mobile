@@ -325,6 +325,26 @@ private fun VelnoxNavHost(
         overlayKey = key
     }
 
+    fun openProduct(productId: String) {
+        val key = if (productId.startsWith("product:")) productId else "product:$productId"
+        requestOverlay(key)
+    }
+
+    fun openCategory(slug: String) {
+        val key = if (slug.startsWith("category:")) slug else "category:$slug"
+        requestOverlay(key)
+    }
+
+    fun openShop(slugOrId: String) {
+        val key = if (slugOrId.startsWith("shop:")) slugOrId else "shop:$slugOrId"
+        requestOverlay(key)
+    }
+
+    fun openOrder(orderId: String) {
+        val key = if (orderId.startsWith("order:")) orderId else "order:$orderId"
+        requestOverlay(key)
+    }
+
     /** Guest declined to sign in: stay exactly where they were. */
     fun dismissLogin() {
         closeAuth()
@@ -642,8 +662,8 @@ private fun VelnoxNavHost(
                         "category" -> MarketScreen(
                             initialCategorySlug = null,
                             onBack = ::closeOverlay,
-                            onOpenProduct = ::requestOverlay,
-                            onOpenCategory = { slug -> requestOverlay("category:$slug") },
+                            onOpenProduct = ::openProduct,
+                            onOpenCategory = ::openCategory,
                         )
 
                         "checkout" -> CheckoutScreen(
@@ -651,14 +671,14 @@ private fun VelnoxNavHost(
                             onBack = ::closeOverlay,
                             onManageAddresses = { overlayKey = SettingsPage.Addresses.key },
                             onViewOrder = { orderId ->
-                                overlayKey = "order:$orderId"
+                                openOrder(orderId)
                             },
                         )
 
                         "wishlist" -> WishlistScreen(
                             cartState = cart,
                             onBack = ::closeOverlay,
-                            onOpenProduct = ::requestOverlay,
+                            onOpenProduct = ::openProduct,
                             onExplore = {
                                 closeOverlay()
                                 requestTab(AppTab.Home)
@@ -670,11 +690,11 @@ private fun VelnoxNavHost(
                             onBack = ::closeOverlay,
                             onOpenRoute = { route ->
                                 if (route.startsWith("order:")) {
-                                    overlayKey = route
+                                    openOrder(route.removePrefix("order:"))
                                 } else if (route.startsWith("category:") || route == "category") {
-                                    overlayKey = route
+                                    openCategory(route.removePrefix("category:"))
                                 } else if (route.startsWith("product:")) {
-                                    overlayKey = route
+                                    openProduct(route.removePrefix("product:"))
                                 } else if (route.startsWith("settings/")) {
                                     overlayKey = route
                                 } else {
@@ -685,7 +705,7 @@ private fun VelnoxNavHost(
 
                         "search" -> SearchScreen(
                             onBack = ::closeOverlay,
-                            onOpenProduct = ::requestOverlay,
+                            onOpenProduct = ::openProduct,
                             searchState = searchState,
                         )
 
@@ -694,21 +714,33 @@ private fun VelnoxNavHost(
                                 MarketScreen(
                                     initialCategorySlug = overlay.removePrefix("category:"),
                                     onBack = { overlayKey = "category" },
-                                    onOpenProduct = ::requestOverlay,
-                                    onOpenCategory = { slug -> requestOverlay("category:$slug") },
+                                    onOpenProduct = ::openProduct,
+                                    onOpenCategory = ::openCategory,
                                 )
                             } else if (overlay.startsWith("shop:")) {
                                 ShopScreen(
                                     shopSlugOrId = overlay.removePrefix("shop:"),
                                     onBack = ::closeOverlay,
-                                    onOpenProduct = ::requestOverlay,
+                                    onOpenProduct = ::openProduct,
                                 )
                             } else if (overlay.startsWith("product:")) {
                                 ProductDetailScreen(
                                     productId = overlay.removePrefix("product:"),
                                     onBack = ::closeOverlay,
-                                    onOpenShop = { requestOverlay("shop:$it") },
-                                    onOpenProduct = ::requestOverlay,
+                                    onOpenShop = ::openShop,
+                                    onOpenProduct = ::openProduct,
+                                    onContactSeller = { shopId, prodId ->
+                                        if (!sessionState.isAuthenticated) {
+                                            askForSignIn(LoginReason.Messages, overlayDestination("shop:$shopId"))
+                                        } else {
+                                            scope.launch {
+                                                when (val conv = customer.call { api, token -> api.startConversation(token, shopId, prodId) }) {
+                                                    is CustomerResult.Ok -> requestOverlay("thread:${conv.value.id}")
+                                                    is CustomerResult.Failed -> requestOverlay("messages")
+                                                }
+                                            }
+                                        }
+                                    },
                                     onAddToCart = { product, variant, qty, imageUrl ->
                                         if (sessionState.isAuthenticated) {
                                             scope.launch {
@@ -787,11 +819,24 @@ private fun VelnoxNavHost(
                                             requestTab(AppTab.Cart)
                                         },
                                         onBack = ::closeOverlay,
+                                        onOpenProduct = ::openProduct,
+                                        onContactSeller = { shopId, prodId ->
+                                            if (!sessionState.isAuthenticated) {
+                                                askForSignIn(LoginReason.Messages, overlayDestination("shop:$shopId"))
+                                            } else {
+                                                scope.launch {
+                                                    when (val conv = customer.call { api, token -> api.startConversation(token, shopId, prodId) }) {
+                                                        is CustomerResult.Ok -> requestOverlay("thread:${conv.value.id}")
+                                                        is CustomerResult.Failed -> requestOverlay("messages")
+                                                    }
+                                                }
+                                            }
+                                        },
                                     )
                                 } else if (overlay.startsWith("thread:")) {
                                     ConversationScreen(
                                         threadId = overlay.removePrefix("thread:"),
-                                        onOpenProduct = ::requestOverlay,
+                                        onOpenProduct = ::openProduct,
                                         onBack = { overlayKey = "messages" },
                                     )
                                 } else {
@@ -1015,6 +1060,7 @@ private fun TabContent(
             state = cart,
             onCheckout = { onOpenOverlay("checkout") },
             onBrowseProducts = { onOpenTab(AppTab.Home) },
+            onOpenProduct = { onOpenOverlay("product:$it") },
         )
 
         AppTab.Account -> {

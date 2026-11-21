@@ -11,6 +11,7 @@
     <string name="common_retry">ထပ်စမ်းကြည့်ပါ</string>
     <string name="common_preview_notice">ဒီဇိုင်းပြသရန် နမူနာဒေတာသာဖြစ်သည်</string>
     <string name="common_demo_account">ဒီဇိုင်းအတွက် သရုပ်ပြအကောင့်</string>
+    <string name="common_share">မျှဝေရန်</string>
 
     <!-- ═════════════════════════════ navigation ═════════════════════════════ -->
     <string name="nav_home">ပင်မ</string>
@@ -463,6 +464,8 @@
     <string name="product_full_screen_zoom">ပုံအကြီးကြည့်ရန် နှိပ်ပါ</string>
     <string name="product_select_options">ရွေးချယ်စရာများ ရွေးပါ</string>
     <string name="product_confirm_options">အတည်ပြုပါ</string>
+    <string name="product_chat_seller">ဆိုင်နှင့် စကားပြောရန်</string>
+    <string name="cart_view_product">ကုန်ပစ္စည်း အသေးစိတ်ကြည့်ရန်</string>
     <string name="product_select_all_options_warning">ရွေးချယ်စရာများ အားလုံး ရွေးပါ</string>
     <string name="product_shop_visit">ဆိုင်သို့ သွားရန်</string>
     <string name="product_shop_verified">အတည်ပြုပြီးသော ဆိုင်</string>
