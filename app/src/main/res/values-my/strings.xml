@@ -658,6 +658,11 @@
     <string name="messages_status_sending">ပို့နေသည်</string>
     <string name="messages_status_sent">ပို့ပြီး</string>
     <string name="messages_status_read">ဖတ်ပြီး</string>
+    <string name="messages_chat_prompt">စကားစတင်ပြောဆိုရန် စာပို့ပါ</string>
+    <string name="messages_support_prompt">၂၄ နာရီ ဝန်ဆောင်မှုအတွက် ဆက်သွယ်ပါ</string>
+    <string name="messages_suggestion_stock">မင်္ဂလာပါ၊ ဤပစ္စည်း လက်ကျန်ရှိပါသလား</string>
+    <string name="messages_suggestion_delivery">ပို့ဆောင်ချိန် ဘယ်လောက်ကြာမလဲ</string>
+    <string name="messages_suggestion_help">အမှာစာနှင့် ပတ်သက်၍ အကူအညီ လိုအပ်ပါသည်</string>
     <string name="profile_change_cover">မျက်နှာဖုံးပုံ ပြောင်းရန်</string>
     <string name="profile_change_avatar">ပရိုဖိုင်ပုံ ပြောင်းရန်</string>
     <string name="profile_photo_picker_title">ပုံ စီမံခန့်ခွဲရန်</string>

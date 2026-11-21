@@ -658,6 +658,11 @@
     <string name="messages_status_sending">Sending</string>
     <string name="messages_status_sent">Sent</string>
     <string name="messages_status_read">Read</string>
+    <string name="messages_chat_prompt">Send a message to start chatting</string>
+    <string name="messages_support_prompt">Contact our team for 24/7 customer support</string>
+    <string name="messages_suggestion_stock">Hi, is this item currently in stock?</string>
+    <string name="messages_suggestion_delivery">How long does shipping usually take?</string>
+    <string name="messages_suggestion_help">I need assistance with an order</string>
     <string name="profile_change_cover">Change cover</string>
     <string name="profile_change_avatar">Change avatar</string>
     <string name="profile_photo_picker_title">Profile Photo</string>

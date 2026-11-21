@@ -343,8 +343,14 @@ class CustomerRemoteDataSource(
         shopId: String,
         productId: String?,
     ): CustomerResult<CustomerConversation> {
-        val body = JSONObject().put("shopId", shopId)
-        productId?.takeIf { it.isNotBlank() }?.let { body.put("productId", it) }
+        val body = JSONObject()
+            .put("shopId", shopId)
+            .put("shop_id", shopId)
+            .put("sellerId", shopId)
+        productId?.takeIf { it.isNotBlank() }?.let {
+            body.put("productId", it)
+            body.put("product_id", it)
+        }
         return send(token, "POST", "/api/customer/conversations", body).map { data ->
             data.asObject("conversation")?.let(::parseConversation)
         }
@@ -360,7 +366,15 @@ class CustomerRemoteDataSource(
         conversationId: String,
     ): CustomerResult<List<CustomerMessage>> =
         send(token, "GET", "/api/customer/conversations/${encode(conversationId)}/messages").map { data ->
-            data.asArray("messages", "items")?.objects()?.mapNotNull { parseMessage(it, false) }
+            val list = data.asArray("messages", "items")?.objects()?.mapNotNull { parseMessage(it, false) }
+            list?.let { rawList ->
+                // Ensure messages are strictly chronological (oldest first).
+                if (rawList.size > 1 && (rawList.first().createdAt ?: 0L) > (rawList.last().createdAt ?: 0L)) {
+                    rawList.reversed()
+                } else {
+                    rawList
+                }
+            }
         }
 
     override suspend fun sendMessage(
@@ -369,8 +383,15 @@ class CustomerRemoteDataSource(
         text: String,
         clientId: String?,
     ): CustomerResult<CustomerMessage> {
-        val payload = JSONObject().put("body", text)
-        clientId?.takeIf { it.isNotBlank() }?.let { payload.put("clientId", it) }
+        val payload = JSONObject()
+            .put("body", text)
+            .put("text", text)
+            .put("content", text)
+            .put("message", text)
+        clientId?.takeIf { it.isNotBlank() }?.let {
+            payload.put("clientId", it)
+            payload.put("client_id", it)
+        }
         return send(
             token,
             "POST",
@@ -729,18 +750,24 @@ class CustomerRemoteDataSource(
     }
 
     private fun parseMessage(obj: JSONObject, knownFromCustomer: Boolean): CustomerMessage? {
-        val id = obj.str("id", "messageId") ?: return null
+        val id = obj.str("id", "messageId", "_id") ?: return null
         val text = obj.str("body", "text", "content", "message") ?: return null
-        val sender = obj.str("senderRole", "sender_role", "senderType", "sender_type", "sender")
+        val senderObj = obj.optJSONObject("sender") ?: obj.optJSONObject("user") ?: obj.optJSONObject("author")
+        val sender = (obj.str("senderRole", "sender_role", "senderType", "sender_type", "role", "sender")
+            ?: senderObj?.str("role", "type", "senderRole", "sender_role"))
             ?.lowercase()
-        val isSystem = obj.flag("isSystem", "is_system") ?: (sender == "system")
+        val isSystem = obj.flag("isSystem", "is_system") ?: (sender in setOf("system", "bot", "auto"))
+        val direction = obj.str("direction")?.lowercase()
+        val isOutgoing = direction in setOf("outgoing", "out", "sent")
         val fromCustomer = !isSystem && (
             knownFromCustomer ||
-                (obj.flag("isMine", "fromCustomer", "isOwn", "is_mine")
+                isOutgoing ||
+                (obj.flag("isMine", "fromCustomer", "isOwn", "is_mine", "isCustomer", "is_customer")
                     ?: (sender in CUSTOMER_SENDERS))
             )
         val isRead = obj.flag("isRead", "is_read", "read")
             ?: (obj.str("readAt", "read_at") != null)
+        val parsedClientId = obj.str("clientId", "client_id")
         return CustomerMessage(
             id = id,
             text = text,
@@ -748,6 +775,7 @@ class CustomerRemoteDataSource(
             createdAt = obj.time("createdAt", "created_at", "sentAt"),
             isSystem = isSystem,
             isRead = isRead,
+            clientId = parsedClientId,
         )
     }
 
@@ -841,7 +869,7 @@ class CustomerRemoteDataSource(
         const val SECONDS_LIMIT = 100_000_000_000L
 
         val REJECTED_CODES = setOf(400, 403, 409, 422)
-        val CUSTOMER_SENDERS = setOf("customer", "buyer", "user", "me")
+        val CUSTOMER_SENDERS = setOf("customer", "buyer", "user", "me", "client", "consumer", "member", "guest")
         val JSON = "application/json; charset=utf-8".toMediaType()
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()

@@ -2,6 +2,7 @@
 
 package com.velnox.app.feature.messages
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -58,6 +60,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -490,7 +493,10 @@ fun ConversationScreen(
         }
     }
 
-    // Smooth auto-scroll to latest message whenever new messages arrive or are sent.
+    val inputInteractionSource = remember { MutableInteractionSource() }
+    val inputFocused by inputInteractionSource.collectIsFocusedAsState()
+
+    // Smooth auto-scroll to latest message whenever new messages arrive, are sent, or input is focused.
     LaunchedEffect(messages.size, messages.lastOrNull()?.id) {
         if (messages.isNotEmpty() && messages.size != lastScrolledCount) {
             val wasInitial = lastScrolledCount == 0
@@ -500,6 +506,13 @@ fun ConversationScreen(
             } else {
                 listState.animateScrollToItem(messages.lastIndex)
             }
+        }
+    }
+
+    LaunchedEffect(inputFocused) {
+        if (inputFocused && messages.isNotEmpty()) {
+            delay(150)
+            listState.animateScrollToItem(messages.lastIndex)
         }
     }
 
@@ -516,6 +529,7 @@ fun ConversationScreen(
             fromCustomer = true,
             createdAt = System.currentTimeMillis(),
             isPending = true,
+            clientId = clientId,
         )
         // Optimistically clear input and append bubble immediately.
         inputText = ""
@@ -525,7 +539,9 @@ fun ConversationScreen(
             listState.animateScrollToItem(messages.lastIndex.coerceAtLeast(0))
             when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
                 is CustomerResult.Ok -> {
-                    val idx = messages.indexOfFirst { it.id == pendingId }
+                    val idx = messages.indexOfFirst {
+                        it.id == pendingId || (it.clientId != null && it.clientId == clientId)
+                    }
                     val alreadyMerged = messages.any { it.id == res.value.id }
                     if (idx >= 0) {
                         if (alreadyMerged) {
@@ -536,7 +552,7 @@ fun ConversationScreen(
                     } else if (!alreadyMerged) {
                         messages.add(res.value)
                     }
-                    focusManager.clearFocus()
+                    // Keep focus so user can continue typing seamlessly without keyboard bouncing
                 }
 
                 is CustomerResult.Failed -> {
@@ -548,9 +564,6 @@ fun ConversationScreen(
             sending = false
         }
     }
-
-    val inputInteractionSource = remember { MutableInteractionSource() }
-    val inputFocused by inputInteractionSource.collectIsFocusedAsState()
 
     Column(
         modifier = modifier
@@ -670,17 +683,83 @@ fun ConversationScreen(
                 }
 
                 messages.isEmpty() -> {
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(PageGutter),
-                        contentAlignment = Alignment.Center,
+                            .padding(horizontal = PageGutter, vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(Circle)
+                                .background(VelnoxBrand.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = VelnoxIcons.MessageCircle,
+                                contentDescription = null,
+                                tint = VelnoxBrand,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
+                        Spacer(Modifier.height(14.dp))
                         Text(
-                            text = stringResource(R.string.messages_empty_chat),
-                            style = TextXs,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = if (thread?.isSupport == true) {
+                                stringResource(R.string.messages_support_title)
+                            } else {
+                                stringResource(R.string.messages_empty_chat)
+                            },
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = if (thread?.isSupport == true) {
+                                stringResource(R.string.messages_support_prompt)
+                            } else {
+                                stringResource(R.string.messages_chat_prompt)
+                            },
+                            style = Text2xs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(18.dp))
+                        // Quick suggestion pills
+                        val suggestions = if (thread?.isSupport == true) {
+                            listOf(
+                                stringResource(R.string.messages_suggestion_help),
+                                stringResource(R.string.messages_suggestion_delivery),
+                            )
+                        } else {
+                            listOf(
+                                stringResource(R.string.messages_suggestion_stock),
+                                stringResource(R.string.messages_suggestion_delivery),
+                            )
+                        }
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            suggestions.forEach { prompt ->
+                                Surface(
+                                    shape = SquircleSm,
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                                    modifier = Modifier.velnoxClickable(role = Role.Button) {
+                                        inputText = prompt
+                                    },
+                                ) {
+                                    Text(
+                                        text = prompt,
+                                        style = TextXs.copy(fontWeight = FontWeight.Medium),
+                                        color = VelnoxBrand,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -747,7 +826,6 @@ fun ConversationScreen(
                         inputText = it
                         sendError = null
                     },
-                    enabled = !sending,
                     maxLines = 4,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurface,
@@ -950,17 +1028,17 @@ private fun Bubble(
                     color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 1.dp,
                     modifier = Modifier
-                        .fillMaxWidth(0.78f)
+                        .widthIn(min = 44.dp, max = 280.dp)
                         .border(1.dp, MaterialTheme.colorScheme.outline, bubbleShape),
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
                         Text(
                             text = text,
                             style = TextXs.copy(lineHeight = MaterialTheme.typography.bodyMedium.lineHeight),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         if (timestamp.isNotEmpty()) {
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(3.dp))
                             Text(
                                 text = timestamp,
                                 style = Text2xs,
@@ -979,11 +1057,11 @@ private fun Bubble(
                 )
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.78f)
-                        .shadow(2.dp, bubbleShape)
+                        .widthIn(min = 44.dp, max = 280.dp)
+                        .shadow(1.5.dp, bubbleShape)
                         .clip(bubbleShape)
                         .background(outgoingGradient)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
                 ) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
@@ -993,9 +1071,8 @@ private fun Bubble(
                                 lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
                             ),
                             color = Color.White,
-                            modifier = Modifier.fillMaxWidth(),
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(3.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.End,

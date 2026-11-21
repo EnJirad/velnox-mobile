@@ -127,17 +127,25 @@ object MessagesState {
         remote: List<CustomerMessage>,
     ): List<CustomerMessage> {
         val remoteIds = remote.mapTo(HashSet(remote.size)) { it.id }
+        val remoteClientIds = remote.mapNotNullTo(HashSet()) { it.clientId }
         val remoteCustomerTexts = remote
             .asSequence()
             .filter { it.fromCustomer }
             .map { it.text.trim() }
             .toHashSet()
-        val remainingPending = current.filter { msg ->
-            msg.isPending &&
-                msg.id !in remoteIds &&
+
+        val now = System.currentTimeMillis()
+        val remainingLocal = current.filter { msg ->
+            val notInRemote = msg.id !in remoteIds && (msg.clientId == null || msg.clientId !in remoteClientIds)
+            if (!notInRemote) return@filter false
+            if (msg.isPending) {
                 msg.text.trim() !in remoteCustomerTexts
+            } else {
+                // Keep recently confirmed local messages for 15s to bridge any replication or poll latency
+                msg.fromCustomer && (msg.createdAt == null || (now - msg.createdAt) < 15_000L)
+            }
         }
-        return if (remainingPending.isEmpty()) remote else remote + remainingPending
+        return if (remainingLocal.isEmpty()) remote else remote + remainingLocal
     }
 
     /** True when [remote] contains an incoming message not yet present in [current]. */

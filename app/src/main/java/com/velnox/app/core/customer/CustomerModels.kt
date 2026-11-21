@@ -215,6 +215,7 @@ data class CustomerMessage(
     val isRead: Boolean = false,
     /** True only for a local optimistic bubble awaiting server confirmation. */
     val isPending: Boolean = false,
+    val clientId: String? = null,
 )
 
 sealed interface CustomerResult<out T> {
