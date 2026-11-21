@@ -182,3 +182,37 @@ After completing any development task, report:
 Do not report PASS without evidence from GitHub Actions.
 
 This policy is mandatory for all AI agents and all future Android development tasks in Velnox Mobile. The AI agent's role is to develop and maintain code. GitHub Actions is the sole authority for building, testing, and verifying the Android application.
+
+---
+
+## 8. AI Model Orchestration & Quota Delegation Policy
+
+### 8.1 Default Role & Lightweight Tasks (Gemini 3.8 Flash Medium)
+- **Coordinator & Everyday Model:** `Gemini 3.8 Flash (Medium)` acts as the primary coordinator, chat conversationalist, and handler for lightweight/routine tasks.
+- **Scope for Lightweight Tasks:**
+  - Minor UI adjustments, font tweaks, alignment/spacing shifts, simple asset changes.
+  - Small, isolated bug fixes or configuration adjustments.
+  - Daily chat, status questions, and general inquiries.
+
+### 8.2 Major Tasks & Architecture (Specialized Models)
+Whenever a task involves significant feature additions, deep architectural changes, multi-file rewrites, or critical system logic:
+1. **System Analysis & Architecture Planning:**
+   - Delegate to top reasoning models: **Claude Opus 5.5 (High)** or **Gemini 4 Argon (High)** to analyze requirements and construct a precise, robust implementation plan.
+2. **Implementation & High-Performance Coding:**
+   - Delegate code generation, core logic, and complex debugging to the top coding model: **Claude Sonnet 5.5 (High/Medium)** to ensure maximum code quality, stability, and adherence to project patterns.
+
+### 8.3 Mandatory Quota Check & Fallback Cascade
+**Agents must always verify quota availability before delegating tasks to specialized models:**
+1. **Pre-flight Quota Check:** Verify the target model's remaining quota prior to launching workers or subagents.
+2. **Quota Fallback Hierarchy:**
+   - **For Analysis & Planning:**
+     - 1st Priority: `Claude Opus 5.5 (High)`
+     - 2nd Priority: `Gemini 4 Argon (High)`
+     - 3rd Priority: Next available high-reasoning model with active quota (e.g., `Gemini 4 Neon High`).
+   - **For Coding & Implementation:**
+     - 1st Priority: `Claude Sonnet 5.5 (High/Medium)`
+     - 2nd Priority: `Gemini 4 Neon (High)` or `Gemini 4 Hydrogen (High)`
+     - 3rd Priority: Next available coding-capable model with active quota.
+3. **Emergency Fallback:**
+   - If quotas across all specialized models are exhausted, immediately fall back to **`Gemini 3.8 Flash (Medium)`** to continue and complete the work without stalling or blocking the user.
+
