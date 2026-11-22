@@ -686,5 +686,6 @@
     <string name="messages_video_label">Video</string>
     <string name="messages_photo_label">Photo</string>
     <string name="messages_scroll_latest">Latest messages</string>
+    <string name="messages_play_video">Play video</string>
     <string name="messages_emojis">Emojis</string>
 </resources>

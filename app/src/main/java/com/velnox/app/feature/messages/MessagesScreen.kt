@@ -4,7 +4,10 @@ package com.velnox.app.feature.messages
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -495,7 +498,9 @@ fun ConversationScreen(
 
     // Media & Dialog states
     var pendingMediaUri by remember { mutableStateOf<Uri?>(null) }
-    var pendingMediaType by remember { mutableStateOf<String?>(null) } // "image"
+    var pendingMediaType by remember { mutableStateOf<String?>(null) } // "image" or "video"
+    var pendingThumbnailUri by remember { mutableStateOf<Uri?>(null) }
+    var showAttachmentSheet by remember { mutableStateOf(false) }
     var previewDialogMedia by remember { mutableStateOf<Pair<String, String>?>(null) } // (url, type)
 
     // Initial load + real-time live polling loop every 2.5s while conversation is open.
@@ -620,6 +625,7 @@ fun ConversationScreen(
         inputText = ""
         pendingMediaUri = null
         pendingMediaType = null
+        pendingThumbnailUri = null
 
         val updated = CustomerRemoteDataSource.sortMessagesChronologically(messages.toList() + optimistic)
         messages.clear()
@@ -638,12 +644,16 @@ fun ConversationScreen(
                         ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
 
                     if (bytes != null && bytes.isNotEmpty()) {
+                        val isVideo = mediaType == "video" || mediaUri.endsWith(".mp4", ignoreCase = true)
+                        val mimeType = if (isVideo) "video/mp4" else "image/webp"
+                        val filename = if (isVideo) "vid_${System.currentTimeMillis()}.mp4" else "chat_${System.currentTimeMillis()}.webp"
+
                         val uploadResult = MessagesState.uploadChatAttachment(
                             repository = repository,
                             conversationId = threadId,
                             bytes = bytes,
-                            mimeType = "image/webp",
-                            filename = "chat_${System.currentTimeMillis()}.webp",
+                            mimeType = mimeType,
+                            filename = filename,
                         )
                         when (uploadResult) {
                             is CustomerResult.Ok -> {
@@ -674,7 +684,7 @@ fun ConversationScreen(
                     text = text,
                     clientId = clientId,
                     mediaUrl = finalPublicUrl ?: mediaUri,
-                    mediaType = mediaType ?: if (finalAttachmentKey != null) "image" else null,
+                    mediaType = mediaType ?: if (finalAttachmentKey?.endsWith(".mp4", ignoreCase = true) == true) "video" else if (finalAttachmentKey != null) "image" else null,
                     attachmentKey = finalAttachmentKey,
                 )) {
                     is CustomerResult.Ok -> {
@@ -744,12 +754,16 @@ fun ConversationScreen(
                     val bytes = file.takeIf { it.exists() }?.readBytes()
                         ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     if (bytes != null && bytes.isNotEmpty()) {
+                        val isVideo = mediaType == "video" || mediaUriStr.endsWith(".mp4", ignoreCase = true)
+                        val mimeType = if (isVideo) "video/mp4" else "image/webp"
+                        val filename = if (isVideo) "vid_${System.currentTimeMillis()}.mp4" else "chat_${System.currentTimeMillis()}.webp"
+
                         val uploadResult = MessagesState.uploadChatAttachment(
                             repository = repository,
                             conversationId = threadId,
                             bytes = bytes,
-                            mimeType = "image/webp",
-                            filename = "chat_${System.currentTimeMillis()}.webp",
+                            mimeType = mimeType,
+                            filename = filename,
                         )
                         when (uploadResult) {
                             is CustomerResult.Ok -> {
@@ -780,7 +794,7 @@ fun ConversationScreen(
                     text = text,
                     clientId = clientId,
                     mediaUrl = finalPublicUrl ?: mediaUriStr,
-                    mediaType = mediaType ?: if (finalAttachmentKey != null) "image" else null,
+                    mediaType = mediaType ?: if (finalAttachmentKey?.endsWith(".mp4", ignoreCase = true) == true) "video" else if (finalAttachmentKey != null) "image" else null,
                     attachmentKey = finalAttachmentKey,
                 )) {
                     is CustomerResult.Ok -> {
@@ -1093,18 +1107,32 @@ fun ConversationScreen(
                                         mediaUrl = msg.mediaUrl,
                                         mediaType = msg.mediaType,
                                         onMediaClick = { url, type ->
-                                            if (type == "video") {
+                                            if (type == "video" || url.endsWith(".mp4", ignoreCase = true)) {
                                                 try {
+                                                    val videoUri = if (url.startsWith("file://")) {
+                                                        val file = File(Uri.parse(url).path ?: "")
+                                                        try {
+                                                            androidx.core.content.FileProvider.getUriForFile(
+                                                                context,
+                                                                "${context.packageName}.fileprovider",
+                                                                file,
+                                                            )
+                                                        } catch (_: Exception) {
+                                                            Uri.parse(url)
+                                                        }
+                                                    } else {
+                                                        Uri.parse(url)
+                                                    }
                                                     val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                        setDataAndType(Uri.parse(url), "video/*")
+                                                        setDataAndType(videoUri, "video/*")
                                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                     }
-                                                    context.startActivity(intent)
+                                                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.messages_play_video)))
                                                 } catch (_: Exception) {
-                                                    previewDialogMedia = Pair(url, type)
+                                                    previewDialogMedia = Pair(url, "video")
                                                 }
                                             } else {
-                                                previewDialogMedia = Pair(url, type)
+                                                previewDialogMedia = Pair(url, "image")
                                             }
                                         },
                                     )
@@ -1195,12 +1223,30 @@ fun ConversationScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             if (pendingMediaType == "video") {
-                                Icon(
-                                    imageVector = VelnoxIcons.Video,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(22.dp),
-                                )
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (pendingThumbnailUri != null) {
+                                        AsyncImage(
+                                            model = pendingThumbnailUri,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Black.copy(alpha = 0.35f)),
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = VelnoxIcons.Video,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
                             } else {
                                 AsyncImage(
                                     model = pendingMediaUri,
@@ -1231,6 +1277,7 @@ fun ConversationScreen(
                             onClick = {
                                 pendingMediaUri = null
                                 pendingMediaType = null
+                                pendingThumbnailUri = null
                             },
                             modifier = Modifier.size(30.dp),
                         ) {
@@ -1252,7 +1299,7 @@ fun ConversationScreen(
                     .padding(horizontal = PageGutter, vertical = 8.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                // Attach Photo Button (+)
+                // Attach Media Button (+)
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -1260,38 +1307,13 @@ fun ConversationScreen(
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .border(1.dp, MaterialTheme.colorScheme.outline, Circle)
                         .velnoxClickable(role = Role.Button) {
-                            onPickImage?.invoke { uri ->
-                                if (uri != null) {
-                                    scope.launch(Dispatchers.IO) {
-                                        val optimized = ImageOptimizer.optimize(
-                                            context,
-                                            uri,
-                                            maxWidth = 1280,
-                                            maxHeight = 1280,
-                                            quality = 85,
-                                        )
-                                        val dir = File(context.filesDir, "chat_media").apply { mkdirs() }
-                                        val file = File(dir, "img_${System.currentTimeMillis()}.webp")
-                                        if (optimized != null) {
-                                            file.writeBytes(optimized.bytes)
-                                        } else {
-                                            context.contentResolver.openInputStream(uri)?.use { stream ->
-                                                file.outputStream().use { stream.copyTo(it) }
-                                            }
-                                        }
-                                        withContext(Dispatchers.Main) {
-                                            pendingMediaUri = Uri.fromFile(file)
-                                            pendingMediaType = "image"
-                                        }
-                                    }
-                                }
-                            }
+                            showAttachmentSheet = true
                         },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = VelnoxIcons.Plus,
-                        contentDescription = stringResource(R.string.messages_attach_photo),
+                        contentDescription = stringResource(R.string.messages_attach_media),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
@@ -1375,6 +1397,180 @@ fun ConversationScreen(
                         modifier = Modifier.size(18.dp),
                     )
                 }
+            }
+        }
+    }
+
+    // Modal Bottom Sheet for Attaching Photos or Videos
+    if (showAttachmentSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAttachmentSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            scrimColor = Color.Black.copy(alpha = 0.5f),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .navigationBarsPadding(),
+            ) {
+                Text(
+                    text = stringResource(R.string.messages_attach_media),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    // Send Photo Option
+                    Surface(
+                        shape = SquircleSm,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .velnoxClickable(role = Role.Button) {
+                                showAttachmentSheet = false
+                                onPickImage?.invoke { uri ->
+                                    if (uri != null) {
+                                        scope.launch(Dispatchers.IO) {
+                                            val optimized = ImageOptimizer.optimize(
+                                                context,
+                                                uri,
+                                                maxWidth = 1280,
+                                                maxHeight = 1280,
+                                                quality = 85,
+                                            )
+                                            val dir = File(context.filesDir, "chat_media").apply { mkdirs() }
+                                            val file = File(dir, "img_${System.currentTimeMillis()}.webp")
+                                            if (optimized != null) {
+                                                file.writeBytes(optimized.bytes)
+                                            } else {
+                                                context.contentResolver.openInputStream(uri)?.use { stream ->
+                                                    file.outputStream().use { stream.copyTo(it) }
+                                                }
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                pendingMediaUri = Uri.fromFile(file)
+                                                pendingMediaType = "image"
+                                                pendingThumbnailUri = null
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(16.dp),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(Circle)
+                                    .background(VelnoxBrand.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = VelnoxIcons.Image,
+                                    contentDescription = null,
+                                    tint = VelnoxBrand,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                text = stringResource(R.string.messages_attach_photo),
+                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+
+                    // Send Video Option
+                    Surface(
+                        shape = SquircleSm,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .velnoxClickable(role = Role.Button) {
+                                showAttachmentSheet = false
+                                onPickVideo?.invoke { uri ->
+                                    if (uri != null) {
+                                        scope.launch(Dispatchers.IO) {
+                                            val dir = File(context.filesDir, "chat_media").apply { mkdirs() }
+                                            val videoFile = File(dir, "vid_${System.currentTimeMillis()}.mp4")
+                                            context.contentResolver.openInputStream(uri)?.use { stream ->
+                                                videoFile.outputStream().use { stream.copyTo(it) }
+                                            }
+                                            val thumbFile = File(dir, "thumb_${System.currentTimeMillis()}.webp")
+                                            val thumbBitmap = try {
+                                                val retriever = MediaMetadataRetriever()
+                                                retriever.setDataSource(videoFile.absolutePath)
+                                                val bmp = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                                    ?: retriever.frameAtTime
+                                                retriever.release()
+                                                bmp
+                                            } catch (_: Exception) {
+                                                null
+                                            }
+                                            if (thumbBitmap != null) {
+                                                try {
+                                                    thumbFile.outputStream().use { out ->
+                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                                            thumbBitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 80, out)
+                                                        } else {
+                                                            @Suppress("DEPRECATION")
+                                                            thumbBitmap.compress(Bitmap.CompressFormat.WEBP, 80, out)
+                                                        }
+                                                    }
+                                                } catch (_: Exception) {
+                                                    // non-fatal
+                                                }
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                pendingMediaUri = Uri.fromFile(videoFile)
+                                                pendingMediaType = "video"
+                                                pendingThumbnailUri = if (thumbFile.exists()) Uri.fromFile(thumbFile) else null
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(16.dp),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(Circle)
+                                    .background(Color(0xFF3B82F6).copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = VelnoxIcons.Video,
+                                    contentDescription = null,
+                                    tint = Color(0xFF3B82F6),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                text = stringResource(R.string.messages_attach_video),
+                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }

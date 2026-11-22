@@ -686,5 +686,6 @@
     <string name="messages_video_label">ဗီဒီယို</string>
     <string name="messages_photo_label">ဓာတ်ပုံ</string>
     <string name="messages_scroll_latest">နောက်ဆုံး မက်ဆေ့ခ်ျများ</string>
+    <string name="messages_play_video">ဗီဒီယိုဖွင့်ပါ</string>
     <string name="messages_emojis">အီမိုဂျီ</string>
 </resources>

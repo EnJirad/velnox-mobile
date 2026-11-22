@@ -686,5 +686,6 @@
     <string name="messages_video_label">วิดีโอ</string>
     <string name="messages_photo_label">รูปภาพ</string>
     <string name="messages_scroll_latest">ข้อความล่าสุด</string>
+    <string name="messages_play_video">เล่นวิดีโอ</string>
     <string name="messages_emojis">อีโมจิ</string>
 </resources>
