@@ -11,6 +11,7 @@ import com.velnox.app.core.customer.CustomerRemoteDataSource
 import com.velnox.app.core.customer.CustomerRepository
 import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.customer.UploadChatAttachmentResult
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -95,6 +96,18 @@ object MessagesState {
     ): CustomerResult<List<CustomerMessage>> =
         repository.call { api, token -> api.messages(token, conversationId) }
 
+    /** Upload a chat attachment image via Cloudflare R2 presigned intent. */
+    suspend fun uploadChatAttachment(
+        repository: CustomerRepository,
+        conversationId: String,
+        bytes: ByteArray,
+        mimeType: String = "image/webp",
+        filename: String = "chat.webp",
+    ): CustomerResult<UploadChatAttachmentResult> =
+        repository.call { api, token ->
+            api.uploadChatAttachment(token, conversationId, bytes, mimeType, filename)
+        }
+
     /** Send a message via `POST /api/customer/conversations/:id/messages` and update preview. */
     suspend fun sendMessage(
         repository: CustomerRepository,
@@ -103,9 +116,10 @@ object MessagesState {
         clientId: String? = null,
         mediaUrl: String? = null,
         mediaType: String? = null,
+        attachmentKey: String? = null,
     ): CustomerResult<CustomerMessage> {
         val result = repository.call { api, token ->
-            api.sendMessage(token, conversationId, text, clientId, mediaUrl, mediaType)
+            api.sendMessage(token, conversationId, text, clientId, mediaUrl, mediaType, attachmentKey)
         }
         if (result is CustomerResult.Ok) {
             val idx = conversations.indexOfFirst { it.id == conversationId }
@@ -113,7 +127,7 @@ object MessagesState {
                 val previewText = when {
                     result.value.text.isNotBlank() && result.value.text != "[รูปภาพ]" && result.value.text != "[วิดีโอ]" -> result.value.text
                     mediaType == "video" -> "[วิดีโอ]"
-                    mediaUrl != null -> "[รูปภาพ]"
+                    mediaUrl != null || attachmentKey != null -> "[รูปภาพ]"
                     else -> result.value.text
                 }
                 val updated = conversations[idx].copy(
@@ -172,7 +186,12 @@ object MessagesState {
             val notInRemote = msg.id !in remoteIds && (msg.clientId == null || msg.clientId !in remoteClientIds)
             if (!notInRemote) return@filter false
             if (msg.isPending || msg.isFailed) {
-                msg.text.trim() !in remoteCustomerTexts
+                if (msg.clientId != null && msg.clientId in remoteClientIds) return@filter false
+                if (msg.text.trim().isNotEmpty()) {
+                    msg.text.trim() !in remoteCustomerTexts
+                } else {
+                    true
+                }
             } else {
                 // Keep recently confirmed local messages for 15s to bridge any replication or poll latency
                 msg.fromCustomer && (msg.createdAt == null || (now - msg.createdAt) < 15_000L)

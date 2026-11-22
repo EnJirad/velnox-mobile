@@ -63,6 +63,7 @@ class MessagesStateTest {
             clientId: String?,
             mediaUrl: String?,
             mediaType: String?,
+            attachmentKey: String?,
         ): CustomerResult<CustomerMessage> {
             failNext?.let { failNext = null; return CustomerResult.Failed(it, "Rate limited") }
             val message = CustomerMessage(

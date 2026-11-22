@@ -222,6 +222,11 @@ data class CustomerMessage(
     val mediaType: String? = null,
 )
 
+data class UploadChatAttachmentResult(
+    val objectKey: String,
+    val publicUrl: String? = null,
+)
+
 sealed interface CustomerResult<out T> {
     data class Ok<T>(val value: T) : CustomerResult<T>
     data class Failed(val error: CustomerError, val message: String? = null) : CustomerResult<Nothing>

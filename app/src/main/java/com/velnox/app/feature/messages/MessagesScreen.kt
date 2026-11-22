@@ -100,6 +100,7 @@ import com.velnox.app.core.customer.CustomerRemoteDataSource
 import com.velnox.app.core.customer.CustomerRepository
 import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.LoadStatus
+import com.velnox.app.core.customer.UploadChatAttachmentResult
 import com.velnox.app.core.customer.userMessage
 import com.velnox.app.core.util.ImageOptimizer
 import com.velnox.app.ui.components.BrandBadge
@@ -492,11 +493,9 @@ fun ConversationScreen(
     var sendError by remember { mutableStateOf<String?>(null) }
     var lastScrolledCount by remember(threadId) { mutableIntStateOf(0) }
 
-    // Media & Emoji & Dialog states
+    // Media & Dialog states
     var pendingMediaUri by remember { mutableStateOf<Uri?>(null) }
-    var pendingMediaType by remember { mutableStateOf<String?>(null) } // "image" or "video"
-    var showEmojiDrawer by remember { mutableStateOf(false) }
-    var showAttachmentSheet by remember { mutableStateOf(false) }
+    var pendingMediaType by remember { mutableStateOf<String?>(null) } // "image"
     var previewDialogMedia by remember { mutableStateOf<Pair<String, String>?>(null) } // (url, type)
 
     // Initial load + real-time live polling loop every 2.5s while conversation is open.
@@ -621,7 +620,6 @@ fun ConversationScreen(
         inputText = ""
         pendingMediaUri = null
         pendingMediaType = null
-        showEmojiDrawer = false
 
         val updated = CustomerRemoteDataSource.sortMessagesChronologically(messages.toList() + optimistic)
         messages.clear()
@@ -631,7 +629,54 @@ fun ConversationScreen(
         // Asynchronous non-blocking message dispatcher
         scope.launch {
             try {
-                when (val res = MessagesState.sendMessage(repository, threadId, text, clientId, mediaUri, mediaType)) {
+                var finalAttachmentKey: String? = null
+                var finalPublicUrl: String? = null
+                if (mediaUri != null) {
+                    val uri = Uri.parse(mediaUri)
+                    val file = if (uri.scheme == "file") File(uri.path ?: "") else null
+                    val bytes = file?.takeIf { it.exists() }?.readBytes()
+                        ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+
+                    if (bytes != null && bytes.isNotEmpty()) {
+                        val uploadResult = MessagesState.uploadChatAttachment(
+                            repository = repository,
+                            conversationId = threadId,
+                            bytes = bytes,
+                            mimeType = "image/webp",
+                            filename = "chat_${System.currentTimeMillis()}.webp",
+                        )
+                        when (uploadResult) {
+                            is CustomerResult.Ok -> {
+                                finalAttachmentKey = uploadResult.value.objectKey
+                                finalPublicUrl = uploadResult.value.publicUrl
+                            }
+                            is CustomerResult.Failed -> {
+                                val idx = messages.indexOfFirst {
+                                    it.id == pendingId || (it.clientId != null && it.clientId == clientId)
+                                }
+                                if (idx >= 0) {
+                                    messages[idx] = messages[idx].copy(
+                                        isPending = false,
+                                        isFailed = true,
+                                        failureReason = uploadResult.userMessage(context),
+                                    )
+                                    MessagesState.setCachedMessages(threadId, messages.toList(), context)
+                                }
+                                return@launch
+                            }
+                        }
+                    }
+                }
+
+                when (val res = MessagesState.sendMessage(
+                    repository = repository,
+                    conversationId = threadId,
+                    text = text,
+                    clientId = clientId,
+                    mediaUrl = finalPublicUrl ?: mediaUri,
+                    mediaType = mediaType ?: if (finalAttachmentKey != null) "image" else null,
+                    attachmentKey = finalAttachmentKey,
+                )) {
                     is CustomerResult.Ok -> {
                         val remaining = messages.filterNot {
                             it.id == pendingId || (it.clientId != null && it.clientId == clientId) || it.id == res.value.id
@@ -677,7 +722,7 @@ fun ConversationScreen(
         if (repository == null) return
         val clientId = msg.clientId ?: UUID.randomUUID().toString()
         val text = msg.text
-        val mediaUri = msg.mediaUrl
+        val mediaUriStr = msg.mediaUrl
         val mediaType = msg.mediaType
         val idx = messages.indexOfFirst { it.id == msg.id }
         if (idx >= 0) {
@@ -691,7 +736,53 @@ fun ConversationScreen(
         }
         scope.launch {
             try {
-                when (val res = MessagesState.sendMessage(repository, threadId, text, clientId, mediaUri, mediaType)) {
+                var finalAttachmentKey: String? = null
+                var finalPublicUrl: String? = mediaUriStr
+                if (mediaUriStr != null && mediaUriStr.startsWith("file://")) {
+                    val uri = Uri.parse(mediaUriStr)
+                    val file = File(uri.path ?: "")
+                    val bytes = file.takeIf { it.exists() }?.readBytes()
+                        ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    if (bytes != null && bytes.isNotEmpty()) {
+                        val uploadResult = MessagesState.uploadChatAttachment(
+                            repository = repository,
+                            conversationId = threadId,
+                            bytes = bytes,
+                            mimeType = "image/webp",
+                            filename = "chat_${System.currentTimeMillis()}.webp",
+                        )
+                        when (uploadResult) {
+                            is CustomerResult.Ok -> {
+                                finalAttachmentKey = uploadResult.value.objectKey
+                                finalPublicUrl = uploadResult.value.publicUrl
+                            }
+                            is CustomerResult.Failed -> {
+                                val currIdx = messages.indexOfFirst {
+                                    it.id == msg.id || (it.clientId != null && it.clientId == clientId)
+                                }
+                                if (currIdx >= 0) {
+                                    messages[currIdx] = messages[currIdx].copy(
+                                        isPending = false,
+                                        isFailed = true,
+                                        failureReason = uploadResult.userMessage(context),
+                                    )
+                                    MessagesState.setCachedMessages(threadId, messages.toList(), context)
+                                }
+                                return@launch
+                            }
+                        }
+                    }
+                }
+
+                when (val res = MessagesState.sendMessage(
+                    repository = repository,
+                    conversationId = threadId,
+                    text = text,
+                    clientId = clientId,
+                    mediaUrl = finalPublicUrl ?: mediaUriStr,
+                    mediaType = mediaType ?: if (finalAttachmentKey != null) "image" else null,
+                    attachmentKey = finalAttachmentKey,
+                )) {
                     is CustomerResult.Ok -> {
                         val remaining = messages.filterNot {
                             it.id == msg.id || (it.clientId != null && it.clientId == clientId) || it.id == res.value.id
@@ -1161,7 +1252,7 @@ fun ConversationScreen(
                     .padding(horizontal = PageGutter, vertical = 8.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                // Attach Media Button (+)
+                // Attach Photo Button (+)
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -1169,13 +1260,38 @@ fun ConversationScreen(
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .border(1.dp, MaterialTheme.colorScheme.outline, Circle)
                         .velnoxClickable(role = Role.Button) {
-                            showAttachmentSheet = true
+                            onPickImage?.invoke { uri ->
+                                if (uri != null) {
+                                    scope.launch(Dispatchers.IO) {
+                                        val optimized = ImageOptimizer.optimize(
+                                            context,
+                                            uri,
+                                            maxWidth = 1280,
+                                            maxHeight = 1280,
+                                            quality = 85,
+                                        )
+                                        val dir = File(context.filesDir, "chat_media").apply { mkdirs() }
+                                        val file = File(dir, "img_${System.currentTimeMillis()}.webp")
+                                        if (optimized != null) {
+                                            file.writeBytes(optimized.bytes)
+                                        } else {
+                                            context.contentResolver.openInputStream(uri)?.use { stream ->
+                                                file.outputStream().use { stream.copyTo(it) }
+                                            }
+                                        }
+                                        withContext(Dispatchers.Main) {
+                                            pendingMediaUri = Uri.fromFile(file)
+                                            pendingMediaType = "image"
+                                        }
+                                    }
+                                }
+                            }
                         },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = VelnoxIcons.Plus,
-                        contentDescription = stringResource(R.string.messages_attach_media),
+                        contentDescription = stringResource(R.string.messages_attach_photo),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
@@ -1183,7 +1299,7 @@ fun ConversationScreen(
 
                 Spacer(Modifier.width(8.dp))
 
-                // Text Field Container with inner Emoji toggle button
+                // Text Field Container
                 val inputBorder = if (inputFocused) VelnoxBrand else MaterialTheme.colorScheme.outline
                 Row(
                     modifier = Modifier
@@ -1192,7 +1308,7 @@ fun ConversationScreen(
                         .clip(RoundedCornerShape(21.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .border(1.dp, inputBorder, RoundedCornerShape(21.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     BasicTextField(
@@ -1209,7 +1325,7 @@ fun ConversationScreen(
                         interactionSource = inputInteractionSource,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { submitMessage() }),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         decorationBox = { innerTextField ->
                             Box(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1226,18 +1342,6 @@ fun ConversationScreen(
                             }
                         },
                     )
-
-                    IconButton(
-                        onClick = { showEmojiDrawer = !showEmojiDrawer },
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            imageVector = VelnoxIcons.Smile,
-                            contentDescription = stringResource(R.string.messages_emojis),
-                            tint = if (showEmojiDrawer) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
                 }
 
                 Spacer(Modifier.width(8.dp))
@@ -1271,189 +1375,6 @@ fun ConversationScreen(
                         modifier = Modifier.size(18.dp),
                     )
                 }
-            }
-
-            // Expanded Emoji Drawer (if toggled open)
-            if (showEmojiDrawer) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = PageGutter, vertical = 8.dp),
-                ) {
-                    val categorizedEmojis = remember {
-                        listOf(
-                            "❤️", "👍", "😂", "🔥", "🙏", "👏", "🥰", "😍", "😊", "🎉", "✨", "💯",
-                            "🛍️", "🛒", "📦", "🚚", "🏷️", "💳", "💵", "⭐", "🎁", "🏬", "🤝", "⚡",
-                            "😃", "😄", "😆", "😉", "😎", "🤔", "👌", "✌️", "🙌", "💬", "❤️‍🔥", "🌟",
-                        )
-                    }
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        items(categorizedEmojis) { emoji ->
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(Circle)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .velnoxClickable(role = Role.Button) {
-                                        inputText += emoji
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(text = emoji, style = MaterialTheme.typography.titleMedium)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Modal Bottom Sheet for Attaching Photos or Videos
-    if (showAttachmentSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showAttachmentSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            scrimColor = Color.Black.copy(alpha = 0.5f),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .navigationBarsPadding(),
-            ) {
-                Text(
-                    text = stringResource(R.string.messages_attach_media),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    // Send Photo Option
-                    Surface(
-                        shape = SquircleSm,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier
-                            .weight(1f)
-                            .velnoxClickable(role = Role.Button) {
-                                showAttachmentSheet = false
-                                onPickImage?.invoke { uri ->
-                                    if (uri != null) {
-                                        scope.launch(Dispatchers.IO) {
-                                            val optimized = ImageOptimizer.optimize(
-                                                context,
-                                                uri,
-                                                maxWidth = 1280,
-                                                maxHeight = 1280,
-                                                quality = 82,
-                                            )
-                                            val dir = File(context.filesDir, "chat_media").apply { mkdirs() }
-                                            val file = File(dir, "img_${System.currentTimeMillis()}.webp")
-                                            if (optimized != null) {
-                                                file.writeBytes(optimized.bytes)
-                                            } else {
-                                                context.contentResolver.openInputStream(uri)?.use { stream ->
-                                                    file.outputStream().use { stream.copyTo(it) }
-                                                }
-                                            }
-                                            withContext(Dispatchers.Main) {
-                                                pendingMediaUri = Uri.fromFile(file)
-                                                pendingMediaType = "image"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(16.dp),
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(Circle)
-                                    .background(VelnoxBrand.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = VelnoxIcons.Image,
-                                    contentDescription = null,
-                                    tint = VelnoxBrand,
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                text = stringResource(R.string.messages_attach_photo),
-                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-
-                    // Send Video Option
-                    Surface(
-                        shape = SquircleSm,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier
-                            .weight(1f)
-                            .velnoxClickable(role = Role.Button) {
-                                showAttachmentSheet = false
-                                onPickVideo?.invoke { uri ->
-                                    if (uri != null) {
-                                        scope.launch(Dispatchers.IO) {
-                                            val dir = File(context.filesDir, "chat_media").apply { mkdirs() }
-                                            val file = File(dir, "vid_${System.currentTimeMillis()}.mp4")
-                                            context.contentResolver.openInputStream(uri)?.use { stream ->
-                                                file.outputStream().use { stream.copyTo(it) }
-                                            }
-                                            withContext(Dispatchers.Main) {
-                                                pendingMediaUri = Uri.fromFile(file)
-                                                pendingMediaType = "video"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(16.dp),
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(Circle)
-                                    .background(Color(0xFF3B82F6).copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = VelnoxIcons.Video,
-                                    contentDescription = null,
-                                    tint = Color(0xFF3B82F6),
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                text = stringResource(R.string.messages_attach_video),
-                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
             }
         }
     }

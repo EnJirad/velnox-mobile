@@ -379,11 +379,12 @@ class CustomerRemoteDataSource(
         clientId: String?,
         mediaUrl: String?,
         mediaType: String?,
+        attachmentKey: String?,
     ): CustomerResult<CustomerMessage> {
         val effectiveText = text.ifBlank {
             when (mediaType) {
                 "video" -> "[วิดีโอ]"
-                else -> if (mediaUrl != null) "[รูปภาพ]" else ""
+                else -> if (mediaUrl != null || attachmentKey != null) "[รูปภาพ]" else ""
             }
         }
         val payload = JSONObject()
@@ -394,6 +395,10 @@ class CustomerRemoteDataSource(
         clientId?.takeIf { it.isNotBlank() }?.let {
             payload.put("clientId", it)
             payload.put("client_id", it)
+        }
+        attachmentKey?.takeIf { it.isNotBlank() }?.let { key ->
+            payload.put("attachmentKey", key)
+            payload.put("attachment_key", key)
         }
         mediaUrl?.takeIf { it.isNotBlank() }?.let { url ->
             payload.put("mediaUrl", url)
@@ -426,12 +431,85 @@ class CustomerRemoteDataSource(
                 if (res.clientId == null && effectiveClientId != null) {
                     res = res.copy(clientId = effectiveClientId)
                 }
-                if (res.mediaUrl == null && mediaUrl != null) {
-                    res = res.copy(mediaUrl = mediaUrl, mediaType = mediaType)
+                if (res.mediaUrl == null && (mediaUrl != null || attachmentKey != null)) {
+                    res = res.copy(
+                        mediaUrl = mediaUrl ?: normalizeMediaUrl(attachmentKey),
+                        mediaType = mediaType ?: "image",
+                    )
                 }
                 res
             }
         }
+    }
+
+    override suspend fun uploadChatAttachment(
+        token: String,
+        conversationId: String,
+        bytes: ByteArray,
+        mimeType: String,
+        filename: String,
+    ): CustomerResult<UploadChatAttachmentResult> = withContext(Dispatchers.IO) {
+        val presignBody = JSONObject()
+            .put("filename", filename)
+            .put("contentType", mimeType)
+            .put("purpose", "chat")
+            .put("conversationId", conversationId)
+
+        val presignRaw = send(token, "POST", "/api/upload/presign", presignBody)
+        if (presignRaw !is Raw.Success) {
+            val failure = presignRaw as? Raw.Failure
+            return@withContext CustomerResult.Failed(
+                failure?.error ?: CustomerError.Server,
+                failure?.message ?: "Upload presign failed",
+            )
+        }
+
+        val presignData = (presignRaw.data as? JSONObject)?.optJSONObject("data")
+            ?: presignRaw.data as? JSONObject
+        val uploadUrl = presignData?.optString("uploadUrl")
+        val objectKey = presignData?.optString("objectKey")
+        val publicUrl = presignData?.optString("publicUrl")
+
+        if (uploadUrl.isNullOrBlank() || objectKey.isNullOrBlank()) {
+            return@withContext CustomerResult.Failed(
+                CustomerError.Server,
+                "Invalid presigned upload response",
+            )
+        }
+
+        val mediaType = try {
+            mimeType.toMediaType()
+        } catch (_: Exception) {
+            "image/webp".toMediaType()
+        }
+
+        val putRequest = Request.Builder()
+            .url(uploadUrl)
+            .header("Content-Type", mimeType)
+            .put(bytes.toRequestBody(mediaType))
+            .build()
+
+        val isPutSuccess = try {
+            client.newCall(putRequest).execute().use { response ->
+                response.isSuccessful
+            }
+        } catch (_: Exception) {
+            false
+        }
+
+        if (!isPutSuccess) {
+            return@withContext CustomerResult.Failed(
+                CustomerError.Network,
+                "Failed to upload media to storage",
+            )
+        }
+
+        CustomerResult.Ok(
+            UploadChatAttachmentResult(
+                objectKey = objectKey,
+                publicUrl = publicUrl?.takeIf { it.isNotBlank() } ?: normalizeMediaUrl(objectKey),
+            )
+        )
     }
 
     override suspend fun markConversationRead(
@@ -786,15 +864,16 @@ class CustomerRemoteDataSource(
     private fun parseMessage(obj: JSONObject, knownFromCustomer: Boolean): CustomerMessage? {
         val id = obj.str("id", "messageId", "_id") ?: return null
         val rawMediaUrl = obj.str(
+            "attachmentUrl", "attachment_url",
+            "attachmentKey", "attachment_key",
             "mediaUrl", "media_url",
             "imageUrl", "image_url",
             "fileUrl", "file_url",
-            "attachmentUrl", "attachment_url",
             "attachment",
         ) ?: imageOf(obj) ?: obj.optJSONArray("attachments")?.let { arr ->
             if (arr.length() > 0) {
                 when (val first = arr.opt(0)) {
-                    is JSONObject -> first.str("url", "mediaUrl", "media_url", "imageUrl", "image_url")
+                    is JSONObject -> first.str("url", "mediaUrl", "media_url", "imageUrl", "image_url", "attachmentUrl", "attachment_url")
                     is String -> first.trim().takeIf { it.isNotEmpty() }
                     else -> null
                 }

@@ -125,7 +125,20 @@ interface CustomerApi {
         clientId: String? = null,
         mediaUrl: String? = null,
         mediaType: String? = null,
+        attachmentKey: String? = null,
     ): CustomerResult<CustomerMessage>
+
+    /**
+     * Uploads an image attachment for a chat conversation to Cloudflare R2 via `/api/upload/presign`.
+     * Returns the server-minted object key and optional public URL.
+     */
+    suspend fun uploadChatAttachment(
+        token: String,
+        conversationId: String,
+        bytes: ByteArray,
+        mimeType: String = "image/webp",
+        filename: String = "chat.webp",
+    ): CustomerResult<UploadChatAttachmentResult>
 
     /** `POST /api/customer/conversations/:id/read` */
     suspend fun markConversationRead(

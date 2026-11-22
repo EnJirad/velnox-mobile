@@ -47,6 +47,14 @@ open class FakeCustomerApi : CustomerApi {
         clientId: String?,
         mediaUrl: String?,
         mediaType: String?,
+        attachmentKey: String?,
     ): CustomerResult<CustomerMessage> = unexpected()
+    override suspend fun uploadChatAttachment(
+        token: String,
+        conversationId: String,
+        bytes: ByteArray,
+        mimeType: String,
+        filename: String,
+    ): CustomerResult<UploadChatAttachmentResult> = unexpected()
     override suspend fun markConversationRead(token: String, conversationId: String): CustomerResult<Unit> = unexpected()
 }
