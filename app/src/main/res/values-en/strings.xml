@@ -678,4 +678,13 @@
     <string name="profile_image_type_error">Invalid image format or corrupted file</string>
     <string name="profile_uploading_photo">Optimizing and uploading image...</string>
     <string name="messages_send_failed">Failed to send. Tap to retry</string>
+    <string name="messages_attach_media">Attach photo or video</string>
+    <string name="messages_attach_photo">Send photo</string>
+    <string name="messages_attach_video">Send video</string>
+    <string name="messages_selected_photo">Selected photo</string>
+    <string name="messages_selected_video">Selected video</string>
+    <string name="messages_video_label">Video</string>
+    <string name="messages_photo_label">Photo</string>
+    <string name="messages_scroll_latest">Latest messages</string>
+    <string name="messages_emojis">Emojis</string>
 </resources>

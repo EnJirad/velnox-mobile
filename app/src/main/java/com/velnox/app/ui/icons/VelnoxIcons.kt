@@ -573,4 +573,44 @@ object VelnoxIcons {
             ),
         )
     }
+
+    val Smile: ImageVector by lazy {
+        stroke(
+            "lucide-smile",
+            listOf(
+                "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z",
+                "M8 14s1.5 2 4 2 4-2 4-2",
+                "M9 9h.01",
+                "M15 9h.01",
+            ),
+        )
+    }
+
+    val Video: ImageVector by lazy {
+        stroke(
+            "lucide-video",
+            listOf(
+                "M16 16l4 2V6l-4 2z",
+                "M2 6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z",
+            ),
+        )
+    }
+
+    val Play: ImageVector by lazy {
+        filled(
+            "lucide-play",
+            listOf(
+                "M6 4l14 8-14 8z",
+            ),
+        )
+    }
+
+    val Paperclip: ImageVector by lazy {
+        stroke(
+            "lucide-paperclip",
+            listOf(
+                "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48",
+            ),
+        )
+    }
 }

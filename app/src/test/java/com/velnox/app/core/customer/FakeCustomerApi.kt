@@ -40,6 +40,13 @@ open class FakeCustomerApi : CustomerApi {
     override suspend fun startConversation(token: String, shopId: String, productId: String?): CustomerResult<CustomerConversation> = unexpected()
     override suspend fun startSupportConversation(token: String): CustomerResult<CustomerConversation> = unexpected()
     override suspend fun messages(token: String, conversationId: String): CustomerResult<List<CustomerMessage>> = unexpected()
-    override suspend fun sendMessage(token: String, conversationId: String, text: String, clientId: String?): CustomerResult<CustomerMessage> = unexpected()
+    override suspend fun sendMessage(
+        token: String,
+        conversationId: String,
+        text: String,
+        clientId: String?,
+        mediaUrl: String?,
+        mediaType: String?,
+    ): CustomerResult<CustomerMessage> = unexpected()
     override suspend fun markConversationRead(token: String, conversationId: String): CustomerResult<Unit> = unexpected()
 }

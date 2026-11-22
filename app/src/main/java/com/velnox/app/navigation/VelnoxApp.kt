@@ -132,6 +132,7 @@ private fun overlayDestination(key: String): String = OVERLAY_DESTINATION + key
 @Composable
 fun VelnoxApp(
     onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
+    onPickVideo: (((Uri?) -> Unit) -> Unit)? = null,
 ) {
     VelnoxPreferencesProvider {
         val preferences = LocalPreferences.current.current
@@ -144,7 +145,10 @@ fun VelnoxApp(
             }
             VelnoxTheme(darkTheme = darkTheme) {
                 VelnoxSessionProvider {
-                    VelnoxNavHost(onPickImage = onPickImage)
+                    VelnoxNavHost(
+                        onPickImage = onPickImage,
+                        onPickVideo = onPickVideo,
+                    )
                 }
             }
         }
@@ -172,6 +176,7 @@ fun VelnoxApp(
 @Composable
 private fun VelnoxNavHost(
     onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
+    onPickVideo: (((Uri?) -> Unit) -> Unit)? = null,
 ) {
     val session = LocalSession.current
     val sessionState = session.state
@@ -842,6 +847,8 @@ private fun VelnoxNavHost(
                                         threadId = overlay.removePrefix("thread:"),
                                         onOpenProduct = ::openProduct,
                                         onBack = { overlayKey = "messages" },
+                                        onPickImage = onPickImage,
+                                        onPickVideo = onPickVideo,
                                     )
                                 } else {
                                     PlaceholderDestination(

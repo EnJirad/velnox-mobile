@@ -1,8 +1,15 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package com.velnox.app.feature.messages
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,14 +18,18 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +37,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -38,14 +50,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -65,15 +76,20 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.velnox.app.R
 import com.velnox.app.VelnoxApplication
@@ -85,6 +101,7 @@ import com.velnox.app.core.customer.CustomerRepository
 import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.LoadStatus
 import com.velnox.app.core.customer.userMessage
+import com.velnox.app.core.util.ImageOptimizer
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.IconActionButton
@@ -101,9 +118,12 @@ import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.TextXs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.ui.theme.VelnoxTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -426,6 +446,8 @@ fun ConversationScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenProduct: ((String) -> Unit)? = null,
+    onPickImage: (((Uri?) -> Unit) -> Unit)? = null,
+    onPickVideo: (((Uri?) -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val repository: CustomerRepository? = remember(context) {
@@ -469,6 +491,13 @@ fun ConversationScreen(
     var inputText by rememberSaveable { mutableStateOf("") }
     var sendError by remember { mutableStateOf<String?>(null) }
     var lastScrolledCount by remember(threadId) { mutableIntStateOf(0) }
+
+    // Media & Emoji & Dialog states
+    var pendingMediaUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingMediaType by remember { mutableStateOf<String?>(null) } // "image" or "video"
+    var showEmojiDrawer by remember { mutableStateOf(false) }
+    var showAttachmentSheet by remember { mutableStateOf(false) }
+    var previewDialogMedia by remember { mutableStateOf<Pair<String, String>?>(null) } // (url, type)
 
     // Initial load + real-time live polling loop every 2.5s while conversation is open.
     LaunchedEffect(threadId, repository, reloadTick) {
@@ -526,9 +555,27 @@ fun ConversationScreen(
     val inputInteractionSource = remember { MutableInteractionSource() }
     val inputFocused by inputInteractionSource.collectIsFocusedAsState()
 
-    // Smooth auto-scroll to latest message whenever new messages arrive, are sent, or input is focused.
+    val density = LocalDensity.current
+    val imeInsets = WindowInsets.ime
+    val imeBottomPx = imeInsets.getBottom(density)
+    val isImeVisible = WindowInsets.isImeVisible
+
+    // Instant push & auto-scroll in lockstep with software keyboard
+    LaunchedEffect(imeBottomPx, isImeVisible) {
+        if (isImeVisible && messages.isNotEmpty()) {
+            listState.scrollToItem(messages.lastIndex)
+        }
+    }
+
+    LaunchedEffect(inputFocused) {
+        if (inputFocused && messages.isNotEmpty()) {
+            listState.scrollToItem(messages.lastIndex)
+        }
+    }
+
+    // Scroll to latest when message size or last message changes
     LaunchedEffect(messages.size, messages.lastOrNull()?.id) {
-        if (messages.isNotEmpty() && messages.size != lastScrolledCount) {
+        if (messages.isNotEmpty()) {
             val wasInitial = lastScrolledCount == 0
             lastScrolledCount = messages.size
             if (wasInitial) {
@@ -539,16 +586,24 @@ fun ConversationScreen(
         }
     }
 
-    LaunchedEffect(inputFocused) {
-        if (inputFocused && messages.isNotEmpty()) {
-            delay(150)
-            listState.animateScrollToItem(messages.lastIndex)
+    val isAtBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val total = layoutInfo.totalItemsCount
+            if (total <= 1) true
+            else {
+                val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                lastVisible >= total - 2
+            }
         }
     }
 
     fun submitMessage() {
         val text = inputText.trim()
-        if (text.isEmpty() || repository == null) return
+        val mediaUri = pendingMediaUri?.toString()
+        val mediaType = pendingMediaType
+        if (text.isEmpty() && mediaUri == null) return
+        if (repository == null) return
         sendError = null
         val clientId = UUID.randomUUID().toString()
         val pendingId = "pending-$clientId"
@@ -559,9 +614,15 @@ fun ConversationScreen(
             createdAt = System.currentTimeMillis(),
             isPending = true,
             clientId = clientId,
+            mediaUrl = mediaUri,
+            mediaType = mediaType,
         )
         // Optimistically clear input immediately so the user can continue typing seamlessly without lockout
         inputText = ""
+        pendingMediaUri = null
+        pendingMediaType = null
+        showEmojiDrawer = false
+
         val updated = CustomerRemoteDataSource.sortMessagesChronologically(messages.toList() + optimistic)
         messages.clear()
         messages.addAll(updated)
@@ -570,7 +631,7 @@ fun ConversationScreen(
         // Asynchronous non-blocking message dispatcher
         scope.launch {
             try {
-                when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
+                when (val res = MessagesState.sendMessage(repository, threadId, text, clientId, mediaUri, mediaType)) {
                     is CustomerResult.Ok -> {
                         val remaining = messages.filterNot {
                             it.id == pendingId || (it.clientId != null && it.clientId == clientId) || it.id == res.value.id
@@ -616,6 +677,8 @@ fun ConversationScreen(
         if (repository == null) return
         val clientId = msg.clientId ?: UUID.randomUUID().toString()
         val text = msg.text
+        val mediaUri = msg.mediaUrl
+        val mediaType = msg.mediaType
         val idx = messages.indexOfFirst { it.id == msg.id }
         if (idx >= 0) {
             messages[idx] = messages[idx].copy(
@@ -628,7 +691,7 @@ fun ConversationScreen(
         }
         scope.launch {
             try {
-                when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
+                when (val res = MessagesState.sendMessage(repository, threadId, text, clientId, mediaUri, mediaType)) {
                     is CustomerResult.Ok -> {
                         val remaining = messages.filterNot {
                             it.id == msg.id || (it.clientId != null && it.clientId == clientId) || it.id == res.value.id
@@ -672,7 +735,8 @@ fun ConversationScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .imePadding(),
     ) {
         // Refined Header
         Column(
@@ -935,10 +999,63 @@ fun ConversationScreen(
                                         isFailed = msg.isFailed,
                                         onRetry = if (msg.isFailed) { { retryMessage(msg) } } else null,
                                         sellerInitials = initials,
+                                        mediaUrl = msg.mediaUrl,
+                                        mediaType = msg.mediaType,
+                                        onMediaClick = { url, type ->
+                                            if (type == "video") {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                        setDataAndType(Uri.parse(url), "video/*")
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(intent)
+                                                } catch (_: Exception) {
+                                                    previewDialogMedia = Pair(url, type)
+                                                }
+                                            } else {
+                                                previewDialogMedia = Pair(url, type)
+                                            }
+                                        },
                                     )
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Floating "Scroll to Bottom" button if !isAtBottom
+            if (!isAtBottom && messages.isNotEmpty()) {
+                Surface(
+                    shape = Circle,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                    border = BorderStroke(1.dp, VelnoxBrand.copy(alpha = 0.5f)),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = PageGutter, bottom = 12.dp)
+                        .velnoxClickable(role = Role.Button) {
+                            scope.launch {
+                                listState.animateScrollToItem(messages.lastIndex)
+                            }
+                        },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = VelnoxIcons.ChevronDown,
+                            contentDescription = null,
+                            tint = VelnoxBrand,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.messages_scroll_latest),
+                            style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                     }
                 }
             }
@@ -956,63 +1073,204 @@ fun ConversationScreen(
             )
         }
 
-        // Sleek Message Input Bar
+        // Sleek Message Input & Attachment Bar
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface),
+                .background(MaterialTheme.colorScheme.surface)
+                .navigationBarsPadding(),
         ) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+            // Pending Media Preview Bar (if user selected photo or video)
+            if (pendingMediaUri != null) {
+                Surface(
+                    shape = SquircleSm,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = PageGutter, vertical = 6.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(SquircleSm)
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (pendingMediaType == "video") {
+                                Icon(
+                                    imageVector = VelnoxIcons.Video,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = pendingMediaUri,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (pendingMediaType == "video") {
+                                    stringResource(R.string.messages_selected_video)
+                                } else {
+                                    stringResource(R.string.messages_selected_photo)
+                                },
+                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = stringResource(R.string.messages_input_placeholder),
+                                style = Text2xs,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                pendingMediaUri = null
+                                pendingMediaType = null
+                            },
+                            modifier = Modifier.size(30.dp),
+                        ) {
+                            Icon(
+                                imageVector = VelnoxIcons.Close,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Quick Emoji Reaction Bar (Horizontal Scroll)
+            val quickEmojis = remember {
+                listOf("❤️", "👍", "😂", "🔥", "🙏", "👏", "😮", "🎉", "💯", "🥰", "✨", "📦", "🛒", "🛍️", "💳", "🏬")
+            }
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PageGutter, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(quickEmojis) { emoji ->
+                    Box(
+                        modifier = Modifier
+                            .clip(Circle)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                            .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), Circle)
+                            .velnoxClickable(role = Role.Button) {
+                                inputText += emoji
+                                sendError = null
+                            }
+                            .padding(horizontal = 9.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(text = emoji, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+
+            // Main Input Action Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .imePadding()
-                    .navigationBarsPadding()
-                    .padding(horizontal = PageGutter, vertical = 10.dp),
+                    .padding(horizontal = PageGutter, vertical = 8.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
+                // Attach Media Button (+)
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(Circle)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, Circle)
+                        .velnoxClickable(role = Role.Button) {
+                            showAttachmentSheet = true
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = VelnoxIcons.Plus,
+                        contentDescription = stringResource(R.string.messages_attach_media),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                // Text Field Container with inner Emoji toggle button
                 val inputBorder = if (inputFocused) VelnoxBrand else MaterialTheme.colorScheme.outline
-                BasicTextField(
-                    value = inputText,
-                    onValueChange = {
-                        inputText = it
-                        sendError = null
-                    },
-                    maxLines = 4,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    cursorBrush = SolidColor(VelnoxBrand),
-                    interactionSource = inputInteractionSource,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { submitMessage() }),
+                Row(
                     modifier = Modifier
                         .weight(1f)
-                        .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(22.dp))
+                        .heightIn(min = 42.dp)
+                        .clip(RoundedCornerShape(21.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(1.dp, inputBorder, RoundedCornerShape(22.dp))
-                        .padding(horizontal = 16.dp, vertical = 11.dp),
-                    decorationBox = { innerTextField ->
-                        Box(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            if (inputText.isEmpty()) {
-                                Text(
-                                    text = stringResource(R.string.messages_input_placeholder),
-                                    style = TextXs,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                        .border(1.dp, inputBorder, RoundedCornerShape(21.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BasicTextField(
+                        value = inputText,
+                        onValueChange = {
+                            inputText = it
+                            sendError = null
+                        },
+                        maxLines = 4,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        cursorBrush = SolidColor(VelnoxBrand),
+                        interactionSource = inputInteractionSource,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { submitMessage() }),
+                        modifier = Modifier.weight(1f),
+                        decorationBox = { innerTextField ->
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                if (inputText.isEmpty() && pendingMediaUri == null) {
+                                    Text(
+                                        text = stringResource(R.string.messages_input_placeholder),
+                                        style = TextXs,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                innerTextField()
                             }
-                            innerTextField()
-                        }
-                    },
-                )
+                        },
+                    )
 
-                Spacer(Modifier.width(10.dp))
+                    IconButton(
+                        onClick = { showEmojiDrawer = !showEmojiDrawer },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            imageVector = VelnoxIcons.Smile,
+                            contentDescription = stringResource(R.string.messages_emojis),
+                            tint = if (showEmojiDrawer) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
 
-                val canSend = inputText.isNotBlank() && repository != null
+                Spacer(Modifier.width(8.dp))
+
+                val canSend = (inputText.isNotBlank() || pendingMediaUri != null) && repository != null
                 val sendBgModifier = if (canSend) {
                     Modifier.background(
                         Brush.linearGradient(
@@ -1024,7 +1282,7 @@ fun ConversationScreen(
                 }
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(42.dp)
                         .clip(Circle)
                         .then(sendBgModifier)
                         .velnoxClickable(
@@ -1039,6 +1297,226 @@ fun ConversationScreen(
                         contentDescription = stringResource(R.string.messages_send),
                         tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            // Expanded Emoji Drawer (if toggled open)
+            if (showEmojiDrawer) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = PageGutter, vertical = 8.dp),
+                ) {
+                    val categorizedEmojis = remember {
+                        listOf(
+                            "❤️", "👍", "😂", "🔥", "🙏", "👏", "🥰", "😍", "😊", "🎉", "✨", "💯",
+                            "🛍️", "🛒", "📦", "🚚", "🏷️", "💳", "💵", "⭐", "🎁", "🏬", "🤝", "⚡",
+                            "😃", "😄", "😆", "😉", "😎", "🤔", "👌", "✌️", "🙌", "💬", "❤️‍🔥", "🌟",
+                        )
+                    }
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(categorizedEmojis) { emoji ->
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(Circle)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .velnoxClickable(role = Role.Button) {
+                                        inputText += emoji
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(text = emoji, style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Modal Bottom Sheet for Attaching Photos or Videos
+    if (showAttachmentSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAttachmentSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            scrimColor = Color.Black.copy(alpha = 0.5f),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .navigationBarsPadding(),
+            ) {
+                Text(
+                    text = stringResource(R.string.messages_attach_media),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    // Send Photo Option
+                    Surface(
+                        shape = SquircleSm,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier
+                            .weight(1f)
+                            .velnoxClickable(role = Role.Button) {
+                                showAttachmentSheet = false
+                                onPickImage?.invoke { uri ->
+                                    if (uri != null) {
+                                        scope.launch(Dispatchers.IO) {
+                                            val optimized = ImageOptimizer.optimize(
+                                                context,
+                                                uri,
+                                                maxWidth = 1280,
+                                                maxHeight = 1280,
+                                                quality = 82,
+                                            )
+                                            val dir = File(context.filesDir, "chat_media").apply { mkdirs() }
+                                            val file = File(dir, "img_${System.currentTimeMillis()}.webp")
+                                            if (optimized != null) {
+                                                file.writeBytes(optimized.bytes)
+                                            } else {
+                                                context.contentResolver.openInputStream(uri)?.use { stream ->
+                                                    file.outputStream().use { stream.copyTo(it) }
+                                                }
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                pendingMediaUri = Uri.fromFile(file)
+                                                pendingMediaType = "image"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(16.dp),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(Circle)
+                                    .background(VelnoxBrand.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = VelnoxIcons.Image,
+                                    contentDescription = null,
+                                    tint = VelnoxBrand,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                text = stringResource(R.string.messages_attach_photo),
+                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+
+                    // Send Video Option
+                    Surface(
+                        shape = SquircleSm,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier
+                            .weight(1f)
+                            .velnoxClickable(role = Role.Button) {
+                                showAttachmentSheet = false
+                                onPickVideo?.invoke { uri ->
+                                    if (uri != null) {
+                                        scope.launch(Dispatchers.IO) {
+                                            val dir = File(context.filesDir, "chat_media").apply { mkdirs() }
+                                            val file = File(dir, "vid_${System.currentTimeMillis()}.mp4")
+                                            context.contentResolver.openInputStream(uri)?.use { stream ->
+                                                file.outputStream().use { stream.copyTo(it) }
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                pendingMediaUri = Uri.fromFile(file)
+                                                pendingMediaType = "video"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(16.dp),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(Circle)
+                                    .background(Color(0xFF3B82F6).copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = VelnoxIcons.Video,
+                                    contentDescription = null,
+                                    tint = Color(0xFF3B82F6),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                text = stringResource(R.string.messages_attach_video),
+                                style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
+    // Fullscreen Dialog for Image Preview
+    if (previewDialogMedia != null && previewDialogMedia?.second == "image") {
+        Dialog(onDismissRequest = { previewDialogMedia = null }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.95f))
+                    .velnoxClickable(role = Role.Button) { previewDialogMedia = null },
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = previewDialogMedia?.first,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                )
+                IconButton(
+                    onClick = { previewDialogMedia = null },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(16.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), Circle),
+                ) {
+                    Icon(
+                        imageVector = VelnoxIcons.Close,
+                        contentDescription = stringResource(R.string.common_close),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -1161,6 +1639,9 @@ private fun InstagramBubble(
     isFailed: Boolean = false,
     onRetry: (() -> Unit)? = null,
     sellerInitials: String = "",
+    mediaUrl: String? = null,
+    mediaType: String? = null,
+    onMediaClick: ((url: String, type: String) -> Unit)? = null,
 ) {
     val bubbleShape = getInstagramBubbleShape(
         incoming = incoming,
@@ -1196,18 +1677,82 @@ private fun InstagramBubble(
                         shape = bubbleShape,
                     ),
             ) {
-                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
-                    Text(
-                        text = text,
-                        style = TextXs.copy(lineHeight = MaterialTheme.typography.bodyMedium.lineHeight),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                Column(modifier = Modifier.padding(horizontal = if (mediaUrl != null) 6.dp else 14.dp, vertical = if (mediaUrl != null) 6.dp else 9.dp)) {
+                    if (mediaUrl != null) {
+                        if (mediaType == "video") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF0F172A))
+                                    .velnoxClickable(role = Role.Button) {
+                                        onMediaClick?.invoke(mediaUrl, "video")
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(46.dp)
+                                            .clip(Circle)
+                                            .background(Color.White.copy(alpha = 0.25f)),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = VelnoxIcons.Play,
+                                            contentDescription = stringResource(R.string.messages_video_label),
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        text = stringResource(R.string.messages_video_label),
+                                        style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                                        color = Color.White.copy(alpha = 0.9f),
+                                    )
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 240.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF1E293B))
+                                    .velnoxClickable(role = Role.Button) {
+                                        onMediaClick?.invoke(mediaUrl, "image")
+                                    },
+                            ) {
+                                AsyncImage(
+                                    model = mediaUrl,
+                                    contentDescription = stringResource(R.string.messages_photo_label),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 120.dp, max = 240.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    if (text.isNotBlank() && text != "[รูปภาพ]" && text != "[วิดีโอ]") {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = text,
+                            style = TextXs.copy(lineHeight = MaterialTheme.typography.bodyMedium.lineHeight),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = if (mediaUrl != null) 6.dp else 0.dp),
+                        )
+                    }
                     if (timestamp.isNotEmpty()) {
                         Spacer(Modifier.height(3.dp))
                         Text(
                             text = timestamp,
                             style = Text2xs,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            modifier = Modifier.padding(horizontal = if (mediaUrl != null) 6.dp else 0.dp),
                         )
                     }
                 }
@@ -1232,22 +1777,88 @@ private fun InstagramBubble(
                                 Modifier.velnoxClickable(role = Role.Button, onClick = onRetry)
                             } else Modifier
                         )
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                        .padding(horizontal = if (mediaUrl != null) 6.dp else 14.dp, vertical = if (mediaUrl != null) 6.dp else 9.dp),
                 ) {
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = text,
-                            style = TextXs.copy(
-                                fontWeight = FontWeight.Normal,
-                                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
-                            ),
-                            color = Color.White,
-                        )
+                        if (mediaUrl != null) {
+                            if (mediaType == "video") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF0F172A))
+                                        .velnoxClickable(role = Role.Button) {
+                                            onMediaClick?.invoke(mediaUrl, "video")
+                                        },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .clip(Circle)
+                                                .background(Color.White.copy(alpha = 0.25f)),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = VelnoxIcons.Play,
+                                                contentDescription = stringResource(R.string.messages_video_label),
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(
+                                            text = stringResource(R.string.messages_video_label),
+                                            style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                                            color = Color.White.copy(alpha = 0.9f),
+                                        )
+                                    }
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 240.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF1E293B))
+                                        .velnoxClickable(role = Role.Button) {
+                                            onMediaClick?.invoke(mediaUrl, "image")
+                                        },
+                                ) {
+                                    AsyncImage(
+                                        model = mediaUrl,
+                                        contentDescription = stringResource(R.string.messages_photo_label),
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 120.dp, max = 240.dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        if (text.isNotBlank() && text != "[รูปภาพ]" && text != "[วิดีโอ]") {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = text,
+                                style = TextXs.copy(
+                                    fontWeight = FontWeight.Normal,
+                                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
+                                ),
+                                color = Color.White,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = if (mediaUrl != null) 6.dp else 0.dp),
+                            )
+                        }
                         if (timestamp.isNotEmpty() || isPending || isFailed) {
                             Spacer(Modifier.height(3.dp))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End,
+                                modifier = Modifier.padding(horizontal = if (mediaUrl != null) 6.dp else 0.dp),
                             ) {
                                 if (timestamp.isNotEmpty()) {
                                     Text(

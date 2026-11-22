@@ -123,6 +123,8 @@ interface CustomerApi {
         conversationId: String,
         text: String,
         clientId: String? = null,
+        mediaUrl: String? = null,
+        mediaType: String? = null,
     ): CustomerResult<CustomerMessage>
 
     /** `POST /api/customer/conversations/:id/read` */

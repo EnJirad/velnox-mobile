@@ -101,13 +101,23 @@ object MessagesState {
         conversationId: String,
         text: String,
         clientId: String? = null,
+        mediaUrl: String? = null,
+        mediaType: String? = null,
     ): CustomerResult<CustomerMessage> {
-        val result = repository.call { api, token -> api.sendMessage(token, conversationId, text, clientId) }
+        val result = repository.call { api, token ->
+            api.sendMessage(token, conversationId, text, clientId, mediaUrl, mediaType)
+        }
         if (result is CustomerResult.Ok) {
             val idx = conversations.indexOfFirst { it.id == conversationId }
             if (idx >= 0) {
+                val previewText = when {
+                    result.value.text.isNotBlank() && result.value.text != "[รูปภาพ]" && result.value.text != "[วิดีโอ]" -> result.value.text
+                    mediaType == "video" -> "[วิดีโอ]"
+                    mediaUrl != null -> "[รูปภาพ]"
+                    else -> result.value.text
+                }
                 val updated = conversations[idx].copy(
-                    lastMessage = result.value.text,
+                    lastMessage = previewText,
                     lastMessageAt = result.value.createdAt ?: System.currentTimeMillis(),
                 )
                 conversations.removeAt(idx)
@@ -233,6 +243,8 @@ object MessagesState {
                     .put("isFailed", msg.isFailed)
                     .put("failureReason", msg.failureReason ?: JSONObject.NULL)
                     .put("clientId", msg.clientId ?: JSONObject.NULL)
+                    .put("mediaUrl", msg.mediaUrl ?: JSONObject.NULL)
+                    .put("mediaType", msg.mediaType ?: JSONObject.NULL)
                 arr.put(obj)
             }
             val temp = File(file.parentFile, "${file.name}.tmp")
@@ -254,8 +266,14 @@ object MessagesState {
             for (i in 0 until arr.length()) {
                 val obj = arr.optJSONObject(i) ?: continue
                 val id = obj.optString("id")
-                val body = obj.optString("text")
-                if (id.isNullOrBlank() || body.isNullOrBlank()) continue
+                val rawText = obj.optString("text")
+                val mediaUrl = if (obj.isNull("mediaUrl")) null else obj.optString("mediaUrl").takeIf { it.isNotBlank() }
+                val mediaType = if (obj.isNull("mediaType")) null else obj.optString("mediaType").takeIf { it.isNotBlank() }
+                val body = rawText.takeIf { it.isNotBlank() } ?: when (mediaType) {
+                    "video" -> "[วิดีโอ]"
+                    else -> if (mediaUrl != null) "[รูปภาพ]" else ""
+                }
+                if (id.isNullOrBlank() || (body.isNullOrBlank() && mediaUrl == null)) continue
                 val isPending = obj.optBoolean("isPending", false)
                 val isFailed = obj.optBoolean("isFailed", false) || isPending
                 list.add(
@@ -270,6 +288,8 @@ object MessagesState {
                         isFailed = isFailed,
                         failureReason = if (obj.isNull("failureReason")) null else obj.optString("failureReason"),
                         clientId = if (obj.isNull("clientId")) null else obj.optString("clientId"),
+                        mediaUrl = mediaUrl,
+                        mediaType = mediaType,
                     )
                 )
             }

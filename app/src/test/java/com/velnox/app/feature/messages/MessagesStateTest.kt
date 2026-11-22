@@ -61,6 +61,8 @@ class MessagesStateTest {
             conversationId: String,
             text: String,
             clientId: String?,
+            mediaUrl: String?,
+            mediaType: String?,
         ): CustomerResult<CustomerMessage> {
             failNext?.let { failNext = null; return CustomerResult.Failed(it, "Rate limited") }
             val message = CustomerMessage(
@@ -68,6 +70,8 @@ class MessagesStateTest {
                 text = text,
                 fromCustomer = true,
                 createdAt = 1_767_323_600_000L,
+                mediaUrl = mediaUrl,
+                mediaType = mediaType,
             )
             msgs.getOrPut(conversationId) { mutableListOf() }.add(message)
             return CustomerResult.Ok(message)

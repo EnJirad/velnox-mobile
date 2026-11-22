@@ -218,6 +218,8 @@ data class CustomerMessage(
     val isFailed: Boolean = false,
     val failureReason: String? = null,
     val clientId: String? = null,
+    val mediaUrl: String? = null,
+    val mediaType: String? = null,
 )
 
 sealed interface CustomerResult<out T> {

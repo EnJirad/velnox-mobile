@@ -678,4 +678,13 @@
     <string name="profile_image_type_error">รูปแบบไฟล์ไม่ถูกต้อง หรือไฟล์เสียหาย</string>
     <string name="profile_uploading_photo">กำลังปรับแต่งและอัปโหลดรูปภาพ...</string>
     <string name="messages_send_failed">ส่งข้อความไม่สำเร็จ แตะเพื่อลองใหม่</string>
+    <string name="messages_attach_media">แนบรูปภาพหรือวิดีโอ</string>
+    <string name="messages_attach_photo">ส่งรูปภาพ</string>
+    <string name="messages_attach_video">ส่งวิดีโอ</string>
+    <string name="messages_selected_photo">รูปภาพที่เลือก</string>
+    <string name="messages_selected_video">วิดีโอที่เลือก</string>
+    <string name="messages_video_label">วิดีโอ</string>
+    <string name="messages_photo_label">รูปภาพ</string>
+    <string name="messages_scroll_latest">ข้อความล่าสุด</string>
+    <string name="messages_emojis">อีโมจิ</string>
 </resources>

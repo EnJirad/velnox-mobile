@@ -11,6 +11,7 @@ import com.velnox.app.navigation.VelnoxApp
 class MainActivity : ComponentActivity() {
 
     private var imagePickerCallback: ((Uri?) -> Unit)? = null
+    private var videoPickerCallback: ((Uri?) -> Unit)? = null
 
     // Register ActivityResult launcher strictly during Activity initialization before STARTED state.
     // Completely decouples image picking from Compose lifecycle and LocalActivityResultRegistryOwner.
@@ -19,6 +20,14 @@ class MainActivity : ComponentActivity() {
     ) { uri: Uri? ->
         val cb = imagePickerCallback
         imagePickerCallback = null
+        cb?.invoke(uri)
+    }
+
+    private val pickVideoLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri: Uri? ->
+        val cb = videoPickerCallback
+        videoPickerCallback = null
         cb?.invoke(uri)
     }
 
@@ -33,6 +42,14 @@ class MainActivity : ComponentActivity() {
                         pickImageLauncher.launch("image/*")
                     } catch (_: Exception) {
                         imagePickerCallback = null
+                    }
+                },
+                onPickVideo = { callback ->
+                    videoPickerCallback = callback
+                    try {
+                        pickVideoLauncher.launch("video/*")
+                    } catch (_: Exception) {
+                        videoPickerCallback = null
                     }
                 },
             )

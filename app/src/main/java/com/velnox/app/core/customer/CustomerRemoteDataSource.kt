@@ -377,15 +377,40 @@ class CustomerRemoteDataSource(
         conversationId: String,
         text: String,
         clientId: String?,
+        mediaUrl: String?,
+        mediaType: String?,
     ): CustomerResult<CustomerMessage> {
+        val effectiveText = text.ifBlank {
+            when (mediaType) {
+                "video" -> "[วิดีโอ]"
+                else -> if (mediaUrl != null) "[รูปภาพ]" else ""
+            }
+        }
         val payload = JSONObject()
-            .put("body", text)
-            .put("text", text)
-            .put("content", text)
-            .put("message", text)
+            .put("body", effectiveText)
+            .put("text", effectiveText)
+            .put("content", effectiveText)
+            .put("message", effectiveText)
         clientId?.takeIf { it.isNotBlank() }?.let {
             payload.put("clientId", it)
             payload.put("client_id", it)
+        }
+        mediaUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            payload.put("mediaUrl", url)
+            payload.put("media_url", url)
+            payload.put("imageUrl", url)
+            payload.put("image_url", url)
+            payload.put("fileUrl", url)
+            payload.put("file_url", url)
+            payload.put("attachmentUrl", url)
+            val attArr = JSONArray().put(
+                JSONObject().put("url", url).put("type", mediaType ?: "image")
+            )
+            payload.put("attachments", attArr)
+        }
+        mediaType?.takeIf { it.isNotBlank() }?.let {
+            payload.put("mediaType", it)
+            payload.put("media_type", it)
         }
         return send(
             token,
@@ -397,11 +422,14 @@ class CustomerRemoteDataSource(
             val msgObj = dataObj?.optJSONObject("message") ?: data.asObject("message")
             val effectiveClientId = dataObj?.str("clientId", "client_id") ?: clientId
             msgObj?.let { parseMessage(it, true) }?.let { parsed ->
-                if (parsed.clientId == null && effectiveClientId != null) {
-                    parsed.copy(clientId = effectiveClientId)
-                } else {
-                    parsed
+                var res = parsed
+                if (res.clientId == null && effectiveClientId != null) {
+                    res = res.copy(clientId = effectiveClientId)
                 }
+                if (res.mediaUrl == null && mediaUrl != null) {
+                    res = res.copy(mediaUrl = mediaUrl, mediaType = mediaType)
+                }
+                res
             }
         }
     }
@@ -757,7 +785,35 @@ class CustomerRemoteDataSource(
 
     private fun parseMessage(obj: JSONObject, knownFromCustomer: Boolean): CustomerMessage? {
         val id = obj.str("id", "messageId", "_id") ?: return null
-        val text = obj.str("body", "text", "content", "message") ?: return null
+        val rawMediaUrl = obj.str(
+            "mediaUrl", "media_url",
+            "imageUrl", "image_url",
+            "fileUrl", "file_url",
+            "attachmentUrl", "attachment_url",
+            "attachment",
+        ) ?: imageOf(obj) ?: obj.optJSONArray("attachments")?.let { arr ->
+            if (arr.length() > 0) {
+                when (val first = arr.opt(0)) {
+                    is JSONObject -> first.str("url", "mediaUrl", "media_url", "imageUrl", "image_url")
+                    is String -> first.trim().takeIf { it.isNotEmpty() }
+                    else -> null
+                }
+            } else null
+        }
+        val mediaUrl = rawMediaUrl?.let { normalizeMediaUrl(it) ?: it }
+        val mediaType = obj.str("mediaType", "media_type", "type")
+            ?: when {
+                mediaUrl?.endsWith(".mp4", ignoreCase = true) == true || mediaUrl?.contains("video") == true -> "video"
+                mediaUrl != null -> "image"
+                else -> null
+            }
+
+        val rawText = obj.str("body", "text", "content", "message")
+        val text = rawText ?: when (mediaType) {
+            "video" -> "[วิดีโอ]"
+            else -> if (mediaUrl != null) "[รูปภาพ]" else return null
+        }
+
         val senderObj = obj.optJSONObject("sender") ?: obj.optJSONObject("user") ?: obj.optJSONObject("author")
         val sender = (obj.str("senderRole", "sender_role", "senderType", "sender_type", "role", "sender")
             ?: senderObj?.str("role", "type", "senderRole", "sender_role"))
@@ -791,6 +847,8 @@ class CustomerRemoteDataSource(
             isSystem = isSystem,
             isRead = isRead,
             clientId = parsedClientId,
+            mediaUrl = mediaUrl,
+            mediaType = mediaType,
         )
     }
 

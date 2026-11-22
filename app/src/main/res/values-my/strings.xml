@@ -678,4 +678,13 @@
     <string name="profile_image_type_error">ပုံဖော်မတ် မမှန်ပါ သို့မဟုတ် ဖိုင်ပျက်စီးနေပါသည်</string>
     <string name="profile_uploading_photo">ပုံကို အကောင်းဆုံးဖြစ်အောင် ပြင်ဆင်ပြီး တင်နေပါသည်...</string>
     <string name="messages_send_failed">မပို့နိုင်ပါ။ ထပ်စမ်းကြည့်ရန် နှိပ်ပါ</string>
+    <string name="messages_attach_media">ဓာတ်ပုံ သို့မဟုတ် ဗီဒီယို တွဲပါ</string>
+    <string name="messages_attach_photo">ဓာတ်ပုံပို့ပါ</string>
+    <string name="messages_attach_video">ဗီဒီယိုပို့ပါ</string>
+    <string name="messages_selected_photo">ရွေးချယ်ထားသော ဓာတ်ပုံ</string>
+    <string name="messages_selected_video">ရွေးချယ်ထားသော ဗီဒီယို</string>
+    <string name="messages_video_label">ဗီဒီယို</string>
+    <string name="messages_photo_label">ဓာတ်ပုံ</string>
+    <string name="messages_scroll_latest">နောက်ဆုံး မက်ဆေ့ခ်ျများ</string>
+    <string name="messages_emojis">အီမိုဂျီ</string>
 </resources>
