@@ -677,4 +677,5 @@
     <string name="profile_image_upload_failed">ပုံတင်ခြင်း မအောင်မြင်ပါ။ ထပ်မံကြိုးစားကြည့်ပါ။</string>
     <string name="profile_image_type_error">ပုံဖော်မတ် မမှန်ပါ သို့မဟုတ် ဖိုင်ပျက်စီးနေပါသည်</string>
     <string name="profile_uploading_photo">ပုံကို အကောင်းဆုံးဖြစ်အောင် ပြင်ဆင်ပြီး တင်နေပါသည်...</string>
+    <string name="messages_send_failed">မပို့နိုင်ပါ။ ထပ်စမ်းကြည့်ရန် နှိပ်ပါ</string>
 </resources>

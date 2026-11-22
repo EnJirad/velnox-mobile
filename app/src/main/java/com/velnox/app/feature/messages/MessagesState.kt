@@ -161,7 +161,7 @@ object MessagesState {
         val remainingLocal = current.filter { msg ->
             val notInRemote = msg.id !in remoteIds && (msg.clientId == null || msg.clientId !in remoteClientIds)
             if (!notInRemote) return@filter false
-            if (msg.isPending) {
+            if (msg.isPending || msg.isFailed) {
                 msg.text.trim() !in remoteCustomerTexts
             } else {
                 // Keep recently confirmed local messages for 15s to bridge any replication or poll latency
@@ -230,6 +230,8 @@ object MessagesState {
                     .put("isSystem", msg.isSystem)
                     .put("isRead", msg.isRead)
                     .put("isPending", msg.isPending)
+                    .put("isFailed", msg.isFailed)
+                    .put("failureReason", msg.failureReason ?: JSONObject.NULL)
                     .put("clientId", msg.clientId ?: JSONObject.NULL)
                 arr.put(obj)
             }
@@ -254,6 +256,8 @@ object MessagesState {
                 val id = obj.optString("id")
                 val body = obj.optString("text")
                 if (id.isNullOrBlank() || body.isNullOrBlank()) continue
+                val isPending = obj.optBoolean("isPending", false)
+                val isFailed = obj.optBoolean("isFailed", false) || isPending
                 list.add(
                     CustomerMessage(
                         id = id,
@@ -262,7 +266,9 @@ object MessagesState {
                         createdAt = if (obj.isNull("createdAt")) null else obj.optLong("createdAt"),
                         isSystem = obj.optBoolean("isSystem", false),
                         isRead = obj.optBoolean("isRead", false),
-                        isPending = obj.optBoolean("isPending", false),
+                        isPending = false,
+                        isFailed = isFailed,
+                        failureReason = if (obj.isNull("failureReason")) null else obj.optString("failureReason"),
                         clientId = if (obj.isNull("clientId")) null else obj.optString("clientId"),
                     )
                 )

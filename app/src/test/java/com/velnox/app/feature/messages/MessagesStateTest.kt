@@ -191,4 +191,42 @@ class MessagesStateTest {
         assertTrue(merged.last().isPending)
         assertTrue(MessagesState.hasNewIncomingMessages(existing, remote))
     }
+
+    @Test
+    fun `mergePolledMessages preserves failed retryable messages until confirmed`() {
+        val existing = listOf(
+            CustomerMessage("m1", "Hello", fromCustomer = false, createdAt = 1000L),
+            CustomerMessage("pending-f", "Failed send", fromCustomer = true, createdAt = 2000L, isPending = false, isFailed = true, failureReason = "Network error"),
+        )
+        val remote = listOf(
+            CustomerMessage("m1", "Hello", fromCustomer = false, createdAt = 1000L),
+        )
+
+        val merged = MessagesState.mergePolledMessages(existing, remote)
+
+        assertEquals(2, merged.size)
+        assertEquals("pending-f", merged[1].id)
+        assertTrue(merged[1].isFailed)
+        assertEquals("Network error", merged[1].failureReason)
+    }
+
+    @Test
+    fun `continuous consecutive message sending works seamlessly without lockout`() = runBlocking {
+        val server = ServerChat(
+            initialConversations = listOf(
+                CustomerConversation("c1", "s1", "Lumen Shop", "Hello", 1000L, unreadCount = 0),
+            ),
+        )
+        val r = repo(server)
+        MessagesState.loadConversations(r)
+
+        val res1 = MessagesState.sendMessage(r, "c1", "First message", clientId = "cid-1")
+        val res2 = MessagesState.sendMessage(r, "c1", "Second message immediately", clientId = "cid-2")
+        val res3 = MessagesState.sendMessage(r, "c1", "Third message immediately", clientId = "cid-3")
+
+        assertTrue(res1 is CustomerResult.Ok)
+        assertTrue(res2 is CustomerResult.Ok)
+        assertTrue(res3 is CustomerResult.Ok)
+        assertEquals("Third message immediately", MessagesState.conversations.first().lastMessage)
+    }
 }

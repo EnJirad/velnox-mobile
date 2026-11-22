@@ -448,7 +448,6 @@ fun ConversationScreen(
     var reloadTick by remember { mutableIntStateOf(0) }
 
     var inputText by rememberSaveable { mutableStateOf("") }
-    var sending by remember { mutableStateOf(false) }
     var sendError by remember { mutableStateOf<String?>(null) }
     var lastScrolledCount by remember(threadId) { mutableIntStateOf(0) }
 
@@ -530,8 +529,7 @@ fun ConversationScreen(
 
     fun submitMessage() {
         val text = inputText.trim()
-        if (text.isEmpty() || sending || repository == null) return
-        sending = true
+        if (text.isEmpty() || repository == null) return
         sendError = null
         val clientId = UUID.randomUUID().toString()
         val pendingId = "pending-$clientId"
@@ -543,35 +541,112 @@ fun ConversationScreen(
             isPending = true,
             clientId = clientId,
         )
-        // Optimistically clear input and append bubble immediately in sorted order.
+        // Optimistically clear input immediately so the user can continue typing seamlessly without lockout
         inputText = ""
         val updated = CustomerRemoteDataSource.sortMessagesChronologically(messages.toList() + optimistic)
         messages.clear()
         messages.addAll(updated)
         MessagesState.setCachedMessages(threadId, updated, context)
 
+        // Asynchronous non-blocking message dispatcher
         scope.launch {
-            listState.animateScrollToItem(messages.lastIndex.coerceAtLeast(0))
-            when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
-                is CustomerResult.Ok -> {
-                    val remaining = messages.filterNot {
-                        it.id == pendingId || (it.clientId != null && it.clientId == clientId) || it.id == res.value.id
+            try {
+                when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
+                    is CustomerResult.Ok -> {
+                        val remaining = messages.filterNot {
+                            it.id == pendingId || (it.clientId != null && it.clientId == clientId) || it.id == res.value.id
+                        }
+                        val sorted = CustomerRemoteDataSource.sortMessagesChronologically(remaining + res.value)
+                        messages.clear()
+                        messages.addAll(sorted)
+                        MessagesState.setCachedMessages(threadId, sorted, context)
                     }
-                    val sorted = CustomerRemoteDataSource.sortMessagesChronologically(remaining + res.value)
-                    messages.clear()
-                    messages.addAll(sorted)
-                    MessagesState.setCachedMessages(threadId, sorted, context)
-                    // Keep focus so user can continue typing seamlessly without keyboard bouncing
-                }
 
-                is CustomerResult.Failed -> {
-                    messages.removeAll { it.id == pendingId }
+                    is CustomerResult.Failed -> {
+                        // Mark optimistic message as failed with retry affordance instead of dropping or blocking UI
+                        val idx = messages.indexOfFirst {
+                            it.id == pendingId || (it.clientId != null && it.clientId == clientId)
+                        }
+                        if (idx >= 0) {
+                            messages[idx] = messages[idx].copy(
+                                isPending = false,
+                                isFailed = true,
+                                failureReason = res.userMessage(context),
+                            )
+                            MessagesState.setCachedMessages(threadId, messages.toList(), context)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                val idx = messages.indexOfFirst {
+                    it.id == pendingId || (it.clientId != null && it.clientId == clientId)
+                }
+                if (idx >= 0) {
+                    messages[idx] = messages[idx].copy(
+                        isPending = false,
+                        isFailed = true,
+                        failureReason = e.message,
+                    )
                     MessagesState.setCachedMessages(threadId, messages.toList(), context)
-                    if (inputText.isEmpty()) inputText = text
-                    sendError = res.userMessage(context)
                 }
             }
-            sending = false
+        }
+    }
+
+    fun retryMessage(msg: CustomerMessage) {
+        if (repository == null) return
+        val clientId = msg.clientId ?: UUID.randomUUID().toString()
+        val text = msg.text
+        val idx = messages.indexOfFirst { it.id == msg.id }
+        if (idx >= 0) {
+            messages[idx] = messages[idx].copy(
+                isPending = true,
+                isFailed = false,
+                failureReason = null,
+                clientId = clientId,
+            )
+            MessagesState.setCachedMessages(threadId, messages.toList(), context)
+        }
+        scope.launch {
+            try {
+                when (val res = MessagesState.sendMessage(repository, threadId, text, clientId)) {
+                    is CustomerResult.Ok -> {
+                        val remaining = messages.filterNot {
+                            it.id == msg.id || (it.clientId != null && it.clientId == clientId) || it.id == res.value.id
+                        }
+                        val sorted = CustomerRemoteDataSource.sortMessagesChronologically(remaining + res.value)
+                        messages.clear()
+                        messages.addAll(sorted)
+                        MessagesState.setCachedMessages(threadId, sorted, context)
+                    }
+
+                    is CustomerResult.Failed -> {
+                        val currIdx = messages.indexOfFirst {
+                            it.id == msg.id || (it.clientId != null && it.clientId == clientId)
+                        }
+                        if (currIdx >= 0) {
+                            messages[currIdx] = messages[currIdx].copy(
+                                isPending = false,
+                                isFailed = true,
+                                failureReason = res.userMessage(context),
+                            )
+                            MessagesState.setCachedMessages(threadId, messages.toList(), context)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                val currIdx = messages.indexOfFirst {
+                    it.id == msg.id || (it.clientId != null && it.clientId == clientId)
+                }
+                if (currIdx >= 0) {
+                    messages[currIdx] = messages[currIdx].copy(
+                        isPending = false,
+                        isFailed = true,
+                        failureReason = e.message,
+                    )
+                    MessagesState.setCachedMessages(threadId, messages.toList(), context)
+                }
+            }
         }
     }
 
@@ -838,6 +913,8 @@ fun ConversationScreen(
                                         timestamp = if (isLastInGroup || isSolo) formatChatTimestamp(msg.createdAt, locale) else "",
                                         isPending = msg.isPending,
                                         isRead = msg.isRead,
+                                        isFailed = msg.isFailed,
+                                        onRetry = if (msg.isFailed) { { retryMessage(msg) } } else null,
                                         sellerInitials = initials,
                                     )
                                 }
@@ -916,7 +993,7 @@ fun ConversationScreen(
 
                 Spacer(Modifier.width(10.dp))
 
-                val canSend = inputText.isNotBlank() && !sending && repository != null
+                val canSend = inputText.isNotBlank() && repository != null
                 val sendBgModifier = if (canSend) {
                     Modifier.background(
                         Brush.linearGradient(
@@ -1062,6 +1139,8 @@ private fun InstagramBubble(
     timestamp: String,
     isPending: Boolean = false,
     isRead: Boolean = false,
+    isFailed: Boolean = false,
+    onRetry: (() -> Unit)? = null,
     sellerInitials: String = "",
 ) {
     val bubbleShape = getInstagramBubbleShape(
@@ -1116,57 +1195,90 @@ private fun InstagramBubble(
             }
         } else {
             val outgoingGradient = Brush.linearGradient(
-                colors = if (isPending) {
-                    listOf(VelnoxBrand.copy(alpha = 0.78f), Color(0xFF059669).copy(alpha = 0.78f))
-                } else {
-                    listOf(VelnoxBrand, Color(0xFF059669))
+                colors = when {
+                    isFailed -> listOf(Color(0xFFDC2626), Color(0xFFB91C1C))
+                    isPending -> listOf(VelnoxBrand.copy(alpha = 0.78f), Color(0xFF059669).copy(alpha = 0.78f))
+                    else -> listOf(VelnoxBrand, Color(0xFF059669))
                 },
             )
-            Box(
-                modifier = Modifier
-                    .widthIn(min = 40.dp, max = 280.dp)
-                    .shadow(0.5.dp, bubbleShape)
-                    .clip(bubbleShape)
-                    .background(outgoingGradient)
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
-            ) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = text,
-                        style = TextXs.copy(
-                            fontWeight = FontWeight.Normal,
-                            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
-                        ),
-                        color = Color.White,
-                    )
-                    if (timestamp.isNotEmpty() || isPending) {
-                        Spacer(Modifier.height(3.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.End,
-                        ) {
-                            if (timestamp.isNotEmpty()) {
+            Column(horizontalAlignment = Alignment.End) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(min = 40.dp, max = 280.dp)
+                        .shadow(0.5.dp, bubbleShape)
+                        .clip(bubbleShape)
+                        .background(outgoingGradient)
+                        .then(
+                            if (isFailed && onRetry != null) {
+                                Modifier.velnoxClickable(role = Role.Button, onClick = onRetry)
+                            } else Modifier
+                        )
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = text,
+                            style = TextXs.copy(
+                                fontWeight = FontWeight.Normal,
+                                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
+                            ),
+                            color = Color.White,
+                        )
+                        if (timestamp.isNotEmpty() || isPending || isFailed) {
+                            Spacer(Modifier.height(3.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                if (timestamp.isNotEmpty()) {
+                                    Text(
+                                        text = timestamp,
+                                        style = Text2xs,
+                                        color = Color.White.copy(alpha = 0.8f),
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                }
+                                val statusTick = when {
+                                    isFailed -> "!"
+                                    isPending -> "✓"
+                                    else -> "✓✓"
+                                }
                                 Text(
-                                    text = timestamp,
-                                    style = Text2xs,
-                                    color = Color.White.copy(alpha = 0.8f),
+                                    text = statusTick,
+                                    style = Text2xs.copy(fontWeight = FontWeight.Bold),
+                                    color = when {
+                                        isFailed -> Color(0xFFFEE2E2)
+                                        isPending -> Color.White.copy(alpha = 0.65f)
+                                        isRead -> Color(0xFFD1FAE5)
+                                        else -> Color.White.copy(alpha = 0.9f)
+                                    },
                                 )
-                                Spacer(Modifier.width(4.dp))
                             }
-                            val statusTick = when {
-                                isPending -> "✓"
-                                else -> "✓✓"
-                            }
-                            Text(
-                                text = statusTick,
-                                style = Text2xs.copy(fontWeight = FontWeight.Bold),
-                                color = when {
-                                    isPending -> Color.White.copy(alpha = 0.65f)
-                                    isRead -> Color(0xFFD1FAE5)
-                                    else -> Color.White.copy(alpha = 0.9f)
-                                },
-                            )
                         }
+                    }
+                }
+                if (isFailed && onRetry != null) {
+                    Spacer(Modifier.height(3.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier
+                            .clip(SquircleSm)
+                            .velnoxClickable(role = Role.Button, onClick = onRetry)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                    ) {
+                        Icon(
+                            imageVector = VelnoxIcons.RotateCcw,
+                            contentDescription = stringResource(R.string.common_retry),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(11.dp),
+                        )
+                        Spacer(Modifier.width(3.dp))
+                        Text(
+                            text = stringResource(R.string.messages_send_failed),
+                            style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             }

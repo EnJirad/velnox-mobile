@@ -215,6 +215,8 @@ data class CustomerMessage(
     val isRead: Boolean = false,
     /** True only for a local optimistic bubble awaiting server confirmation. */
     val isPending: Boolean = false,
+    val isFailed: Boolean = false,
+    val failureReason: String? = null,
     val clientId: String? = null,
 )
 

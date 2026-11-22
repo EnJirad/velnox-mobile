@@ -393,7 +393,16 @@ class CustomerRemoteDataSource(
             "/api/customer/conversations/${encode(conversationId)}/messages",
             payload,
         ).map { data ->
-            data.asObject("message")?.let { parseMessage(it, true) }
+            val dataObj = data as? JSONObject
+            val msgObj = dataObj?.optJSONObject("message") ?: data.asObject("message")
+            val effectiveClientId = dataObj?.str("clientId", "client_id") ?: clientId
+            msgObj?.let { parseMessage(it, true) }?.let { parsed ->
+                if (parsed.clientId == null && effectiveClientId != null) {
+                    parsed.copy(clientId = effectiveClientId)
+                } else {
+                    parsed
+                }
+            }
         }
     }
 
@@ -457,6 +466,8 @@ class CustomerRemoteDataSource(
             }
         } catch (_: IOException) {
             Raw.Failure(CustomerError.Network, null)
+        } catch (e: Exception) {
+            Raw.Failure(CustomerError.Server, e.message)
         }
     }
 
@@ -884,7 +895,7 @@ class CustomerRemoteDataSource(
         const val SECONDS_LIMIT = 100_000_000_000L
 
         val REJECTED_CODES = setOf(400, 403, 409, 422)
-        val SELLER_SENDERS = setOf("seller", "merchant", "shop", "support", "agent", "admin", "staff", "vendor", "store")
+        val SELLER_SENDERS = setOf("seller", "merchant", "shop", "support", "agent", "admin", "staff", "vendor", "store", "company")
         val CUSTOMER_SENDERS = setOf("customer", "buyer", "user", "me", "client", "consumer", "member", "guest")
         val JSON = "application/json; charset=utf-8".toMediaType()
 
