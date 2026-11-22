@@ -24,11 +24,13 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -102,7 +104,9 @@ import com.velnox.app.feature.wishlist.WishlistState
 import com.velnox.app.ui.components.PageGutter
 import com.velnox.app.ui.components.VelnoxSpacing
 import com.velnox.app.ui.components.velnoxClickable
+import com.velnox.app.ui.theme.Circle
 import com.velnox.app.ui.theme.Squircle
+import com.velnox.app.ui.theme.Text2xs
 import com.velnox.app.ui.theme.VelnoxBrand
 import com.velnox.app.VelnoxApplication
 import com.velnox.app.ui.theme.VelnoxTheme
@@ -872,7 +876,7 @@ private fun VelnoxNavHost(
     }
 }
 
-/** Full-screen emerald splash shown while a stored session is being verified. */
+/** Full-screen luxury emerald/obsidian splash shown while stored session is being verified. */
 @Composable
 private fun VelnoxSplashScreen() {
     val transition = rememberInfiniteTransition(label = "velnoxSplash")
@@ -880,52 +884,159 @@ private fun VelnoxSplashScreen() {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "velnoxSplashPulse",
     )
+    val floatAnim by transition.animateFloat(
+        initialValue = -3f,
+        targetValue = 3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "velnoxSplashFloat",
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(VelnoxBrand, Color(0xFF047857), Color(0xFF064E3B)),
+                    colors = listOf(
+                        Color(0xFF070B14),
+                        Color(0xFF0A151F),
+                        Color(0xFF070B14),
+                    ),
                 ),
             ),
         contentAlignment = Alignment.Center,
     ) {
+        // Ethereal ambient radial glow behind the emblem
+        Box(
+            modifier = Modifier
+                .size(280.dp)
+                .graphicsLayer {
+                    val scale = 0.90f + 0.15f * pulse
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 0.50f + 0.35f * pulse
+                }
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            VelnoxBrand.copy(alpha = 0.28f),
+                            Color(0xFF047857).copy(alpha = 0.12f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
+
+        // Main Brand Presentation: Official Velnox Mark + Geometric Wordmark
         Column(
-            modifier = Modifier.graphicsLayer {
-                val scale = 0.92f + 0.08f * pulse
-                scaleX = scale
-                scaleY = scale
-                alpha = 0.70f + 0.30f * pulse
-            },
+            modifier = Modifier
+                .graphicsLayer {
+                    val scale = 0.97f + 0.03f * pulse
+                    scaleX = scale
+                    scaleY = scale
+                    translationY = floatAnim
+                },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(
+            // Official Velnox 4-band Mark in crisp white
+            Image(
+                painter = painterResource(R.drawable.ic_velnox_mark_white),
+                contentDescription = "Velnox Emblem",
                 modifier = Modifier
-                    .size(100.dp)
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(Color.White.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
+                    .size(width = 84.dp, height = 64.dp)
+                    .graphicsLayer {
+                        alpha = 0.95f + 0.05f * pulse
+                    },
+            )
+
+            Spacer(Modifier.height(22.dp))
+
+            // Official Velnox Wordmark SVG path (replaces generic font)
+            Image(
+                painter = painterResource(R.drawable.ic_velnox_wordmark_white),
+                contentDescription = "VELNOX",
+                modifier = Modifier
+                    .size(width = 168.dp, height = 35.dp)
+                    .graphicsLayer {
+                        alpha = 0.95f
+                    },
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            // Premium brand lockup subtitle with subtle glowing accents
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
             ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_velnox_mark_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(width = 56.dp, height = 44.dp),
+                Box(
+                    modifier = Modifier
+                        .width(22.dp)
+                        .height(1.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color.Transparent, VelnoxBrand.copy(alpha = 0.7f)),
+                            ),
+                        ),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = "MARKETPLACE",
+                    style = Text2xs.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 4.5.sp,
+                    ),
+                    color = VelnoxBrand,
+                )
+                Spacer(Modifier.width(10.dp))
+                Box(
+                    modifier = Modifier
+                        .width(22.dp)
+                        .height(1.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(VelnoxBrand.copy(alpha = 0.7f), Color.Transparent),
+                            ),
+                        ),
                 )
             }
-            Spacer(Modifier.height(22.dp))
-            Text(
-                text = "VELNOX",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 8.sp,
-                ),
-                color = Color.White,
-            )
+        }
+
+        // Bottom status / verification indicator
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 32.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(Circle)
+                        .background(VelnoxBrand.copy(alpha = 0.4f + 0.6f * pulse)),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "SECURE ECOSYSTEM",
+                    style = Text2xs.copy(
+                        letterSpacing = 2.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    color = Color(0xFF64748B),
+                )
+            }
         }
     }
 }

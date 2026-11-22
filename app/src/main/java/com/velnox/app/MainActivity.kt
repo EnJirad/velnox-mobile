@@ -38,4 +38,17 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
+    override fun onPause() {
+        super.onPause()
+        // Clear focus so switching windows or returning to the app never automatically pops up the keyboard
+        currentFocus?.clearFocus()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) {
+            currentFocus?.clearFocus()
+        }
+    }
 }
