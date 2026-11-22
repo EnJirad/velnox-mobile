@@ -452,66 +452,85 @@ class CustomerRemoteDataSource(
         mimeType: String,
         filename: String,
     ): CustomerResult<UploadChatAttachmentResult> = withContext(Dispatchers.IO) {
-        val presignBody = JSONObject()
-            .put("filename", filename)
-            .put("contentType", mimeType)
-            .put("purpose", "chat")
-            .put("conversationId", conversationId)
+        // 1. Try presign + direct PUT to cloud storage
+        try {
+            val presignBody = JSONObject()
+                .put("filename", filename)
+                .put("contentType", mimeType)
+                .put("purpose", "chat")
+                .put("conversationId", conversationId)
 
-        val presignRaw = send(token, "POST", "/api/upload/presign", presignBody)
-        if (presignRaw !is Raw.Success) {
-            val failure = presignRaw as? Raw.Failure
-            return@withContext CustomerResult.Failed(
-                failure?.error ?: CustomerError.Server,
-                failure?.message ?: "Upload presign failed",
-            )
-        }
+            val presignRaw = send(token, "POST", "/api/upload/presign", presignBody)
+            if (presignRaw is Raw.Success) {
+                val presignData = (presignRaw.data as? JSONObject)?.optJSONObject("data")
+                    ?: presignRaw.data as? JSONObject
+                val uploadUrl = presignData?.optString("uploadUrl")
+                val objectKey = presignData?.optString("objectKey")
+                val publicUrl = presignData?.optString("publicUrl")
 
-        val presignData = (presignRaw.data as? JSONObject)?.optJSONObject("data")
-            ?: presignRaw.data as? JSONObject
-        val uploadUrl = presignData?.optString("uploadUrl")
-        val objectKey = presignData?.optString("objectKey")
-        val publicUrl = presignData?.optString("publicUrl")
+                if (!uploadUrl.isNullOrBlank() && !objectKey.isNullOrBlank()) {
+                    val mediaType = try {
+                        mimeType.toMediaType()
+                    } catch (_: Exception) {
+                        "image/webp".toMediaType()
+                    }
 
-        if (uploadUrl.isNullOrBlank() || objectKey.isNullOrBlank()) {
-            return@withContext CustomerResult.Failed(
-                CustomerError.Server,
-                "Invalid presigned upload response",
-            )
-        }
+                    val putRequest = Request.Builder()
+                        .url(uploadUrl)
+                        .header("Content-Type", mimeType)
+                        .put(bytes.toRequestBody(mediaType))
+                        .build()
 
-        val mediaType = try {
-            mimeType.toMediaType()
-        } catch (_: Exception) {
-            "image/webp".toMediaType()
-        }
+                    val isPutSuccess = try {
+                        client.newCall(putRequest).execute().use { response ->
+                            response.isSuccessful
+                        }
+                    } catch (_: Exception) {
+                        false
+                    }
 
-        val putRequest = Request.Builder()
-            .url(uploadUrl)
-            .header("Content-Type", mimeType)
-            .put(bytes.toRequestBody(mediaType))
-            .build()
-
-        val isPutSuccess = try {
-            client.newCall(putRequest).execute().use { response ->
-                response.isSuccessful
+                    if (isPutSuccess) {
+                        return@withContext CustomerResult.Ok(
+                            UploadChatAttachmentResult(
+                                objectKey = objectKey,
+                                publicUrl = publicUrl?.takeIf { it.isNotBlank() } ?: normalizeMediaUrl(objectKey),
+                            )
+                        )
+                    }
+                }
             }
         } catch (_: Exception) {
-            false
+            // Presign/PUT failed, fallback below
         }
 
-        if (!isPutSuccess) {
-            return@withContext CustomerResult.Failed(
-                CustomerError.Network,
-                "Failed to upload media to storage",
-            )
+        // 2. Direct server upload fallback (resilient to cloud storage auth/permission glitches)
+        val base64Str = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        val directBody = JSONObject()
+            .put("conversationId", conversationId)
+            .put("filename", filename)
+            .put("contentType", mimeType)
+            .put("base64", base64Str)
+
+        val directRaw = send(token, "POST", "/api/upload/direct", directBody)
+        if (directRaw is Raw.Success) {
+            val directData = (directRaw.data as? JSONObject)?.optJSONObject("data")
+                ?: directRaw.data as? JSONObject
+            val dObjectKey = directData?.optString("objectKey")
+            val dPublicUrl = directData?.optString("publicUrl")
+            if (!dObjectKey.isNullOrBlank()) {
+                return@withContext CustomerResult.Ok(
+                    UploadChatAttachmentResult(
+                        objectKey = dObjectKey,
+                        publicUrl = dPublicUrl?.takeIf { it.isNotBlank() } ?: normalizeMediaUrl(dObjectKey),
+                    )
+                )
+            }
         }
 
-        CustomerResult.Ok(
-            UploadChatAttachmentResult(
-                objectKey = objectKey,
-                publicUrl = publicUrl?.takeIf { it.isNotBlank() } ?: normalizeMediaUrl(objectKey),
-            )
+        val directFailure = directRaw as? Raw.Failure
+        CustomerResult.Failed(
+            directFailure?.error ?: CustomerError.Network,
+            directFailure?.message ?: "Failed to upload media attachment to server",
         )
     }
 
