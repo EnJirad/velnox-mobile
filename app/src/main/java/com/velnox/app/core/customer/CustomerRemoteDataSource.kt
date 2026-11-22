@@ -432,9 +432,12 @@ class CustomerRemoteDataSource(
                     res = res.copy(clientId = effectiveClientId)
                 }
                 if (res.mediaUrl == null && (mediaUrl != null || attachmentKey != null)) {
+                    val resolvedType = mediaType
+                        ?: if (attachmentKey?.endsWith(".mp4", ignoreCase = true) == true || mediaUrl?.endsWith(".mp4", ignoreCase = true) == true) "video"
+                        else "image"
                     res = res.copy(
                         mediaUrl = mediaUrl ?: normalizeMediaUrl(attachmentKey),
-                        mediaType = mediaType ?: "image",
+                        mediaType = resolvedType,
                     )
                 }
                 res
@@ -838,7 +841,18 @@ class CustomerRemoteDataSource(
         val last = obj.opt("lastMessage") ?: obj.opt("last_message")
         val lastText = when (last) {
             is String -> last.trim().takeIf { it.isNotEmpty() }
-            is JSONObject -> last.str("body", "text", "content")
+            is JSONObject -> {
+                val t = last.str("body", "text", "content")
+                if (t.isNullOrBlank()) {
+                    val mType = last.str("mediaType", "media_type", "type")
+                    val aKey = last.str("attachmentKey", "attachment_key", "mediaUrl", "media_url", "attachmentUrl")
+                    when {
+                        mType == "video" || aKey?.endsWith(".mp4", ignoreCase = true) == true -> "[วิดีโอ]"
+                        mType == "image" || aKey != null -> "[รูปภาพ]"
+                        else -> null
+                    }
+                } else t
+            }
             else -> null
         }
         val convType = obj.str("type")?.uppercase()

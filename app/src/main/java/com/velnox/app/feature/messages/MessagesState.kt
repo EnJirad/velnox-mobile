@@ -126,8 +126,8 @@ object MessagesState {
             if (idx >= 0) {
                 val previewText = when {
                     result.value.text.isNotBlank() && result.value.text != "[รูปภาพ]" && result.value.text != "[วิดีโอ]" -> result.value.text
-                    mediaType == "video" -> "[วิดีโอ]"
-                    mediaUrl != null || attachmentKey != null -> "[รูปภาพ]"
+                    mediaType == "video" || result.value.mediaType == "video" || attachmentKey?.endsWith(".mp4", ignoreCase = true) == true -> "[วิดีโอ]"
+                    mediaUrl != null || attachmentKey != null || result.value.mediaUrl != null -> "[รูปภาพ]"
                     else -> result.value.text
                 }
                 val updated = conversations[idx].copy(
@@ -287,7 +287,12 @@ object MessagesState {
                 val id = obj.optString("id")
                 val rawText = obj.optString("text")
                 val mediaUrl = if (obj.isNull("mediaUrl")) null else obj.optString("mediaUrl").takeIf { it.isNotBlank() }
-                val mediaType = if (obj.isNull("mediaType")) null else obj.optString("mediaType").takeIf { it.isNotBlank() }
+                val mediaType = (if (obj.isNull("mediaType")) null else obj.optString("mediaType").takeIf { it.isNotBlank() })
+                    ?: when {
+                        mediaUrl?.endsWith(".mp4", ignoreCase = true) == true || mediaUrl?.contains("video") == true -> "video"
+                        mediaUrl != null -> "image"
+                        else -> null
+                    }
                 val body = rawText.takeIf { it.isNotBlank() } ?: when (mediaType) {
                     "video" -> "[วิดีโอ]"
                     else -> if (mediaUrl != null) "[รูปภาพ]" else ""

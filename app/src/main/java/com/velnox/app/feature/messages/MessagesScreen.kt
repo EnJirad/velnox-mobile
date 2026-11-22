@@ -1768,7 +1768,17 @@ private fun InstagramBubble(
             ) {
                 Column(modifier = Modifier.padding(horizontal = if (mediaUrl != null) 6.dp else 14.dp, vertical = if (mediaUrl != null) 6.dp else 9.dp)) {
                     if (mediaUrl != null) {
-                        if (mediaType == "video") {
+                        val isVideo = mediaType == "video" || mediaUrl.endsWith(".mp4", ignoreCase = true) || mediaUrl.endsWith(".webm", ignoreCase = true) || mediaUrl.endsWith(".mov", ignoreCase = true)
+                        if (isVideo) {
+                            val localThumbUri = remember(mediaUrl) {
+                                if (mediaUrl.startsWith("file://")) {
+                                    val f = File(Uri.parse(mediaUrl).path ?: "")
+                                    val name = f.nameWithoutExtension
+                                    val thumbName = name.replaceFirst("vid_", "thumb_") + ".webp"
+                                    val thumbFile = File(f.parentFile, thumbName)
+                                    if (thumbFile.exists()) Uri.fromFile(thumbFile) else null
+                                } else null
+                            }
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1780,19 +1790,32 @@ private fun InstagramBubble(
                                     },
                                 contentAlignment = Alignment.Center,
                             ) {
+                                if (localThumbUri != null) {
+                                    AsyncImage(
+                                        model = localThumbUri,
+                                        contentDescription = stringResource(R.string.messages_video_label),
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.35f)),
+                                    )
+                                }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Box(
                                         modifier = Modifier
                                             .size(46.dp)
                                             .clip(Circle)
-                                            .background(Color.White.copy(alpha = 0.25f)),
+                                            .background(Color.Black.copy(alpha = 0.5f)),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Icon(
                                             imageVector = VelnoxIcons.Play,
                                             contentDescription = stringResource(R.string.messages_video_label),
                                             tint = Color.White,
-                                            modifier = Modifier.size(20.dp),
+                                            modifier = Modifier.size(22.dp),
                                         )
                                     }
                                     Spacer(Modifier.height(6.dp))
@@ -1870,7 +1893,17 @@ private fun InstagramBubble(
                 ) {
                     Column(horizontalAlignment = Alignment.End) {
                         if (mediaUrl != null) {
-                            if (mediaType == "video") {
+                            val isVideo = mediaType == "video" || mediaUrl.endsWith(".mp4", ignoreCase = true) || mediaUrl.endsWith(".webm", ignoreCase = true) || mediaUrl.endsWith(".mov", ignoreCase = true)
+                            if (isVideo) {
+                                val localThumbUri = remember(mediaUrl) {
+                                    if (mediaUrl.startsWith("file://")) {
+                                        val f = File(Uri.parse(mediaUrl).path ?: "")
+                                        val name = f.nameWithoutExtension
+                                        val thumbName = name.replaceFirst("vid_", "thumb_") + ".webp"
+                                        val thumbFile = File(f.parentFile, thumbName)
+                                        if (thumbFile.exists()) Uri.fromFile(thumbFile) else null
+                                    } else null
+                                }
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1882,19 +1915,32 @@ private fun InstagramBubble(
                                         },
                                     contentAlignment = Alignment.Center,
                                 ) {
+                                    if (localThumbUri != null) {
+                                        AsyncImage(
+                                            model = localThumbUri,
+                                            contentDescription = stringResource(R.string.messages_video_label),
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Black.copy(alpha = 0.35f)),
+                                        )
+                                    }
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Box(
                                             modifier = Modifier
                                                 .size(46.dp)
                                                 .clip(Circle)
-                                                .background(Color.White.copy(alpha = 0.25f)),
+                                                .background(Color.Black.copy(alpha = 0.5f)),
                                             contentAlignment = Alignment.Center,
                                         ) {
                                             Icon(
                                                 imageVector = VelnoxIcons.Play,
                                                 contentDescription = stringResource(R.string.messages_video_label),
                                                 tint = Color.White,
-                                                modifier = Modifier.size(20.dp),
+                                                modifier = Modifier.size(22.dp),
                                             )
                                         }
                                         Spacer(Modifier.height(6.dp))
