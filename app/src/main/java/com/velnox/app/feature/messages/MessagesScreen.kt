@@ -1154,34 +1154,6 @@ fun ConversationScreen(
                 }
             }
 
-            // Quick Emoji Reaction Bar (Horizontal Scroll)
-            val quickEmojis = remember {
-                listOf("❤️", "👍", "😂", "🔥", "🙏", "👏", "😮", "🎉", "💯", "🥰", "✨", "📦", "🛒", "🛍️", "💳", "🏬")
-            }
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = PageGutter, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(quickEmojis) { emoji ->
-                    Box(
-                        modifier = Modifier
-                            .clip(Circle)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
-                            .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), Circle)
-                            .velnoxClickable(role = Role.Button) {
-                                inputText += emoji
-                                sendError = null
-                            }
-                            .padding(horizontal = 9.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(text = emoji, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-
             // Main Input Action Row
             Row(
                 modifier = Modifier
