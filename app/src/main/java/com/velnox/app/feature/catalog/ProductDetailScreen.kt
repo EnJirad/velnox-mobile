@@ -723,6 +723,36 @@ fun ProductDetailScreen(
                                                 color = MaterialTheme.colorScheme.onSurface,
                                             )
                                         }
+                                        if (onContactSeller != null && !shopTarget.isNullOrBlank()) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(SquircleXs)
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                    .velnoxClickable(role = Role.Button) {
+                                                        onContactSeller.invoke(shopTarget, product.id)
+                                                    }
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                ) {
+                                                    Icon(
+                                                        imageVector = VelnoxIcons.MessageCircle,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.onSurface,
+                                                        modifier = Modifier.size(13.dp),
+                                                    )
+                                                    Text(
+                                                        text = stringResource(R.string.product_chat_seller),
+                                                        style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                    )
+                                                }
+                                            }
+                                            Spacer(Modifier.width(6.dp))
+                                        }
                                         if (!shopTarget.isNullOrBlank() && onOpenShop != null) {
                                             Box(
                                                 modifier = Modifier
@@ -1770,20 +1800,15 @@ private fun BottomPurchaseArea(
                 }
             }
 
-            // Add to Cart (Secondary style)
+            // Add to Cart (Emerald Solid style per Velnox DS)
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp)
                     .clip(Squircle)
                     .background(
-                        if (canPurchase) MaterialTheme.colorScheme.surface
+                        if (canPurchase) VelnoxBrand
                         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = if (canPurchase) VelnoxBrand else MaterialTheme.colorScheme.outline,
-                        shape = Squircle,
                     )
                     .velnoxClickable(
                         enabled = canPurchase,
@@ -1796,28 +1821,30 @@ private fun BottomPurchaseArea(
                     Icon(
                         imageVector = VelnoxIcons.ShoppingCart,
                         contentDescription = null,
-                        tint = if (canPurchase) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (canPurchase) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text = stringResource(R.string.product_add_to_cart),
                         style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                        color = if (canPurchase) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (canPurchase) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            // Buy Now (Primary solid style)
+            // Buy Now (Dark solid primary style per Velnox DS)
+            val buyNowBg = if (!canPurchase) {
+                MaterialTheme.colorScheme.surfaceVariant
+            } else {
+                if (androidx.compose.foundation.isSystemInDarkTheme()) Color(0xFF1E293B) else Color(0xFF0F172A)
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp)
                     .clip(Squircle)
-                    .background(
-                        if (canPurchase) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                    )
+                    .background(buyNowBg)
                     .velnoxClickable(
                         enabled = canPurchase,
                         role = Role.Button,
@@ -1833,7 +1860,7 @@ private fun BottomPurchaseArea(
                     },
                     style = TextXs.copy(fontWeight = FontWeight.SemiBold),
                     color = if (canPurchase) {
-                        MaterialTheme.colorScheme.onPrimary
+                        Color.White
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },

@@ -225,13 +225,103 @@ fun CheckoutScreen(
     StandaloneScreen(
         title = stringResource(R.string.checkout_title),
         onBack = onBack,
+        scrollable = false,
+        horizontalPadding = 0.dp,
         modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            // 5. Bottom Sticky Checkout Bar
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    .navigationBarsPadding()
+                    .padding(horizontal = PageGutter, vertical = 12.dp),
+            ) {
+                if (submitError != null) {
+                    Text(
+                        text = submitError.orEmpty(),
+                        style = Text2xs,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.checkout_total_payment),
+                            style = Text2xs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = formattedGrandTotal,
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = VelnoxBrand,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    PrimaryPill(
+                        label = stringResource(
+                            if (isSubmitting) R.string.checkout_placing_order else R.string.checkout_place_order,
+                        ),
+                        onClick = {
+                            val address = activeAddress
+                            if (isSubmitting) {
+                                // Submission already in flight.
+                            } else if (address == null) {
+                                submitError = context.getString(R.string.checkout_address_required)
+                            } else {
+                                isSubmitting = true
+                                submitError = null
+                                scope.launch {
+                                    val req = CheckoutRequest(
+                                        shippingAddressId = address.id,
+                                        items = selectedItems.map {
+                                            CheckoutLine(
+                                                productId = it.productId,
+                                                variantId = it.variantId,
+                                                quantity = it.quantity,
+                                            )
+                                        },
+                                        paymentMethod = selectedPayment.wireValue,
+                                        cartItemIds = selectedRemoteIds.takeIf { it.isNotEmpty() },
+                                        shippingQuoteId = quote?.quoteId,
+                                        requestId = requestId,
+                                        shippingAddress = address.toInput(),
+                                    )
+                                    when (val res = repository.call { api, token -> api.checkout(token, req) }) {
+                                        is CustomerResult.Ok -> {
+                                            createdOrderId = res.value.primaryOrderId
+                                            createdOrderNumber = res.value.primaryOrderNumber
+                                            cartState.load(repository)
+                                            if (selectedPayment == PaymentMethod.PromptPay) {
+                                                showPromptPayQr = true
+                                            } else {
+                                                isOrderSuccess = true
+                                            }
+                                        }
+
+                                        is CustomerResult.Failed -> {
+                                            submitError = res.userMessage(context)
+                                        }
+                                    }
+                                    isSubmitting = false
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        },
     ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(bottom = 16.dp),
+            contentPadding = PaddingValues(horizontal = PageGutter, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // 1. Delivery Address Card (real server addresses only)
@@ -283,93 +373,6 @@ fun CheckoutScreen(
                     quoteError = quoteError,
                     onRetryQuote = { quoteRetryTick++ },
                     locale = locale,
-                )
-            }
-        }
-
-        // 5. Bottom Sticky Checkout Bar
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                .navigationBarsPadding()
-                .padding(horizontal = PageGutter, vertical = 12.dp),
-        ) {
-            if (submitError != null) {
-                Text(
-                    text = submitError.orEmpty(),
-                    style = Text2xs,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.checkout_total_payment),
-                        style = Text2xs,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = formattedGrandTotal,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = VelnoxBrand,
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                PrimaryPill(
-                    label = stringResource(
-                        if (isSubmitting) R.string.checkout_placing_order else R.string.checkout_place_order,
-                    ),
-                    onClick = {
-                        val address = activeAddress
-                        if (isSubmitting) {
-                            // Submission already in flight.
-                        } else if (address == null) {
-                            submitError = context.getString(R.string.checkout_address_required)
-                        } else {
-                            isSubmitting = true
-                            submitError = null
-                            scope.launch {
-                                val req = CheckoutRequest(
-                                    shippingAddressId = address.id,
-                                    items = selectedItems.map {
-                                        CheckoutLine(
-                                            productId = it.productId,
-                                            variantId = it.variantId,
-                                            quantity = it.quantity,
-                                        )
-                                    },
-                                    paymentMethod = selectedPayment.wireValue,
-                                    cartItemIds = selectedRemoteIds.takeIf { it.isNotEmpty() },
-                                    shippingQuoteId = quote?.quoteId,
-                                    requestId = requestId,
-                                    shippingAddress = address.toInput(),
-                                )
-                                when (val res = repository.call { api, token -> api.checkout(token, req) }) {
-                                    is CustomerResult.Ok -> {
-                                        createdOrderId = res.value.primaryOrderId
-                                        createdOrderNumber = res.value.primaryOrderNumber
-                                        cartState.load(repository)
-                                        if (selectedPayment == PaymentMethod.PromptPay) {
-                                            showPromptPayQr = true
-                                        } else {
-                                            isOrderSuccess = true
-                                        }
-                                    }
-
-                                    is CustomerResult.Failed -> {
-                                        submitError = res.userMessage(context)
-                                    }
-                                }
-                                isSubmitting = false
-                            }
-                        }
-                    },
                 )
             }
         }

@@ -342,44 +342,31 @@ fun HomeScreen(
                             }
 
                             val items = current.items
-                            val popularProducts = items.take(6)
-                            val trendingProducts = items.drop(3).take(6)
+                            val specialDeals = items.filter {
+                                val disp = it.displayPrice
+                                (it.discountPercent != null && it.discountPercent > 0) ||
+                                (it.compareAtPrice != null && disp != null && it.compareAtPrice > disp)
+                            }.take(8)
                             val bestSellers = items
                                 .filter { it.soldCount > 0 }
                                 .sortedByDescending { it.soldCount }
-                                .take(6)
-                                .ifEmpty { items.drop(6).take(6) }
-                            val recommendedProducts = items.drop(9).take(6).ifEmpty { items.take(6) }
-                            val newArrivals = items.takeLast(6)
-                            val specialDeals = items.filter { it.price != null && it.price == 0.0 }
+                                .take(8)
+                            val newArrivals = items.takeLast(8)
 
-                            // 4. Popular Products
-                            if (popularProducts.isNotEmpty()) {
-                                item(key = "popular-products", contentType = "section") {
+                            // 4. Special Deals (only when genuine promotions exist)
+                            if (specialDeals.isNotEmpty()) {
+                                item(key = "special-deals", contentType = "section") {
                                     ProductSectionRail(
-                                        title = stringResource(R.string.home_popular_products_title),
-                                        subtitle = stringResource(R.string.home_popular_products_subtitle),
-                                        products = popularProducts,
+                                        title = stringResource(R.string.home_special_deals_title),
+                                        subtitle = stringResource(R.string.home_special_deals_subtitle),
+                                        products = specialDeals,
                                         onOpenProduct = onOpenProduct,
                                         onViewAll = { onOpenListing(ALL_CATEGORY) },
                                     )
                                 }
                             }
 
-                            // 5. Trending Products or Trending Categories
-                            if (trendingProducts.isNotEmpty()) {
-                                item(key = "trending-products", contentType = "section") {
-                                    ProductSectionRail(
-                                        title = stringResource(R.string.home_trending_title),
-                                        subtitle = stringResource(R.string.home_trending_subtitle),
-                                        products = trendingProducts,
-                                        onOpenProduct = onOpenProduct,
-                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
-                                    )
-                                }
-                            }
-
-                            // 6. Best Sellers
+                            // 5. Best Sellers
                             if (bestSellers.isNotEmpty()) {
                                 item(key = "best-sellers", contentType = "section") {
                                     ProductSectionRail(
@@ -392,39 +379,13 @@ fun HomeScreen(
                                 }
                             }
 
-                            // 7. Recommended Products
-                            if (recommendedProducts.isNotEmpty()) {
-                                item(key = "recommended-products", contentType = "section") {
-                                    ProductSectionRail(
-                                        title = stringResource(R.string.home_recommended_title),
-                                        subtitle = stringResource(R.string.home_recommended_subtitle),
-                                        products = recommendedProducts,
-                                        onOpenProduct = onOpenProduct,
-                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
-                                    )
-                                }
-                            }
-
-                            // 8. New Arrivals
+                            // 6. New Arrivals
                             if (newArrivals.isNotEmpty()) {
                                 item(key = "new-arrivals", contentType = "section") {
                                     ProductSectionRail(
                                         title = stringResource(R.string.home_new_arrivals_title),
                                         subtitle = stringResource(R.string.home_new_arrivals_subtitle),
                                         products = newArrivals,
-                                        onOpenProduct = onOpenProduct,
-                                        onViewAll = { onOpenListing(ALL_CATEGORY) },
-                                    )
-                                }
-                            }
-
-                            // 9. Special Deals (only when genuine promotions exist)
-                            if (specialDeals.isNotEmpty()) {
-                                item(key = "special-deals", contentType = "section") {
-                                    ProductSectionRail(
-                                        title = stringResource(R.string.home_special_deals_title),
-                                        subtitle = stringResource(R.string.home_special_deals_subtitle),
-                                        products = specialDeals,
                                         onOpenProduct = onOpenProduct,
                                         onViewAll = { onOpenListing(ALL_CATEGORY) },
                                     )
@@ -795,13 +756,21 @@ private fun SeasonalBanner(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val bannerBrush = androidx.compose.ui.graphics.Brush.linearGradient(
+        colors = listOf(
+            Color(0xFF0F172A),
+            Color(0xFF064E3B),
+            Color(0xFF047857),
+        ),
+    )
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(SquircleLg)
-            .background(MaterialTheme.colorScheme.primary),
+            .background(bannerBrush)
+            .velnoxClickable(role = Role.Button, onClick = onClick),
     ) {
-        val onPrimary = MaterialTheme.colorScheme.onPrimary
+        val onPrimary = Color.White
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
                 color = VelnoxBrand.copy(alpha = 0.22f),
@@ -822,14 +791,14 @@ private fun SeasonalBanner(
             Text(
                 text = stringResource(R.string.home_hero_title),
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = Color.White,
                 modifier = Modifier.widthIn(max = 240.dp),
             )
             Spacer(Modifier.height(VelnoxSpacing.xs))
             Text(
                 text = stringResource(R.string.home_hero_body),
                 style = TextXs,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.74f),
+                color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier.widthIn(max = 260.dp),
             )
             Spacer(Modifier.height(VelnoxSpacing.lg))
@@ -837,20 +806,19 @@ private fun SeasonalBanner(
                 modifier = Modifier
                     .heightIn(min = 44.dp)
                     .clip(SquircleSm)
-                    .background(MaterialTheme.colorScheme.secondary)
-                    .velnoxClickable(role = Role.Button, onClick = onClick)
+                    .background(VelnoxBrand)
                     .padding(horizontal = VelnoxSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = stringResource(R.string.home_hero_cta),
                     style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSecondary,
+                    color = Color.White,
                 )
                 Icon(
                     imageVector = VelnoxIcons.ArrowRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondary,
+                    tint = Color.White,
                     modifier = Modifier
                         .padding(start = VelnoxSpacing.xs)
                         .size(14.dp),
@@ -962,6 +930,23 @@ internal fun ProductCard(
                 outOfStock = product.inStock == false,
                 modifier = Modifier.aspectRatio(1f),
             )
+            product.discountPercent?.takeIf { it > 0 }?.let { discount ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .clip(SquircleXs)
+                        .background(Color(0xFFEF4444))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "-$discount%",
+                        style = Text2xs.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                    )
+                }
+            }
             val isFav = WishlistState.isFavorite(product.id)
             val cardScope = rememberCoroutineScope()
             val session = LocalSession.current
@@ -970,9 +955,9 @@ internal fun ProductCard(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(4.dp)
-                    .size(28.dp)
+                    .size(34.dp)
                     .clip(Circle)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f))
                     .velnoxClickable(role = Role.Button) {
                         val wishItem = WishlistItem(
                             productId = product.id,
@@ -996,7 +981,7 @@ internal fun ProductCard(
                     imageVector = if (isFav) VelnoxIcons.HeartFill else VelnoxIcons.Heart,
                     contentDescription = null,
                     tint = if (isFav) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
@@ -1019,60 +1004,77 @@ internal fun ProductCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if ((product.rating != null && product.rating > 0) || product.soldCount > 0) {
+            Spacer(Modifier.height(3.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (product.rating != null && product.rating > 0) {
+                    Icon(
+                        imageVector = VelnoxIcons.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFF59E0B),
+                        modifier = Modifier.size(11.dp),
+                    )
+                    Text(
+                        text = "%.1f".format(locale, product.rating),
+                        style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (product.reviewCount > 0) {
+                        Text(
+                            text = "(${product.reviewCount})",
+                            style = Text2xs,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (product.rating != null && product.rating > 0 && product.soldCount > 0) {
+                    Text(
+                        text = "•",
+                        style = Text2xs,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (product.soldCount > 0) {
+                    Text(
+                        text = stringResource(R.string.product_sold, product.soldCount),
+                        style = Text2xs,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(6.dp))
         val priceToDisplay = product.displayPrice
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                PriceFormat.format(priceToDisplay, product.currency, locale)?.let { price ->
+            PriceFormat.format(priceToDisplay, product.currency, locale)?.let { price ->
+                Text(
+                    text = price,
+                    style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            }
+            if (product.compareAtPrice != null && priceToDisplay != null && product.compareAtPrice > priceToDisplay) {
+                PriceFormat.format(product.compareAtPrice, product.currency, locale)?.let { original ->
                     Text(
-                        text = price,
-                        style = TextXs.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        text = original,
+                        style = Text2xs.copy(
+                            textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                     )
                 }
-                if (product.compareAtPrice != null && priceToDisplay != null && product.compareAtPrice > priceToDisplay) {
-                    PriceFormat.format(product.compareAtPrice, product.currency, locale)?.let { original ->
-                        Text(
-                            text = original,
-                            style = Text2xs.copy(
-                                textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                }
             }
-            product.discountPercent?.takeIf { it > 0 }?.let { discount ->
-                Text(
-                    text = "-$discount%",
-                    style = Text2xs.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .clip(SquircleXs)
-                        .background(MaterialTheme.colorScheme.errorContainer)
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                )
-            } ?: Icon(
-                imageVector = VelnoxIcons.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(14.dp),
-            )
-        }
-        if (product.soldCount > 0) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.product_sold, product.soldCount),
-                style = Text2xs,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }

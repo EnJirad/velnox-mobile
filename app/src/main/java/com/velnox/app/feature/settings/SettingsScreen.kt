@@ -160,12 +160,6 @@ fun SettingsScreen(
                 onClick = { showSignOut = true },
             )
         }
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = stringResource(R.string.settings_sign_out_demo),
-            style = TextXs,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 
     if (showSignOut) {

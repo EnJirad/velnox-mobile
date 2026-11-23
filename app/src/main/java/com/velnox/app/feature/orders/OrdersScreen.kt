@@ -313,24 +313,28 @@ private fun OrderCard(order: CustomerOrder, onClick: () -> Unit) {
         }
         if (uiStatus == OrderStatus.Pending) {
             Spacer(Modifier.height(8.dp))
+            val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val bannerBg = if (isDark) Color(0xFF451A03) else Color(0xFFFEF3C7)
+            val bannerText = if (isDark) Color(0xFFFDE68A) else Color(0xFF92400E)
+            val bannerAction = if (isDark) Color(0xFFFBBF24) else Color(0xFFB45309)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(SquircleSm)
-                    .background(Color(0xFFFEF3C7))
+                    .background(bannerBg)
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = stringResource(R.string.checkout_payment_promptpay),
+                    text = formatPaymentMethod(order.paymentMethod) ?: stringResource(R.string.checkout_payment_promptpay),
                     style = Text2xs.copy(fontWeight = FontWeight.Medium),
-                    color = Color(0xFF92400E),
+                    color = bannerText,
                 )
                 Text(
                     text = stringResource(R.string.orders_pay_now),
                     style = Text2xs.copy(fontWeight = FontWeight.Bold),
-                    color = Color(0xFFB45309),
+                    color = bannerAction,
                 )
             }
         }
@@ -772,6 +776,39 @@ private fun formatPaymentMethod(raw: String?): String? = when (raw?.uppercase())
 
 @Composable
 private fun OrderTimeline(status: OrderStatus) {
+    if (status == OrderStatus.Cancelled || status == OrderStatus.Returned) {
+        val isCancelled = status == OrderStatus.Cancelled
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(SquircleSm)
+                .background(if (isCancelled) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (isCancelled) VelnoxIcons.Close else VelnoxIcons.RotateCcw,
+                contentDescription = null,
+                tint = if (isCancelled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = stringResource(if (isCancelled) R.string.orders_status_cancelled else R.string.orders_status_returned),
+                    style = TextXs.copy(fontWeight = FontWeight.Bold),
+                    color = if (isCancelled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(if (isCancelled) R.string.orders_status_cancelled else R.string.orders_status_returned),
+                    style = Text2xs,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        return
+    }
+
     val steps = listOf(
         R.string.orders_timeline_placed,
         R.string.orders_timeline_paid,
@@ -785,7 +822,7 @@ private fun OrderTimeline(status: OrderStatus) {
         OrderStatus.Shipping -> 4
         OrderStatus.Completed -> 5
         OrderStatus.Cancelled -> 1
-        OrderStatus.Returned -> 5
+        OrderStatus.Returned -> 1
     }
     Column {
         steps.forEachIndexed { index, stepRes ->

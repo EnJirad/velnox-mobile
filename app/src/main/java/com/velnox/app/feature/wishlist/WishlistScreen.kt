@@ -98,6 +98,8 @@ fun WishlistScreen(
     StandaloneScreen(
         title = stringResource(R.string.wishlist_title),
         onBack = onBack,
+        scrollable = false,
+        horizontalPadding = 0.dp,
         modifier = modifier.fillMaxSize(),
     ) {
         if (items.isEmpty()) {
@@ -166,7 +168,7 @@ fun WishlistScreen(
                                     quantity = 1,
                                 )
                                 actionNotice = when (res) {
-                                    is CustomerResult.Ok -> "เพิ่ม ${item.name} ลงตะกร้าแล้ว"
+                                    is CustomerResult.Ok -> context.getString(R.string.product_added_to_cart, item.name)
                                     is CustomerResult.Failed -> res.userMessage(context)
                                 }
                                 delay(3000)
@@ -178,7 +180,7 @@ fun WishlistScreen(
                                 when (val res = WishlistState.toggleRemote(repository, item)) {
                                     is CustomerResult.Ok -> {
                                         recentlyRemoved = item
-                                        actionNotice = "นำออกจากรายการโปรดแล้ว"
+                                        actionNotice = context.getString(R.string.wishlist_removed)
                                         delay(4000)
                                         if (recentlyRemoved == item) {
                                             recentlyRemoved = null

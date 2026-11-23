@@ -22,6 +22,9 @@ val VelnoxBrand = Color(0xFF10B981)
 val VelnoxBrandForeground = Color(0xFFFFFFFF)
 val VelnoxBrandSoft = Color(0xFFECFDF5)
 val VelnoxBrandSoftForeground = Color(0xFF047857)
+val VelnoxBrandStrong = Color(0xFF059669)
+val VelnoxBrandDeep = Color(0xFF0F766E)
+val VelnoxBrandLight = Color(0xFF34D399)
 
 // Secondary / muted — neutral supporting UI
 val VelnoxSecondary = Color(0xFFF1F5F9)

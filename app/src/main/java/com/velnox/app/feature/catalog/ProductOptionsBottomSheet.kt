@@ -659,6 +659,7 @@ fun ProductOptionsBottomSheet(
 
                     ProductSelectionIntent.BUY_NOW -> {
                         // User opened with Buy Now intent -> ONLY Buy Now button
+                        val buyNowBg = if (androidx.compose.foundation.isSystemInDarkTheme()) Color(0xFF1E293B) else Color(0xFF0F172A)
                         Button(
                             onClick = {
                                 onBuyNow?.invoke(matchedVariant, currentQuantity, previewImage)
@@ -670,8 +671,8 @@ fun ProductOptionsBottomSheet(
                                 .height(50.dp),
                             shape = SquircleLg,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                containerColor = buyNowBg,
+                                contentColor = Color.White,
                             ),
                         ) {
                             Text(
@@ -693,7 +694,7 @@ fun ProductOptionsBottomSheet(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             // Add to Cart
-                            OutlinedButton(
+                            Button(
                                 onClick = {
                                     onAddToCart?.invoke(matchedVariant, currentQuantity, previewImage)
                                     onDismissRequest()
@@ -703,20 +704,16 @@ fun ProductOptionsBottomSheet(
                                     .weight(1f)
                                     .height(50.dp),
                                 shape = SquircleLg,
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = VelnoxBrand,
-                                ),
-                                border = ButtonDefaults.outlinedButtonBorder.copy(
-                                    brush = androidx.compose.ui.graphics.SolidColor(
-                                        if (!isOutOfStock) VelnoxBrand else MaterialTheme.colorScheme.outline,
-                                    ),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = VelnoxBrand,
+                                    contentColor = Color.White,
                                 ),
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = VelnoxIcons.ShoppingCart,
                                         contentDescription = null,
-                                        tint = if (!isOutOfStock) VelnoxBrand else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = Color.White,
                                         modifier = Modifier.size(16.dp),
                                     )
                                     Spacer(Modifier.width(6.dp))
@@ -728,6 +725,7 @@ fun ProductOptionsBottomSheet(
                             }
 
                             // Buy Now
+                            val buyNowBg = if (androidx.compose.foundation.isSystemInDarkTheme()) Color(0xFF1E293B) else Color(0xFF0F172A)
                             Button(
                                 onClick = {
                                     onBuyNow?.invoke(matchedVariant, currentQuantity, previewImage)
@@ -739,8 +737,8 @@ fun ProductOptionsBottomSheet(
                                     .height(50.dp),
                                 shape = SquircleLg,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = buyNowBg,
+                                    contentColor = Color.White,
                                 ),
                             ) {
                                 Text(

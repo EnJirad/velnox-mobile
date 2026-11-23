@@ -43,13 +43,13 @@ private val VelnoxLightColors = lightColorScheme(
     inverseOnSurface = VelnoxPrimaryForeground,
 )
 
-// Slate is the dark neutral of the system, white is the primary action there.
+// Slate is the dark neutral of the system, emerald brand is the primary action.
 private val VelnoxDarkColors = darkColorScheme(
-    primary = Color(0xFFF8FAFC),
-    onPrimary = VelnoxPrimary,
+    primary = VelnoxBrand,
+    onPrimary = Color.White,
     primaryContainer = Color(0xFF1E293B),
     onPrimaryContainer = VelnoxSlate100,
-    secondary = VelnoxBrand,
+    secondary = VelnoxBrandLight,
     onSecondary = VelnoxPrimary,
     secondaryContainer = Color(0xFF064E3B),
     onSecondaryContainer = Color(0xFFD1FAE5),

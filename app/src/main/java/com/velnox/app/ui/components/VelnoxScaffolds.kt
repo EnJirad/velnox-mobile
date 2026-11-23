@@ -58,6 +58,9 @@ fun StandaloneScreen(
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
+    scrollable: Boolean = true,
+    horizontalPadding: androidx.compose.ui.unit.Dp = PageGutter,
+    bottomBar: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -75,11 +78,19 @@ fun StandaloneScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = PageGutter)
-                .padding(top = 12.dp, bottom = 28.dp),
+                .then(
+                    if (scrollable) {
+                        Modifier
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = horizontalPadding)
+                            .padding(top = 12.dp, bottom = 28.dp)
+                    } else {
+                        Modifier.padding(horizontal = horizontalPadding)
+                    }
+                ),
             content = content,
         )
+        bottomBar?.invoke()
     }
 }
 
