@@ -190,6 +190,21 @@ class AuthRemoteDataSource(
             }
         }
 
+    override suspend fun lineSignIn(idToken: String, nonce: String?): ApiResult<AuthSession> =
+        router.executeWithFailover(isIdempotent = true) { host, dialect ->
+            val path = if (dialect == BackendDialect.WORKERS_V1) "/api/v1/auth/line" else "/api/auth/mobile/line"
+            val body = JSONObject().put("idToken", idToken).apply {
+                if (!nonce.isNullOrBlank()) put("nonce", nonce)
+            }
+            val raw = post(host, path, body, isSignIn = true, dialect = dialect)
+            if (raw is Raw.Fail && raw.statusCode == 404 && dialect == BackendDialect.WORKERS_V1) {
+                post(host, "/api/auth/mobile/line", body, isSignIn = true, dialect = BackendDialect.EXPRESS_LEGACY)
+                    .toSessionResult(host, BackendDialect.EXPRESS_LEGACY)
+            } else {
+                raw.toSessionResult(host, dialect)
+            }
+        }
+
     /** `POST /api/auth/mobile/link`. */
     override suspend fun linkGoogle(idToken: String, sessionToken: String): ApiResult<Unit> =
         router.executeWithFailover(isIdempotent = true) { host, dialect ->
@@ -387,8 +402,8 @@ class AuthRemoteDataSource(
         }
 
         return when {
-            code == "INVALID_GOOGLE_TOKEN" || code == "EMAIL_NOT_VERIFIED" -> AuthError.InvalidProviderToken
-            code == "GOOGLE_NOT_CONFIGURED" || code == "GOOGLE_UNAVAILABLE" -> AuthError.ProviderUnavailable
+            code == "INVALID_GOOGLE_TOKEN" || code == "EMAIL_NOT_VERIFIED" || code == "INVALID_LINE_TOKEN" -> AuthError.InvalidProviderToken
+            code == "GOOGLE_NOT_CONFIGURED" || code == "GOOGLE_UNAVAILABLE" || code == "LINE_NOT_CONFIGURED" || code == "LINE_UNAVAILABLE" -> AuthError.ProviderUnavailable
             code == "LINK_REQUIRED" -> AuthError.LinkRequired
             code == "EMAIL_MISMATCH" -> AuthError.EmailMismatch
             code == "IDENTITY_CONFLICT" -> AuthError.IdentityConflict

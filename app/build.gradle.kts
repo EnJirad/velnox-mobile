@@ -40,14 +40,26 @@ android {
         // Google Sign-In needs the *Web* OAuth client id as its `serverClientId`,
         // because the ID token's `aud` must match what the backend verifies.
         // It is a public identifier, not a secret, but it is deployment
-        // configuration, so it is not hard-coded: supply it with
-        // -PvelnoxGoogleClientId=… or let the app read it from
-        // GET /api/auth/mobile/config at runtime. Empty means "not configured",
-        // and the app says so instead of opening a flow that cannot finish.
+        // configuration: supply it with -PvelnoxGoogleClientId=… or use deployment default.
         val googleClientId = (project.findProperty("velnoxGoogleClientId") as String?)
             ?.trim()
-            .orEmpty()
+            ?.ifEmpty { null }
+            ?: "133324383928-de3hpaliq2t0ndjpo5c3q1h8amc46n0v.apps.googleusercontent.com"
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleClientId\"")
+
+        // Stripe Publishable Key for in-app client card / payments
+        val stripePublishableKey = (project.findProperty("velnoxStripePublishableKey") as String?)
+            ?.trim()
+            ?.ifEmpty { null }
+            ?: "pk_test_51UKCn2Kp4iwMdWLy3iqkWlCC1pFshtCtvzxix3NlhCFosPINXALHG9JHMSHVytkZf3gU0uA31ka7iCd9eXmYdcpc00fmasjSzN"
+        buildConfigField("String", "STRIPE_PUBLISHABLE_KEY", "\"$stripePublishableKey\"")
+
+        // LINE Login Channel ID
+        val lineChannelId = (project.findProperty("velnoxLineChannelId") as String?)
+            ?.trim()
+            ?.ifEmpty { null }
+            ?: "2012753443"
+        buildConfigField("String", "LINE_CHANNEL_ID", "\"$lineChannelId\"")
     }
 
     buildTypes {

@@ -36,6 +36,12 @@ interface AuthApi {
     suspend fun googleSignIn(idToken: String): ApiResult<AuthSession>
 
     /**
+     * `POST /api/v1/auth/line` or `POST /api/auth/mobile/line` — exchanges a LINE ID token for a session.
+     */
+    suspend fun lineSignIn(idToken: String, nonce: String? = null): ApiResult<AuthSession> =
+        ApiResult.Error(AuthError.ProviderUnavailable)
+
+    /**
      * `POST /api/auth/mobile/link` — attaches a Google identity to the account
      * that is already signed in.
      */

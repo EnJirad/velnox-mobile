@@ -98,6 +98,7 @@ fun LoginScreen(
     emailPrefill: String = "",
     currentLanguage: AppLanguage? = null,
     onLanguageSelected: ((AppLanguage) -> Unit)? = null,
+    onLineSignIn: (() -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
 
@@ -273,17 +274,40 @@ fun LoginScreen(
         OrDivider()
         Spacer(Modifier.height(16.dp))
 
-        SocialButton(
-            label = stringResource(R.string.login_continue_google),
-            glyph = "G",
-            enabled = googleButtonEnabled(
-                isSubmitting = isSubmitting,
-                googleBusy = googleBusy,
-                googleAvailable = googleAvailable,
-            ),
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            onClick = onGoogleSignIn,
-        )
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SocialButton(
+                label = stringResource(R.string.login_continue_google),
+                glyph = "G",
+                enabled = googleButtonEnabled(
+                    isSubmitting = isSubmitting,
+                    googleBusy = googleBusy,
+                    googleAvailable = googleAvailable,
+                ),
+                modifier = Modifier.weight(1f),
+                onClick = onGoogleSignIn,
+            )
+            val context = androidx.compose.ui.platform.LocalContext.current
+            SocialButton(
+                label = stringResource(R.string.login_continue_line),
+                glyph = "L",
+                enabled = !isSubmitting,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    if (onLineSignIn != null) {
+                        onLineSignIn.invoke()
+                    } else {
+                        android.widget.Toast.makeText(
+                            context,
+                            "LINE Login Channel: " + com.velnox.app.core.network.BackendConfig.LINE_CHANNEL_ID,
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                },
+            )
+        }
 
         if (onDismiss != null) {
             Spacer(Modifier.height(14.dp))

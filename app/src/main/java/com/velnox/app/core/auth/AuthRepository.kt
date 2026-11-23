@@ -147,6 +147,16 @@ class AuthRepository(
         }
     }
 
+    /**
+     * Exchange a LINE ID token for a session.
+     */
+    suspend fun signInWithLine(idToken: String, nonce: String? = null): SignInResult {
+        return when (val result = api.lineSignIn(idToken.trim(), nonce?.trim())) {
+            is ApiResult.Error -> SignInResult.Failure(result.error)
+            is ApiResult.Ok -> persist(result.value)
+        }
+    }
+
     suspend fun linkGoogle(idToken: String): ApiResult<Unit> {
         val token = sessions.current() ?: return ApiResult.Error(AuthError.Unauthorized)
         return api.linkGoogle(idToken.trim(), token)

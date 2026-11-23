@@ -32,4 +32,8 @@ object BackendConfig {
         .filter { it.isNotEmpty() && it != PRIMARY_HOST }
 
     val MEDIA_BASE_URL: String = BuildConfig.MEDIA_BASE_URL.trimEnd('/')
+
+    val GOOGLE_WEB_CLIENT_ID: String = BuildConfig.GOOGLE_WEB_CLIENT_ID
+    val STRIPE_PUBLISHABLE_KEY: String = BuildConfig.STRIPE_PUBLISHABLE_KEY
+    val LINE_CHANNEL_ID: String = BuildConfig.LINE_CHANNEL_ID
 }
