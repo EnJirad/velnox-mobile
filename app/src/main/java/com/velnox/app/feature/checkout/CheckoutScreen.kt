@@ -157,6 +157,7 @@ fun CheckoutScreen(
 
     var isSubmitting by remember { mutableStateOf(false) }
     var submitError by remember { mutableStateOf<String?>(null) }
+    var showPromptPayQr by remember { mutableStateOf(false) }
 
     val addresses = AddressBookState.addresses
     val activeAddress = remember(addresses.toList(), selectedAddressId) {
@@ -354,7 +355,11 @@ fun CheckoutScreen(
                                         createdOrderId = res.value.primaryOrderId
                                         createdOrderNumber = res.value.primaryOrderNumber
                                         cartState.load(repository)
-                                        isOrderSuccess = true
+                                        if (selectedPayment == PaymentMethod.PromptPay) {
+                                            showPromptPayQr = true
+                                        } else {
+                                            isOrderSuccess = true
+                                        }
                                     }
 
                                     is CustomerResult.Failed -> {
@@ -461,6 +466,21 @@ fun CheckoutScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            },
+        )
+    }
+
+    if (showPromptPayQr) {
+        PromptPayQrDialog(
+            orderNumber = createdOrderNumber,
+            amountText = formattedGrandTotal,
+            onDismissRequest = {
+                showPromptPayQr = false
+                isOrderSuccess = true
+            },
+            onPaymentConfirmed = {
+                showPromptPayQr = false
+                isOrderSuccess = true
             },
         )
     }

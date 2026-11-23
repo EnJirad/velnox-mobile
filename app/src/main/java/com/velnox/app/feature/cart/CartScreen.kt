@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -98,6 +99,7 @@ fun CartScreen(
     }
     val scope = rememberCoroutineScope()
     var actionError by remember { mutableStateOf<String?>(null) }
+    var itemPendingDeleteId by remember { mutableStateOf<String?>(null) }
 
     // Refresh cart from server on screen entry so prices and stock are current.
     LaunchedEffect(repository) {
@@ -265,17 +267,7 @@ fun CartScreen(
                         }
                     },
                     onRemove = { lineId ->
-                        actionError = null
-                        if (repository != null) {
-                            scope.launch {
-                                val res = state.removeRemote(repository, lineId)
-                                if (res is CustomerResult.Failed) {
-                                    actionError = res.userMessage(context)
-                                }
-                            }
-                        } else {
-                            state.remove(lineId)
-                        }
+                        itemPendingDeleteId = lineId
                     },
                     onOpenProduct = onOpenProduct,
                 )
@@ -308,6 +300,62 @@ fun CartScreen(
             totalPriceText = formattedTotal,
             onCheckout = onCheckout,
         )
+
+        if (itemPendingDeleteId != null) {
+            val targetId = itemPendingDeleteId!!
+            AlertDialog(
+                onDismissRequest = { itemPendingDeleteId = null },
+                shape = SquircleLg,
+                containerColor = MaterialTheme.colorScheme.surface,
+                title = {
+                    Text(
+                        text = stringResource(R.string.cart_delete_confirm_title),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    )
+                },
+                text = {
+                    Text(
+                        text = stringResource(R.string.cart_delete_confirm_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                },
+                confirmButton = {
+                    Text(
+                        text = stringResource(R.string.cart_remove),
+                        style = TextXs.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .velnoxClickable(role = Role.Button) {
+                                itemPendingDeleteId = null
+                                actionError = null
+                                if (repository != null) {
+                                    scope.launch {
+                                        val res = state.removeRemote(repository, targetId)
+                                        if (res is CustomerResult.Failed) {
+                                            actionError = res.userMessage(context)
+                                        }
+                                    }
+                                } else {
+                                    state.remove(targetId)
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                },
+                dismissButton = {
+                    Text(
+                        text = stringResource(R.string.common_cancel),
+                        style = TextXs.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .velnoxClickable(role = Role.Button) {
+                                itemPendingDeleteId = null
+                            }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                },
+            )
+        }
     }
 }
 
@@ -320,6 +368,8 @@ private fun ShopCartSection(
     onRemove: (String) -> Unit,
     onOpenProduct: ((String) -> Unit)? = null,
 ) {
+    val isShopAllSelected = group.items.isNotEmpty() && group.items.all { it.selected }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -327,13 +377,18 @@ private fun ShopCartSection(
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, SquircleLg),
     ) {
-        // Shop Header
+        // Shop Header with Shop-level Selection
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            SelectionBox(
+                checked = isShopAllSelected,
+                onClick = { state.toggleShopSelection(group.items, !isShopAllSelected) },
+            )
+            Spacer(Modifier.width(10.dp))
             Icon(
                 imageVector = VelnoxIcons.ShoppingBag,
                 contentDescription = null,

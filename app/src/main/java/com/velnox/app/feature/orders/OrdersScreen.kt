@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -60,6 +61,7 @@ import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.LoadStatus
 import com.velnox.app.core.customer.userMessage
 import com.velnox.app.feature.cart.CartState
+import com.velnox.app.feature.checkout.PromptPayQrDialog
 import com.velnox.app.feature.home.ProductArt
 import com.velnox.app.feature.home.ProductArtTile
 import com.velnox.app.ui.components.CardDivider
@@ -309,6 +311,29 @@ private fun OrderCard(order: CustomerOrder, onClick: () -> Unit) {
                 modifier = Modifier.size(16.dp),
             )
         }
+        if (uiStatus == OrderStatus.Pending) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(SquircleSm)
+                    .background(Color(0xFFFEF3C7))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(R.string.checkout_payment_promptpay),
+                    style = Text2xs.copy(fontWeight = FontWeight.Medium),
+                    color = Color(0xFF92400E),
+                )
+                Text(
+                    text = stringResource(R.string.orders_pay_now),
+                    style = Text2xs.copy(fontWeight = FontWeight.Bold),
+                    color = Color(0xFFB45309),
+                )
+            }
+        }
     }
 }
 
@@ -338,6 +363,7 @@ fun OrderDetailScreen(
     var reloadTick by remember { mutableIntStateOf(0) }
 
     var showCancelDialog by remember { mutableStateOf(false) }
+    var showPromptPayDialog by remember { mutableStateOf(false) }
     var actionBusy by remember { mutableStateOf(false) }
     var actionError by remember { mutableStateOf<String?>(null) }
     var copiedNotice by remember { mutableStateOf(false) }
@@ -365,6 +391,11 @@ fun OrderDetailScreen(
     }
 
     val activeOrder = order
+    val placeholder = stringResource(R.string.common_value_placeholder)
+
+    fun fmt(amount: Double?): String = amount?.let {
+        PriceFormat.format(it, activeOrder?.currency ?: "THB", locale) ?: "฿$it"
+    } ?: placeholder
 
     StandaloneScreen(
         title = stringResource(R.string.orders_detail_title),
@@ -403,11 +434,6 @@ fun OrderDetailScreen(
         }
 
         val uiStatus = activeOrder.uiStatus
-        val placeholder = stringResource(R.string.common_value_placeholder)
-
-        fun fmt(amount: Double?): String = amount?.let {
-            PriceFormat.format(it, activeOrder.currency, locale) ?: "฿$it"
-        } ?: placeholder
 
         SectionCard(title = stringResource(R.string.orders_detail_items)) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -591,6 +617,14 @@ fun OrderDetailScreen(
             )
         }
 
+        if (activeOrder.uiStatus == OrderStatus.Pending) {
+            Spacer(Modifier.height(14.dp))
+            PrimaryPill(
+                label = stringResource(R.string.orders_pay_now),
+                onClick = { showPromptPayDialog = true },
+            )
+        }
+
         if (cartState != null && repository != null) {
             Spacer(Modifier.height(14.dp))
             PrimaryPill(
@@ -611,6 +645,37 @@ fun OrderDetailScreen(
                     }
                 },
             )
+        }
+
+        val reviewedProductId = activeOrder.items.firstOrNull()?.productId
+        if (activeOrder.uiStatus == OrderStatus.Completed && onOpenProduct != null && !reviewedProductId.isNullOrBlank()) {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(Squircle)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, Squircle)
+                    .velnoxClickable(role = Role.Button) {
+                        onOpenProduct(reviewedProductId)
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = VelnoxIcons.Star,
+                    contentDescription = null,
+                    tint = Color(0xFFF59E0B),
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = stringResource(R.string.orders_review_item),
+                    style = TextXs.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
 
         if (activeOrder.isCancelable && repository != null) {
@@ -680,6 +745,21 @@ fun OrderDetailScreen(
             },
         )
     }
+
+    if (showPromptPayDialog && activeOrder != null) {
+        PromptPayQrDialog(
+            orderNumber = activeOrder.orderNumber,
+            amountText = fmt(activeOrder.total),
+            onDismissRequest = { showPromptPayDialog = false },
+            onPaymentConfirmed = {
+                showPromptPayDialog = false
+                reloadTick++
+                if (repository != null) {
+                    scope.launch { OrdersState.load(repository) }
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -693,18 +773,19 @@ private fun formatPaymentMethod(raw: String?): String? = when (raw?.uppercase())
 @Composable
 private fun OrderTimeline(status: OrderStatus) {
     val steps = listOf(
-        R.string.orders_status_pending,
-        R.string.orders_status_processing,
-        R.string.orders_status_shipping,
-        R.string.orders_status_completed,
+        R.string.orders_timeline_placed,
+        R.string.orders_timeline_paid,
+        R.string.orders_timeline_processing,
+        R.string.orders_timeline_shipped,
+        R.string.orders_timeline_delivered,
     )
     val reached = when (status) {
         OrderStatus.Pending -> 1
-        OrderStatus.Processing -> 2
-        OrderStatus.Shipping -> 3
-        OrderStatus.Completed -> 4
+        OrderStatus.Processing -> 3
+        OrderStatus.Shipping -> 4
+        OrderStatus.Completed -> 5
         OrderStatus.Cancelled -> 1
-        OrderStatus.Returned -> 4
+        OrderStatus.Returned -> 5
     }
     Column {
         steps.forEachIndexed { index, stepRes ->

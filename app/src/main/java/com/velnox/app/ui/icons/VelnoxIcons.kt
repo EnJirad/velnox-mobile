@@ -308,6 +308,16 @@ object VelnoxIcons {
         )
     }
 
+    val Clock: ImageVector by lazy {
+        stroke(
+            "lucide-clock",
+            listOf(
+                "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z",
+                "M12 6v6l4 2",
+            ),
+        )
+    }
+
     // ------------------------------------------------------ phase 2 additions
 
     val MessageCircle: ImageVector by lazy {

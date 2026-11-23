@@ -173,8 +173,11 @@ object AddressFormValidator {
     /** Extracts only numeric digits from a user-entered phone string. */
     fun normalizePhone(raw: String): String = raw.filter { it.isDigit() }
 
-    /** True when the phone number has exactly 10 numeric digits. */
-    fun isValidPhone(raw: String): Boolean = normalizePhone(raw).length == 10
+    /** True when the phone number has exactly 10 numeric digits starting with 0. */
+    fun isValidPhone(raw: String): Boolean {
+        val digits = normalizePhone(raw)
+        return digits.length == 10 && digits.startsWith("0")
+    }
 
     /** True when the postal code is exactly 5 digits. */
     fun isValidPostalCode(raw: String): Boolean = POSTAL_REGEX.matches(raw.trim())
