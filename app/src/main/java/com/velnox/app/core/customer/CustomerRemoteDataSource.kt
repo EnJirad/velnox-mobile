@@ -1,9 +1,15 @@
 package com.velnox.app.core.customer
 
 import com.velnox.app.BuildConfig
+import com.velnox.app.core.auth.AuthRemoteDataSource
+import com.velnox.app.core.network.BackendConfig
+import com.velnox.app.core.network.BackendDialect
+import com.velnox.app.core.network.BackendEndpointRouter
+import com.velnox.app.core.network.VelnoxMediaUrlResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -20,18 +26,18 @@ import java.util.concurrent.TimeUnit
 /**
  * The Velnox API client for the authenticated customer area.
  *
- * Every response uses the backend envelope `{ success, data }` (errors:
- * `{ success: false, error: { code, message } }`). No call throws for an expected
- * failure: the caller receives a [CustomerResult.Failed]. Nothing is synthesised
- * when the API fails or omits a field.
- *
- * The parsers accept the documented key and its snake_case / nested variants
- * (`productId` / `product_id` / `product.id`), because the customer routes are
- * served by several handlers that do not all share one casing.
+ * Supports both Cloudflare Workers v1 API (`api.velnox.live`) and Express legacy API
+ * (`velnox-api.onrender.com`), with automatic host failover, dual routing, and
+ * resilient fallback.
  */
 class CustomerRemoteDataSource(
-    private val baseUrl: String = BuildConfig.API_BASE_URL,
+    baseUrl: String = BuildConfig.API_BASE_URL,
     private val client: OkHttpClient = defaultClient(),
+    val router: BackendEndpointRouter = BackendEndpointRouter(
+        primaryHost = baseUrl,
+        fallbackHosts = BackendConfig.FALLBACK_HOSTS,
+        client = client,
+    ),
 ) : CustomerApi {
 
     // ------------------------------------------------------ profile & addresses
@@ -59,7 +65,44 @@ class CustomerRemoteDataSource(
         mimeType: String,
         filename: String,
     ): CustomerResult<String> = withContext(Dispatchers.IO) {
-        // 1. Storage presign flow (Upload intent -> PUT storage -> Save metadata)
+        val dialect = router.getDialect()
+
+        // 1. Try Cloudflare Workers multipart upload if targeting Workers
+        if (dialect == BackendDialect.WORKERS_V1) {
+            try {
+                val mediaType = try { mimeType.toMediaType() } catch (_: Exception) { "image/webp".toMediaType() }
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("purpose", if (kind == "avatar") "avatar" else "cover")
+                    .addFormDataPart("file", filename, bytes.toRequestBody(mediaType))
+                    .build()
+
+                val request = Request.Builder()
+                    .url(router.currentHost().trimEnd('/') + "/api/v1/media/upload")
+                    .header("Authorization", "Bearer $token")
+                    .header("Accept", "application/json")
+                    .post(requestBody)
+                    .build()
+
+                val response = client.newCall(request).execute()
+                response.use { resp ->
+                    if (resp.isSuccessful) {
+                        val text = resp.body?.string().orEmpty()
+                        val root = JSONObject(text)
+                        val data = root.optJSONObject("data")
+                        val pubUrl = data?.optString("publicUrl")?.takeIf { it.isNotBlank() }
+                            ?: data?.optString("r2Key")?.takeIf { it.isNotBlank() }
+                        if (pubUrl != null) {
+                            return@withContext CustomerResult.Ok(normalizeMediaUrl(pubUrl) ?: pubUrl)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // Fallback to Express flows below
+            }
+        }
+
+        // 2. Storage presign flow (Upload intent -> PUT storage -> Save metadata)
         val intentBody = JSONObject()
             .put("kind", kind)
             .put("filename", filename)
@@ -115,7 +158,7 @@ class CustomerRemoteDataSource(
             intentFailure = CustomerResult.Failed(intentRaw.error, intentRaw.message)
         }
 
-        // 2. Direct upload fallback to backend server (persisted in PostgreSQL, 100% reliable)
+        // 3. Direct upload fallback to backend server
         val base64Str = java.util.Base64.getEncoder().encodeToString(bytes)
         val directBody = JSONObject()
             .put("kind", kind)
@@ -156,6 +199,7 @@ class CustomerRemoteDataSource(
             .put("recipientName", input.recipientName)
             .put("phone", input.phone)
             .put("line1", input.addressLine)
+            .put("addressLine1", input.addressLine)
             .put("subdistrict", input.subDistrict)
             .put("district", input.district)
             .put("province", input.province)
@@ -163,7 +207,10 @@ class CustomerRemoteDataSource(
             .put("isDefault", input.isDefault)
         addressId?.let { body.put("addressId", it) }
         input.label?.let { body.put("label", it) }
-        input.addressLine2?.let { body.put("line2", it) }
+        input.addressLine2?.let {
+            body.put("line2", it)
+            body.put("addressLine2", it)
+        }
         input.latitude?.let { body.put("latitude", it) }
         input.longitude?.let { body.put("longitude", it) }
         return send(token, "POST", "/api/customer/addresses", body).map { data ->
@@ -176,8 +223,15 @@ class CustomerRemoteDataSource(
 
     // ------------------------------------------------------------------- cart
 
-    override suspend fun cart(token: String): CustomerResult<RemoteCart> =
-        send(token, "GET", "/api/customer/cart").map { data -> data.toCart() }
+    override suspend fun cart(token: String): CustomerResult<RemoteCart> {
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val path = if (isWorkers) "/api/v1/cart" else "/api/customer/cart"
+        var raw = send(token, "GET", path)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            raw = send(token, "GET", "/api/customer/cart")
+        }
+        return raw.map { data -> data.toCart() }
+    }
 
     override suspend fun addToCart(
         token: String,
@@ -187,31 +241,41 @@ class CustomerRemoteDataSource(
     ): CustomerResult<RemoteCart> {
         val body = JSONObject().put("productId", productId).put("quantity", quantity)
         variantId?.let { body.put("variantId", it) }
-        return cartAfter(token, send(token, "POST", "/api/customer/cart/add", body))
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val path = if (isWorkers) "/api/v1/cart/items" else "/api/customer/cart/add"
+        var raw = send(token, "POST", path, body, isIdempotent = false)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            raw = send(token, "POST", "/api/customer/cart/add", body, isIdempotent = false)
+        }
+        return cartAfter(token, raw)
     }
 
     override suspend fun updateCartItem(
         token: String,
         itemId: String,
         quantity: Int,
-    ): CustomerResult<RemoteCart> = cartAfter(
-        token,
-        send(
-            token,
-            "PUT",
-            "/api/customer/cart/item/${encode(itemId)}",
-            JSONObject().put("quantity", quantity),
-        ),
-    )
+    ): CustomerResult<RemoteCart> {
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val method = if (isWorkers) "PATCH" else "PUT"
+        val path = if (isWorkers) "/api/v1/cart/items/${encode(itemId)}" else "/api/customer/cart/item/${encode(itemId)}"
+        val body = JSONObject().put("quantity", quantity)
+        var raw = send(token, method, path, body, isIdempotent = true)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            raw = send(token, "PUT", "/api/customer/cart/item/${encode(itemId)}", body, isIdempotent = true)
+        }
+        return cartAfter(token, raw)
+    }
 
-    override suspend fun removeCartItem(token: String, itemId: String): CustomerResult<RemoteCart> =
-        cartAfter(token, send(token, "DELETE", "/api/customer/cart/item/${encode(itemId)}"))
+    override suspend fun removeCartItem(token: String, itemId: String): CustomerResult<RemoteCart> {
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val path = if (isWorkers) "/api/v1/cart/items/${encode(itemId)}" else "/api/customer/cart/item/${encode(itemId)}"
+        var raw = send(token, "DELETE", path, isIdempotent = true)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            raw = send(token, "DELETE", "/api/customer/cart/item/${encode(itemId)}", isIdempotent = true)
+        }
+        return cartAfter(token, raw)
+    }
 
-    /**
-     * A mutation may answer with the new cart or with a bare acknowledgement. The
-     * cart shown afterwards must be the server's, so an acknowledgement triggers a
-     * fresh `GET`.
-     */
     private suspend fun cartAfter(token: String, raw: Raw): CustomerResult<RemoteCart> =
         when (raw) {
             is Raw.Failure -> CustomerResult.Failed(raw.error, raw.message)
@@ -240,7 +304,6 @@ class CustomerRemoteDataSource(
                 if (state != null) {
                     CustomerResult.Ok(state)
                 } else {
-                    // Acknowledgement without a state: the list is the source of truth.
                     when (val list = wishlist(token)) {
                         is CustomerResult.Failed -> list
                         is CustomerResult.Ok ->
@@ -273,44 +336,110 @@ class CustomerRemoteDataSource(
         token: String,
         request: CheckoutRequest,
     ): CustomerResult<CheckoutOutcome> {
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val path = if (isWorkers) "/api/v1/orders/checkout" else "/api/customer/checkout"
         val body = JSONObject()
-            .put("shippingAddressId", request.shippingAddressId)
-            .put("paymentMethod", request.paymentMethod)
-        if (!request.cartItemIds.isNullOrEmpty()) {
-            val ids = JSONArray()
-            request.cartItemIds.forEach { ids.put(it) }
-            body.put("cartItemIds", ids)
-        }
-        if (request.items.isNotEmpty()) {
-            val items = JSONArray()
-            for (line in request.items) {
-                val obj = JSONObject().put("productId", line.productId).put("quantity", line.quantity)
-                line.variantId?.let { obj.put("variantId", it) }
-                items.put(obj)
-            }
-            body.put("items", items)
-        }
-        request.shippingQuoteId?.takeIf { it.isNotBlank() }?.let { body.put("shippingQuoteId", it) }
-        request.requestId?.takeIf { it.isNotBlank() }?.let { body.put("requestId", it) }
-        request.note?.takeIf { it.isNotBlank() }?.let { body.put("notes", it) }
 
-        return send(token, "POST", "/api/customer/checkout", body).map { data ->
+        if (isWorkers) {
+            val addr = request.shippingAddress
+            if (addr != null) {
+                val addrJson = JSONObject().apply {
+                    put("recipientName", addr.recipientName)
+                    put("phone", addr.phone)
+                    put("addressLine1", addr.addressLine)
+                    addr.addressLine2?.takeIf { it.isNotBlank() }?.let { put("addressLine2", it) }
+                    put("subdistrict", addr.subDistrict.ifEmpty { "-" })
+                    put("district", addr.district.ifEmpty { "-" })
+                    put("province", addr.province.ifEmpty { "-" })
+                    put("postalCode", addr.postalCode.ifEmpty { "-" })
+                    put("isDefault", addr.isDefault)
+                }
+                body.put("shippingAddress", addrJson)
+            } else {
+                body.put("shippingAddressId", request.shippingAddressId)
+            }
+
+            val mappedMethod = when (request.paymentMethod.uppercase()) {
+                "CARD", "STRIPE" -> "stripe"
+                "PROMPTPAY" -> "promptpay"
+                "COD" -> "cod"
+                "BANK_TRANSFER" -> "bank_transfer"
+                else -> request.paymentMethod.lowercase()
+            }
+            body.put("paymentMethod", mappedMethod)
+            request.note?.takeIf { it.isNotBlank() }?.let { body.put("notes", it) }
+        } else {
+            body.put("shippingAddressId", request.shippingAddressId)
+            body.put("paymentMethod", request.paymentMethod)
+            if (!request.cartItemIds.isNullOrEmpty()) {
+                val ids = JSONArray()
+                request.cartItemIds.forEach { ids.put(it) }
+                body.put("cartItemIds", ids)
+            }
+            if (request.items.isNotEmpty()) {
+                val items = JSONArray()
+                for (line in request.items) {
+                    val obj = JSONObject().put("productId", line.productId).put("quantity", line.quantity)
+                    line.variantId?.let { obj.put("variantId", it) }
+                    items.put(obj)
+                }
+                body.put("items", items)
+            }
+            request.shippingQuoteId?.takeIf { it.isNotBlank() }?.let { body.put("shippingQuoteId", it) }
+            request.requestId?.takeIf { it.isNotBlank() }?.let { body.put("requestId", it) }
+            request.note?.takeIf { it.isNotBlank() }?.let { body.put("notes", it) }
+        }
+
+        var raw = send(token, "POST", path, body, isIdempotent = false, idempotencyKey = request.requestId)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            val fbBody = JSONObject()
+                .put("shippingAddressId", request.shippingAddressId)
+                .put("paymentMethod", request.paymentMethod)
+            request.shippingQuoteId?.takeIf { it.isNotBlank() }?.let { fbBody.put("shippingQuoteId", it) }
+            request.requestId?.takeIf { it.isNotBlank() }?.let { fbBody.put("requestId", it) }
+            request.note?.takeIf { it.isNotBlank() }?.let { fbBody.put("notes", it) }
+            raw = send(token, "POST", "/api/customer/checkout", fbBody, isIdempotent = false, idempotencyKey = request.requestId)
+        }
+
+        return raw.map { data ->
             (data as? JSONObject)?.let(::parseCheckout)
         }
     }
 
-    override suspend fun orders(token: String): CustomerResult<List<CustomerOrder>> =
-        send(token, "GET", "/api/customer/orders").map { data ->
+    override suspend fun orders(token: String): CustomerResult<List<CustomerOrder>> {
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val path = if (isWorkers) "/api/v1/orders" else "/api/customer/orders"
+        var raw = send(token, "GET", path)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            raw = send(token, "GET", "/api/customer/orders")
+        }
+        return raw.map { data ->
             data.asArray("orders", "items")?.objects()?.mapNotNull(::parseOrder)
+                ?: (data as? JSONArray)?.objects()?.mapNotNull(::parseOrder)
         }
+    }
 
-    override suspend fun order(token: String, id: String): CustomerResult<CustomerOrder> =
-        send(token, "GET", "/api/customer/orders/${encode(id)}").map { data ->
-            data.asObject("order")?.let(::parseOrder)
+    override suspend fun order(token: String, id: String): CustomerResult<CustomerOrder> {
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val path = if (isWorkers) "/api/v1/orders/${encode(id)}" else "/api/customer/orders/${encode(id)}"
+        var raw = send(token, "GET", path)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            raw = send(token, "GET", "/api/customer/orders/${encode(id)}")
         }
+        return raw.map { data ->
+            data.asObject("order")?.let(::parseOrder) ?: (data as? JSONObject)?.let(::parseOrder)
+        }
+    }
 
-    override suspend fun cancelOrder(token: String, id: String): CustomerResult<Unit> =
-        send(token, "PATCH", "/api/customer/orders/${encode(id)}/cancel").toUnit()
+    override suspend fun cancelOrder(token: String, id: String): CustomerResult<Unit> {
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val (method, path) = if (isWorkers) "POST" to "/api/v1/orders/${encode(id)}/cancel" else "PATCH" to "/api/customer/orders/${encode(id)}/cancel"
+        var raw = send(token, method, path)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            raw = send(token, "PATCH", "/api/customer/orders/${encode(id)}/cancel")
+        }
+        return raw.toUnit()
+    }
 
     override suspend fun reorder(token: String, orderId: String): CustomerResult<RemoteCart> =
         cartAfter(
@@ -452,7 +581,49 @@ class CustomerRemoteDataSource(
         mimeType: String,
         filename: String,
     ): CustomerResult<UploadChatAttachmentResult> = withContext(Dispatchers.IO) {
-        // 1. Try presign + direct PUT to cloud storage
+        val dialect = router.getDialect()
+
+        // 1. Try Workers multipart upload
+        if (dialect == BackendDialect.WORKERS_V1) {
+            try {
+                val mediaType = try { mimeType.toMediaType() } catch (_: Exception) { "image/webp".toMediaType() }
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("purpose", "chat_attachment")
+                    .addFormDataPart("file", filename, bytes.toRequestBody(mediaType))
+                    .build()
+
+                val request = Request.Builder()
+                    .url(router.currentHost().trimEnd('/') + "/api/v1/media/upload")
+                    .header("Authorization", "Bearer $token")
+                    .header("Accept", "application/json")
+                    .post(requestBody)
+                    .build()
+
+                val response = client.newCall(request).execute()
+                response.use { resp ->
+                    if (resp.isSuccessful) {
+                        val text = resp.body?.string().orEmpty()
+                        val root = JSONObject(text)
+                        val data = root.optJSONObject("data")
+                        val objKey = data?.optString("r2Key")?.takeIf { it.isNotBlank() }
+                            ?: data?.optString("id")
+                        val pubUrl = data?.optString("publicUrl")?.takeIf { it.isNotBlank() }
+                        if (objKey != null) {
+                            return@withContext CustomerResult.Ok(
+                                UploadChatAttachmentResult(
+                                    objectKey = objKey,
+                                    publicUrl = pubUrl ?: normalizeMediaUrl(objKey),
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        // 2. Try presign + direct PUT to cloud storage
         try {
             val presignBody = JSONObject()
                 .put("filename", filename)
@@ -500,10 +671,9 @@ class CustomerRemoteDataSource(
                 }
             }
         } catch (_: Exception) {
-            // Presign/PUT failed, fallback below
         }
 
-        // 2. Direct server upload fallback (resilient to cloud storage auth/permission glitches)
+        // 3. Direct server upload fallback
         val base64Str = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
         val directBody = JSONObject()
             .put("conversationId", conversationId)
@@ -543,7 +713,6 @@ class CustomerRemoteDataSource(
     // -------------------------------------------------------------- transport
 
     private sealed interface Raw {
-        /** [data] is the envelope's `data` (null when absent, `null`, or an empty body). */
         data class Success(val data: Any?) : Raw
         data class Failure(val error: CustomerError, val message: String?) : Raw
     }
@@ -553,43 +722,85 @@ class CustomerRemoteDataSource(
         method: String,
         path: String,
         body: JSONObject? = null,
+        isIdempotent: Boolean = (method == "GET" || method == "DELETE"),
+        idempotencyKey: String? = null,
     ): Raw = withContext(Dispatchers.IO) {
-        val requestBody = if (method == "GET") {
-            null
-        } else {
-            (body?.toString() ?: "{}").toRequestBody(JSON)
-        }
-        val request = Request.Builder()
-            .url(baseUrl + path)
-            .header("Authorization", "Bearer $token")
-            .header("Accept", "application/json")
-            .method(method, requestBody)
-            .build()
-
         try {
-            client.newCall(request).execute().use { response ->
-                val text = response.body?.string().orEmpty()
-                val envelope = text.takeIf { it.isNotBlank() }?.let {
-                    try {
-                        JSONObject(it)
-                    } catch (_: JSONException) {
-                        null
-                    }
+            router.executeWithFailover(isIdempotent = isIdempotent) { host, dialect ->
+                val requestBody = if (method == "GET") {
+                    null
+                } else {
+                    (body?.toString() ?: "{}").toRequestBody(JSON)
                 }
-                val message = envelope?.optJSONObject("error")?.str("message")
-                    ?: envelope?.str("message")
-                when {
-                    response.code == 401 -> Raw.Failure(CustomerError.Unauthorized, message)
-                    response.code == 404 -> Raw.Failure(CustomerError.NotFound, message)
-                    response.code in REJECTED_CODES -> Raw.Failure(CustomerError.Rejected, message)
-                    !response.isSuccessful -> Raw.Failure(CustomerError.Server, message)
-                    text.isBlank() -> Raw.Success(null)
-                    envelope == null -> Raw.Failure(CustomerError.Server, null)
-                    envelope.has("success") && !envelope.optBoolean("success", false) ->
-                        Raw.Failure(CustomerError.Rejected, message)
-                    else -> Raw.Success(
-                        envelope.opt("data")?.takeUnless { it === JSONObject.NULL },
-                    )
+
+                val effectivePath = if (dialect == BackendDialect.WORKERS_V1 && path.startsWith("/api/") && !path.startsWith("/api/v1/")) {
+                    "/api/v1/" + path.removePrefix("/api/")
+                } else path
+
+                val requestBuilder = Request.Builder()
+                    .url(host.trimEnd('/') + effectivePath)
+                    .header("Authorization", "Bearer $token")
+                    .header("Accept", "application/json")
+                    .header("Cookie", "${AuthRemoteDataSource.SESSION_COOKIE}=$token")
+                    .method(method, requestBody)
+
+                if (idempotencyKey != null) {
+                    requestBuilder.header("Idempotency-Key", idempotencyKey)
+                }
+
+                client.newCall(requestBuilder.build()).execute().use { response ->
+                    val text = response.body?.string().orEmpty()
+                    val envelope = text.takeIf { it.isNotBlank() }?.let {
+                        try {
+                            JSONObject(it)
+                        } catch (_: JSONException) {
+                            null
+                        }
+                    }
+                    val message = envelope?.optJSONObject("error")?.str("message")
+                        ?: envelope?.str("message")
+
+                    // Legacy capability fallback for routes not yet ported to Workers
+                    if (response.code == 404 && dialect == BackendDialect.WORKERS_V1 && router.allowLegacyCapabilityFallback) {
+                        for (fbHost in router.candidateHostsList()) {
+                            if (fbHost != host && fbHost.contains("onrender.com")) {
+                                try {
+                                    val fbRequest = Request.Builder()
+                                        .url(fbHost.trimEnd('/') + path)
+                                        .header("Authorization", "Bearer $token")
+                                        .header("Accept", "application/json")
+                                        .header("Cookie", "${AuthRemoteDataSource.SESSION_COOKIE}=$token")
+                                        .method(method, requestBody)
+                                        .build()
+                                    val fbResp = client.newCall(fbRequest).execute()
+                                    fbResp.use { fbR ->
+                                        if (fbR.isSuccessful) {
+                                            val fbText = fbR.body?.string().orEmpty()
+                                            val fbEnv = try { JSONObject(fbText) } catch (_: Exception) { null }
+                                            return@executeWithFailover Raw.Success(
+                                                fbEnv?.opt("data")?.takeUnless { it === JSONObject.NULL },
+                                            )
+                                        }
+                                    }
+                                } catch (_: Exception) {
+                                }
+                            }
+                        }
+                    }
+
+                    when {
+                        response.code == 401 -> Raw.Failure(CustomerError.Unauthorized, message)
+                        response.code == 404 -> Raw.Failure(CustomerError.NotFound, message)
+                        response.code in REJECTED_CODES -> Raw.Failure(CustomerError.Rejected, message)
+                        !response.isSuccessful -> Raw.Failure(CustomerError.Server, message)
+                        text.isBlank() -> Raw.Success(null)
+                        envelope == null -> Raw.Failure(CustomerError.Server, null)
+                        envelope.has("success") && !envelope.optBoolean("success", false) ->
+                            Raw.Failure(CustomerError.Rejected, message)
+                        else -> Raw.Success(
+                            envelope.opt("data")?.takeUnless { it === JSONObject.NULL },
+                        )
+                    }
                 }
             }
         } catch (_: IOException) {
@@ -612,7 +823,6 @@ class CustomerRemoteDataSource(
 
     // ---------------------------------------------------------------- parsing
 
-    /** `data` as an object: itself, or the object under one of [keys]. */
     private fun Any?.asObject(vararg keys: String): JSONObject? {
         val obj = this as? JSONObject ?: return null
         for (key in keys) {
@@ -621,7 +831,6 @@ class CustomerRemoteDataSource(
         return obj
     }
 
-    /** `data` as an array: itself, or the array under one of [keys]. */
     private fun Any?.asArray(vararg keys: String): JSONArray? {
         if (this is JSONArray) return this
         val obj = this as? JSONObject ?: return null
@@ -636,21 +845,33 @@ class CustomerRemoteDataSource(
 
     private fun Any?.toCart(): RemoteCart? {
         val obj = this as? JSONObject
+        if (obj != null && obj.has("shopGroups")) {
+            val groups = obj.optJSONArray("shopGroups")
+            if (groups != null) {
+                val allItems = ArrayList<RemoteCartItem>()
+                for (g in 0 until groups.length()) {
+                    val group = groups.optJSONObject(g) ?: continue
+                    val gShopId = group.str("shopId", "shop_id")
+                    val gShopName = group.str("shopName", "shop_name")
+                    val groupItems = group.optJSONArray("items")?.objects().orEmpty()
+                    for (item in groupItems) {
+                        parseCartItem(item, gShopId, gShopName)?.let { allItems.add(it) }
+                    }
+                }
+                return RemoteCart(allItems)
+            }
+        }
         val array = when {
             this is JSONArray -> this
             obj == null -> null
             else -> obj.optJSONArray("items")
                 ?: obj.optJSONObject("cart")?.optJSONArray("items")
         } ?: return null
-        return RemoteCart(array.objects().mapNotNull(::parseCartItem))
+        return RemoteCart(array.objects().mapNotNull { parseCartItem(it, null, null) })
     }
 
     private fun normalizeMediaUrl(url: String?): String? {
-        if (url.isNullOrBlank()) return null
-        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:") || url.startsWith("content://") || url.startsWith("file://")) return url
-        val cleanKey = url.trimStart('/')
-        val cleanBase = baseUrl.trimEnd('/')
-        return "$cleanBase/api/media/$cleanKey"
+        return VelnoxMediaUrlResolver.resolve(url, router.currentHost(), router.getDialect())
     }
 
     private fun parseProfile(obj: JSONObject): CustomerProfile = CustomerProfile(
@@ -669,8 +890,8 @@ class CustomerRemoteDataSource(
             label = obj.str("label"),
             recipientName = obj.str("recipientName", "recipient_name", "recipient", "fullName", "name").orEmpty(),
             phone = obj.str("phone", "phoneNumber", "phone_number").orEmpty(),
-            addressLine = obj.str("line1", "addressLine", "address_line", "address", "street").orEmpty(),
-            addressLine2 = obj.str("line2", "addressLine2"),
+            addressLine = obj.str("addressLine1", "line1", "addressLine", "address_line", "address", "street").orEmpty(),
+            addressLine2 = obj.str("addressLine2", "line2"),
             subDistrict = obj.str("subdistrict", "subDistrict", "sub_district").orEmpty(),
             district = obj.str("district").orEmpty(),
             province = obj.str("province", "state").orEmpty(),
@@ -681,27 +902,32 @@ class CustomerRemoteDataSource(
         )
     }
 
-    private fun parseCartItem(obj: JSONObject): RemoteCartItem? {
+    private fun parseCartItem(obj: JSONObject, fallbackShopId: String? = null, fallbackShopName: String? = null): RemoteCartItem? {
         val product = obj.optJSONObject("product")
         val variant = obj.optJSONObject("variant")
         val productId = obj.str("productId", "product_id") ?: product?.str("id") ?: return null
         val id = obj.str("id", "cartItemId", "cart_item_id", "itemId") ?: return null
         val quantity = obj.num("quantity", "qty")?.toInt() ?: return null
+        val shopName = obj.str("shopName", "shop_name") ?: fallbackShopName ?: product?.str("shopName")
+            ?: obj.optJSONObject("shop")?.str("name")
+        val shopId = obj.str("shopId", "shop_id") ?: fallbackShopId ?: product?.str("shopId")
+            ?: obj.optJSONObject("shop")?.str("id")
+
         return RemoteCartItem(
             id = id,
             productId = productId,
             variantId = obj.str("variantId", "variant_id") ?: variant?.str("id"),
             name = obj.str("name", "productName", "product_name") ?: product?.str("name"),
             variantName = obj.str("variantOptionLabels", "variantName", "variant_name") ?: variant?.str("name"),
-            shopName = obj.str("shopName", "shop_name") ?: product?.str("shopName")
-                ?: obj.optJSONObject("shop")?.str("name"),
+            shopName = shopName,
             imageUrl = imageOf(obj) ?: product?.let(::imageOf),
             price = obj.num("priceSnapshot", "price", "unitPrice", "unit_price")
                 ?: variant?.num("price") ?: product?.num("price"),
             currency = obj.str("currency") ?: DEFAULT_CURRENCY,
             quantity = quantity,
-            maxStock = (obj.num("maxStock", "availableStock", "stock") ?: variant?.num("stock")
+            maxStock = (obj.num("maxStock", "availableStock", "stockAvailable", "stock") ?: variant?.num("stock")
                 ?: product?.num("totalAvailableStock", "stock"))?.toInt(),
+            shopId = shopId,
         )
     }
 
@@ -767,10 +993,14 @@ class CustomerRemoteDataSource(
             obj.str("parentOrderNumber", "parent_order_number")?.let(numbers::add)
         }
         if (ids.isEmpty()) return null
+
+        val totalAmount = obj.num("total", "totalAmount", "total_amount", "grandTotal")
+            ?: obj.num("totalSatang")?.let { it / 100.0 }
+
         return CheckoutOutcome(
             orderIds = ids,
             orderNumbers = numbers,
-            total = obj.num("total", "totalAmount", "total_amount", "grandTotal"),
+            total = totalAmount,
             currency = obj.str("currency") ?: DEFAULT_CURRENCY,
         )
     }
@@ -791,6 +1021,8 @@ class CustomerRemoteDataSource(
         }
         val firstShipment = obj.optJSONArray("shipments")?.optJSONObject(0)
         val firstPayment = obj.optJSONArray("payments")?.optJSONObject(0)
+        val serverCount = obj.num("itemCount", "item_count")?.toInt()
+
         return CustomerOrder(
             id = id,
             orderNumber = obj.str("orderNumber", "order_number", "number") ?: id,
@@ -809,10 +1041,10 @@ class CustomerRemoteDataSource(
                 ?: firstShipment?.str("trackingNumber", "tracking_number"),
             carrier = obj.str("carrier") ?: firstShipment?.str("carrier"),
             shopId = obj.str("shopId", "shop_id") ?: obj.optJSONObject("shop")?.str("id"),
+            serverItemCount = serverCount,
         )
     }
 
-    /** The shipping address as one line: a ready-made string, or the parts of an object. */
     private fun addressText(order: JSONObject): String? {
         order.str("deliveryAddress", "delivery_address")?.let { return it }
         val obj = order.optJSONObject("addressSnapshot")
@@ -825,8 +1057,8 @@ class CustomerRemoteDataSource(
             listOf(address.addressLine, address.addressLine2.orEmpty(), address.subDistrict, address.district, address.province, address.postalCode)
         } else {
             listOf(
-                obj.str("line1", "addressLine", "address_line", "address").orEmpty(),
-                obj.str("line2").orEmpty(),
+                obj.str("addressLine1", "line1", "addressLine", "address_line", "address").orEmpty(),
+                obj.str("addressLine2", "line2").orEmpty(),
                 obj.str("subdistrict", "subDistrict", "city").orEmpty(),
                 obj.str("district").orEmpty(),
                 obj.str("province", "state").orEmpty(),
@@ -857,6 +1089,7 @@ class CustomerRemoteDataSource(
         val id = obj.str("id", "conversationId") ?: return null
         val shop = obj.optJSONObject("shop")
         val product = obj.optJSONObject("product")
+        val seller = obj.optJSONObject("seller")
         val last = obj.opt("lastMessage") ?: obj.opt("last_message")
         val lastText = when (last) {
             is String -> last.trim().takeIf { it.isNotEmpty() }
@@ -876,16 +1109,18 @@ class CustomerRemoteDataSource(
         }
         val convType = obj.str("type")?.uppercase()
         val isSupport = obj.flag("isSupport", "is_support") ?: (convType == "CUSTOMER_COMPANY")
+        val shopName = obj.str("shopName", "shop_name") ?: shop?.str("name") ?: seller?.str("shopName", "name") ?: obj.str("title")
+
         return CustomerConversation(
             id = id,
-            shopId = obj.str("shopId", "shop_id") ?: shop?.str("id"),
-            shopName = obj.str("shopName", "shop_name") ?: shop?.str("name"),
+            shopId = obj.str("shopId", "shop_id") ?: shop?.str("id") ?: seller?.str("id"),
+            shopName = shopName,
             lastMessage = lastText,
             lastMessageAt = obj.time("lastMessageAt", "last_message_at", "updatedAt", "updated_at")
                 ?: (last as? JSONObject)?.time("createdAt", "created_at"),
             unreadCount = obj.num("unreadCount", "unread_count", "unread")?.toInt() ?: 0,
             isSupport = isSupport,
-            participantName = obj.str("participantName", "participant_name"),
+            participantName = obj.str("participantName", "participant_name") ?: shopName,
             participantOnline = obj.flag("participantOnline", "participant_online"),
             productId = obj.str("productId", "product_id") ?: product?.str("id"),
             productName = product?.str("name"),
@@ -898,118 +1133,64 @@ class CustomerRemoteDataSource(
         val id = obj.str("id", "messageId", "_id") ?: return null
         val rawMediaUrl = obj.str(
             "attachmentUrl", "attachment_url",
-            "attachmentKey", "attachment_key",
-            "mediaUrl", "media_url",
-            "imageUrl", "image_url",
-            "fileUrl", "file_url",
-            "attachment",
-        ) ?: imageOf(obj) ?: obj.optJSONArray("attachments")?.let { arr ->
-            if (arr.length() > 0) {
-                when (val first = arr.opt(0)) {
-                    is JSONObject -> first.str("url", "mediaUrl", "media_url", "imageUrl", "image_url", "attachmentUrl", "attachment_url")
-                    is String -> first.trim().takeIf { it.isNotEmpty() }
-                    else -> null
-                }
-            } else null
+            "mediaUrl", "media_url", "imageUrl", "image_url", "fileUrl", "file_url",
+        ) ?: obj.optJSONArray("attachments")?.optJSONObject(0)?.str("url")
+        val senderRole = obj.str("senderRole", "sender_role", "role")?.lowercase()
+        val fromCustomer = when {
+            knownFromCustomer -> true
+            senderRole != null -> senderRole !in SELLER_SENDERS
+            obj.flag("isFromCustomer", "fromCustomer", "is_customer") != null ->
+                obj.flag("isFromCustomer", "fromCustomer", "is_customer") == true
+            obj.flag("isFromShop", "fromShop", "is_seller", "is_shop") != null ->
+                obj.flag("isFromShop", "fromShop", "is_seller", "is_shop") == false
+            else -> false
         }
-        val mediaUrl = rawMediaUrl?.let { normalizeMediaUrl(it) ?: it }
-        val mediaType = obj.str("mediaType", "media_type", "type")
-            ?: when {
-                mediaUrl?.endsWith(".mp4", ignoreCase = true) == true || mediaUrl?.contains("video") == true -> "video"
-                mediaUrl != null -> "image"
-                else -> null
-            }
-
-        val rawText = obj.str("body", "text", "content", "message")
-        val text = rawText ?: when (mediaType) {
-            "video" -> "[วิดีโอ]"
-            else -> if (mediaUrl != null) "[รูปภาพ]" else return null
+        val rawType = obj.str("mediaType", "media_type", "type")
+        val mediaType = when {
+            rawType == "video" || rawMediaUrl?.endsWith(".mp4", ignoreCase = true) == true -> "video"
+            rawType == "image" || rawMediaUrl != null -> "image"
+            else -> null
         }
-
-        val senderObj = obj.optJSONObject("sender") ?: obj.optJSONObject("user") ?: obj.optJSONObject("author")
-        val sender = (obj.str("senderRole", "sender_role", "senderType", "sender_type", "role", "sender")
-            ?: senderObj?.str("role", "type", "senderRole", "sender_role"))
-            ?.lowercase()
-        val isSystem = obj.flag("isSystem", "is_system") ?: (sender in setOf("system", "bot", "auto"))
-        val direction = obj.str("direction")?.lowercase()
-        val isOutgoing = direction in setOf("outgoing", "out", "sent")
-        val isIncoming = direction in setOf("incoming", "in", "received") ||
-            (sender in SELLER_SENDERS)
-
-        val fromCustomer = !isSystem && (
-            knownFromCustomer ||
-                isOutgoing ||
-                (!isIncoming && (
-                    (obj.flag("isMine", "is_mine", "fromCustomer", "from_customer", "isOwn", "is_own", "isCustomer", "is_customer", "isMe", "is_me")
-                        ?: senderObj?.flag("isMine", "is_mine", "fromCustomer", "from_customer", "isMe", "is_me")
-                        ?: (sender in CUSTOMER_SENDERS))
-                ))
-            )
-        val isRead = obj.flag("isRead", "is_read", "read")
-            ?: (obj.str("readAt", "read_at") != null)
-        val parsedClientId = obj.str("clientId", "client_id")
-        val timestamp = obj.time("createdAt", "created_at", "sentAt", "sent_at", "timestamp", "time", "date", "created")
-            ?: extractObjectIdTime(id)
-
         return CustomerMessage(
             id = id,
-            text = text,
+            text = obj.str("content", "message", "body", "text").orEmpty(),
             fromCustomer = fromCustomer,
-            createdAt = timestamp,
-            isSystem = isSystem,
-            isRead = isRead,
-            clientId = parsedClientId,
-            mediaUrl = mediaUrl,
+            createdAt = obj.time("createdAt", "created_at", "timestamp", "sentAt"),
+            isSystem = senderRole == "system" || obj.flag("isSystem", "is_system") == true,
+            isRead = obj.flag("isRead", "is_read", "read") == true,
+            clientId = obj.str("clientId", "client_id"),
+            mediaUrl = normalizeMediaUrl(rawMediaUrl),
             mediaType = mediaType,
         )
     }
 
-    private fun extractObjectIdTime(id: String): Long? {
-        if (id.length == 24 && id.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
-            return try {
-                id.substring(0, 8).toLong(16) * 1000L
-            } catch (_: Exception) {
-                null
-            }
-        }
-        return null
-    }
-
-    /** `primaryImage`, `images[]`, or a plain url field. */
     private fun imageOf(obj: JSONObject): String? {
-        obj.str("productImageUrl", "imageUrl", "image_url", "image", "thumbnail")?.let { return it }
-        obj.optJSONObject("primaryImage")?.let { it.str("displayUrl", "url")?.let { u -> return u } }
-        val images = obj.optJSONArray("images") ?: return null
-        for (i in 0 until images.length()) {
-            when (val entry = images.opt(i)) {
-                is JSONObject -> entry.str("displayUrl", "url")?.let { return it }
-                is String -> entry.trim().takeIf { it.isNotEmpty() }?.let { return it }
-            }
-        }
-        return null
+        val raw = obj.str("imageUrl", "image_url", "image")
+            ?: obj.optJSONObject("primaryImage")?.str("displayUrl", "url")
+            ?: obj.optJSONArray("images")?.optJSONObject(0)?.str("displayUrl", "url")
+            ?: obj.optJSONArray("images")?.optString(0)?.takeIf { it.isNotBlank() }
+        return normalizeMediaUrl(raw)
     }
 
     private fun JSONObject.str(vararg keys: String): String? {
         for (key in keys) {
             if (!has(key) || isNull(key)) continue
-            val value = opt(key)
-            if (value is String || value is Number) {
-                value.toString().trim().takeIf { it.isNotEmpty() }?.let { return it }
-            }
+            val v = optString(key).trim()
+            if (v.isNotEmpty() && !v.equals("null", ignoreCase = true)) return v
         }
         return null
     }
 
-    /** Accepts JSON numbers and numeric strings (`0` and `"0.00"` both occur). */
     private fun JSONObject.num(vararg keys: String): Double? {
         for (key in keys) {
             if (!has(key) || isNull(key)) continue
-            val parsed = when (val raw = opt(key)) {
+            val raw = opt(key)
+            val d = when (raw) {
                 is Number -> raw.toDouble()
                 is String -> raw.trim().toDoubleOrNull()
                 else -> null
             }
-            if (parsed != null && parsed.isFinite()) return parsed
+            if (d != null && d.isFinite()) return d
         }
         return null
     }
@@ -1017,64 +1198,66 @@ class CustomerRemoteDataSource(
     private fun JSONObject.flag(vararg keys: String): Boolean? {
         for (key in keys) {
             if (!has(key) || isNull(key)) continue
-            when (val raw = opt(key)) {
-                is Boolean -> return raw
-                is Number -> return raw.toInt() != 0
-                is String -> when (raw.trim().lowercase()) {
-                    "true", "1" -> return true
-                    "false", "0" -> return false
-                }
+            return when (val raw = opt(key)) {
+                is Boolean -> raw
+                is Number -> raw.toInt() != 0
+                is String -> raw.trim().lowercase().let { it == "true" || it == "1" }
+                else -> null
             }
         }
         return null
     }
 
-    /** Epoch seconds, epoch millis, or an ISO-8601 string → epoch millis. */
     private fun JSONObject.time(vararg keys: String): Long? {
         for (key in keys) {
             if (!has(key) || isNull(key)) continue
-            val millis = when (val raw = opt(key)) {
-                is Number -> raw.toLong().let { if (it in 1 until SECONDS_LIMIT) it * 1000 else it }
-                is String -> raw.trim().let { s ->
-                    s.toLongOrNull()?.let { if (it in 1 until SECONDS_LIMIT) it * 1000 else it }
-                        ?: parseIso(s)
+            val raw = opt(key)
+            when (raw) {
+                is Number -> {
+                    val n = raw.toLong()
+                    return if (n < 100_000_000_000L) n * 1000L else n
                 }
-                else -> null
+                is String -> {
+                    val s = raw.trim()
+                    s.toLongOrNull()?.let { n ->
+                        return if (n < 100_000_000_000L) n * 1000L else n
+                    }
+                    parseIsoDate(s)?.let { return it }
+                }
             }
-            if (millis != null && millis > 0) return millis
         }
         return null
     }
 
-    private fun parseIso(value: String): Long? = try {
-        Instant.parse(value).toEpochMilli()
-    } catch (_: DateTimeParseException) {
+    private fun parseIsoDate(s: String): Long? =
         try {
-            OffsetDateTime.parse(value).toInstant().toEpochMilli()
+            Instant.parse(s).toEpochMilli()
         } catch (_: DateTimeParseException) {
-            null
+            try {
+                OffsetDateTime.parse(s).toInstant().toEpochMilli()
+            } catch (_: DateTimeParseException) {
+                null
+            }
         }
-    }
 
-    private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
+    private fun encode(v: String): String = URLEncoder.encode(v, "UTF-8")
+
+    private fun sortMessagesChronologically(messages: List<CustomerMessage>): List<CustomerMessage> =
+        messages.sortedWith { a, b ->
+            val timeA = a.createdAt ?: 0L
+            val timeB = b.createdAt ?: 0L
+            when {
+                timeA != timeB -> timeA.compareTo(timeB)
+                else -> a.id.compareTo(b.id)
+            }
+        }
 
     companion object {
-        const val DEFAULT_CURRENCY = "THB"
+        private const val DEFAULT_CURRENCY = "THB"
+        private val JSON = "application/json; charset=utf-8".toMediaType()
+        private val REJECTED_CODES = setOf(400, 409, 422)
+        private val SELLER_SENDERS = setOf("seller", "shop", "support", "agent", "admin", "company")
 
-        /** Anything below this is epoch *seconds* (year 5138 in millis, 1973 in seconds). */
-        const val SECONDS_LIMIT = 100_000_000_000L
-
-        val REJECTED_CODES = setOf(400, 403, 409, 422)
-        val SELLER_SENDERS = setOf("seller", "merchant", "shop", "support", "agent", "admin", "staff", "vendor", "store", "company")
-        val CUSTOMER_SENDERS = setOf("customer", "buyer", "user", "me", "client", "consumer", "member", "guest")
-        val JSON = "application/json; charset=utf-8".toMediaType()
-
-        /**
-         * Strictly sorts messages in chronological order (oldest first).
-         * If the server returned messages in reverse-chronological order (newest first),
-         * it reverses them before stable sorting so that messages with equal timestamps
-         * preserve their natural relative order.
-         */
         fun sortMessagesChronologically(list: List<CustomerMessage>): List<CustomerMessage> {
             if (list.size <= 1) return list
             val withTime = list.filter { it.createdAt != null && it.createdAt > 0L }
@@ -1089,9 +1272,9 @@ class CustomerRemoteDataSource(
         }
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(BackendConfig.CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
+            .readTimeout(BackendConfig.READ_TIMEOUT_SEC, TimeUnit.SECONDS)
+            .writeTimeout(BackendConfig.WRITE_TIMEOUT_SEC, TimeUnit.SECONDS)
             .build()
     }
 }

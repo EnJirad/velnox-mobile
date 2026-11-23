@@ -244,7 +244,9 @@ fun MarketScreen(
         when (val result = catalog.categories()) {
             is CatalogResult.Ok -> {
                 categories = result.value.sortedWith(
-                    compareByDescending<CatalogCategory> { it.productCount }.thenBy { it.name }
+                    compareBy<CatalogCategory> { it.displayOrder }
+                        .thenByDescending { it.productCount }
+                        .thenBy { it.name }
                 )
             }
             is CatalogResult.Failed -> {}

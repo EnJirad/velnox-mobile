@@ -6,18 +6,12 @@ import kotlinx.coroutines.sync.withLock
 /**
  * The catalogue the app is allowed to see.
  *
- * Responsibilities, and nothing else:
- *
+ * Responsibilities:
  * - ask [CatalogApi] for data and hand back its result unchanged;
  * - keep a small in-memory cache so switching tabs, rotating the device or
  *   returning from a product page does not re-hit the network;
- * - never turn a failure into data. If the API is unreachable the caller gets
- *   [CatalogResult.Failed] and must show an error state.
- *
- * The cache is deliberately unbounded-but-small: one entry per distinct query
- * plus one per opened product. A catalogue page is at most 20 rows and detail
- * objects are dropped when the query set grows past [MAX_LIST_ENTRIES], so a long
- * browsing session cannot grow the heap without limit.
+ * - resolve categorySlug -> categoryId when querying products to work around
+ *   backend SQL filter limitations.
  */
 class CatalogRepository(private val api: CatalogApi) {
 
@@ -44,12 +38,27 @@ class CatalogRepository(private val api: CatalogApi) {
     }
 
     suspend fun products(query: CatalogQuery, force: Boolean = false): CatalogResult<CatalogPage> {
-        val key = query.cacheKey()
+        // Resolve categoryId if category slug is present but categoryId is null
+        var effectiveQuery = query
+        if (query.category != null && query.categoryId == null) {
+            val cachedCats = mutex.withLock { categories } ?: run {
+                when (val catRes = categories()) {
+                    is CatalogResult.Ok -> catRes.value
+                    is CatalogResult.Failed -> null
+                }
+            }
+            val matched = cachedCats?.firstOrNull { it.slug.equals(query.category, ignoreCase = true) }
+            if (matched?.id != null) {
+                effectiveQuery = query.copy(categoryId = matched.id)
+            }
+        }
+
+        val key = effectiveQuery.cacheKey()
         mutex.withLock {
             if (!force) lists[key]?.let { return CatalogResult.Ok(it) }
         }
 
-        return when (val result = api.products(query)) {
+        return when (val result = api.products(effectiveQuery)) {
             is CatalogResult.Ok -> {
                 mutex.withLock {
                     lists.remove(key)
@@ -80,7 +89,6 @@ class CatalogRepository(private val api: CatalogApi) {
                 }
                 result
             }
-            // A product that vanished must not stay reachable from the cache.
             is CatalogResult.Failed -> {
                 if (result.error == CatalogError.NotFound) {
                     mutex.withLock { details.remove(id) }
@@ -100,13 +108,18 @@ class CatalogRepository(private val api: CatalogApi) {
                 mutex.withLock {
                     shops.remove(slugOrId)
                     shops[slugOrId] = result.value
-                    while (shops.size > MAX_DETAIL_ENTRIES) {
+                    while (shops.size > MAX_SHOP_ENTRIES) {
                         shops.remove(shops.keys.first())
                     }
                 }
                 result
             }
-            is CatalogResult.Failed -> result
+            is CatalogResult.Failed -> {
+                if (result.error == CatalogError.NotFound) {
+                    mutex.withLock { shops.remove(slugOrId) }
+                }
+                result
+            }
         }
     }
 
@@ -120,7 +133,7 @@ class CatalogRepository(private val api: CatalogApi) {
                 mutex.withLock {
                     reviewsCache.remove(productId)
                     reviewsCache[productId] = result.value
-                    while (reviewsCache.size > MAX_DETAIL_ENTRIES) {
+                    while (reviewsCache.size > MAX_REVIEWS_ENTRIES) {
                         reviewsCache.remove(reviewsCache.keys.first())
                     }
                 }
@@ -130,22 +143,21 @@ class CatalogRepository(private val api: CatalogApi) {
         }
     }
 
-    /** Drop everything: used when the catalogue is known to have changed. */
-    suspend fun invalidate() {
-        mutex.withLock {
-            categories = null
-            lists.clear()
-            details.clear()
-            shops.clear()
-            reviewsCache.clear()
-        }
+    suspend fun evict() = mutex.withLock {
+        categories = null
+        lists.clear()
+        details.clear()
+        shops.clear()
+        reviewsCache.clear()
     }
 
-    private fun CatalogQuery.cacheKey(): String =
-        "${category.orEmpty()}|${search.orEmpty().trim().lowercase()}|$minPrice|$maxPrice|$sortBy|$shopId|$offset|$limit"
+    /** Drop everything: used when the catalogue is known to have changed. */
+    suspend fun invalidate() = evict()
 
-    private companion object {
-        const val MAX_LIST_ENTRIES = 24
-        const val MAX_DETAIL_ENTRIES = 24
+    companion object {
+        const val MAX_LIST_ENTRIES = 16
+        const val MAX_DETAIL_ENTRIES = 32
+        const val MAX_SHOP_ENTRIES = 8
+        const val MAX_REVIEWS_ENTRIES = 16
     }
 }

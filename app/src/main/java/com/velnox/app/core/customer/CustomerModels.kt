@@ -63,7 +63,7 @@ data class AddressInput(
 )
 
 data class RemoteCartItem(
-    /** Cart line id, used by `PUT`/`DELETE /api/customer/cart/item/:id`. */
+    /** Cart line id, used by `PUT`/`DELETE /api/customer/cart/item/:id` or `/api/v1/cart/items/:id`. */
     val id: String,
     val productId: String,
     val variantId: String?,
@@ -75,6 +75,7 @@ data class RemoteCartItem(
     val currency: String,
     val quantity: Int,
     val maxStock: Int?,
+    val shopId: String? = null,
 )
 
 data class RemoteCart(
@@ -120,12 +121,13 @@ data class ShippingQuote(
 data class CheckoutRequest(
     val shippingAddressId: String,
     val items: List<CheckoutLine> = emptyList(),
-    /** Wire value: `PROMPTPAY`, `CARD`, or `COD`. */
+    /** Wire value: `PROMPTPAY`, `CARD`, `COD`, `stripe`, etc. */
     val paymentMethod: String,
     val cartItemIds: List<String>? = null,
     val shippingQuoteId: String? = null,
     val requestId: String? = null,
     val note: String? = null,
+    val shippingAddress: AddressInput? = null,
 )
 
 /** What `POST /api/customer/checkout` created: one or more real orders. */
@@ -167,8 +169,9 @@ data class CustomerOrder(
     val trackingNumber: String? = null,
     val carrier: String? = null,
     val shopId: String? = null,
+    val serverItemCount: Int? = null,
 ) {
-    val itemCount: Int get() = items.sumOf { it.quantity }.coerceAtLeast(items.size)
+    val itemCount: Int get() = if (items.isNotEmpty()) items.sumOf { it.quantity }.coerceAtLeast(items.size) else (serverItemCount ?: 0)
 
     /** Matches backend `CANCELABLE_STATUSES` in `routes/cart.ts`. */
     val isCancelable: Boolean get() = status in CANCELABLE_STATUSES

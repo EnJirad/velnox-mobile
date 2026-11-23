@@ -1,9 +1,19 @@
 package com.velnox.app.core.session
 
-/** A session as it is persisted between launches. */
+/**
+ * A session as it is persisted between launches.
+ * Supports both modern v2 tokens (accessToken + refreshToken + expiry + backendFlavor)
+ * and legacy v1 single token sessions.
+ */
 data class StoredSession(
-    /** The opaque session value issued by the API. Never logged, never rendered. */
+    /** The opaque session or access token value issued by the API. Never logged, never rendered. */
     val token: String,
+    /** Long-lived refresh token issued by Cloudflare Workers backend. */
+    val refreshToken: String? = null,
+    /** Expiry timestamp in epoch milliseconds (if provided by API). */
+    val expiresAtMillis: Long? = null,
+    /** Flavor of the issuing backend: "WORKERS_V1" or "EXPRESS_LEGACY". */
+    val backendFlavor: String? = null,
 )
 
 /**

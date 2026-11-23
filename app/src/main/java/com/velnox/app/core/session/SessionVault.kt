@@ -3,6 +3,7 @@ package com.velnox.app.core.session
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import org.json.JSONObject
 import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -13,21 +14,9 @@ import javax.crypto.spec.GCMParameterSpec
 /**
  * Keystore-backed storage for the session token.
  *
- * Why not DataStore/SharedPreferences: those are plain files inside the app's
- * private directory, readable from a rooted device or a full backup, and easy to
- * leak through a bug. The token here is encrypted with an AES-256-GCM key that
- * lives in the Android Keystore and never enters the app process, so the
- * ciphertext on disk is useless without the device.
- *
- * Layout of the stored file (`filesDir/session/session.bin`):
- *
- * ```
- * [1 byte version][12 byte GCM IV][ciphertext]
- * ```
- *
- * There is no separate "clear text" copy and no fallback to weaker storage: if
- * the Keystore refuses to produce a key, [write] throws and the caller treats the
- * result as "not signed in" rather than downgrading.
+ * Supports FORMAT_VERSION 2 (encrypted JSON containing accessToken, refreshToken,
+ * expiresAtMillis, backendFlavor) with seamless backward compatibility for
+ * FORMAT_VERSION 1 (raw token UTF-8).
  */
 class SessionVault(private val context: Context) : SessionStore {
 
@@ -41,7 +30,7 @@ class SessionVault(private val context: Context) : SessionStore {
 
         return try {
             val version = bytes[0]
-            if (version != FORMAT_VERSION_BYTE) return null
+            if (version != FORMAT_VERSION_V1_BYTE && version != FORMAT_VERSION_V2_BYTE) return null
 
             val iv = bytes.copyOfRange(VERSION_BYTES, VERSION_BYTES + IV_BYTES)
             val ciphertext = bytes.copyOfRange(VERSION_BYTES + IV_BYTES, bytes.size)
@@ -54,29 +43,49 @@ class SessionVault(private val context: Context) : SessionStore {
             )
             val plaintext = cipher.doFinal(ciphertext)
 
-            val token = String(plaintext, Charsets.UTF_8)
-            if (token.isEmpty()) null else StoredSession(token)
+            if (version == FORMAT_VERSION_V1_BYTE) {
+                val token = String(plaintext, Charsets.UTF_8)
+                if (token.isEmpty()) null else StoredSession(token)
+            } else {
+                val jsonStr = String(plaintext, Charsets.UTF_8)
+                if (jsonStr.isEmpty()) null else {
+                    val json = JSONObject(jsonStr)
+                    val token = json.optString("token")
+                    if (token.isEmpty()) null else {
+                        StoredSession(
+                            token = token,
+                            refreshToken = json.optString("refreshToken").takeIf { it.isNotEmpty() },
+                            expiresAtMillis = if (json.has("expiresAtMillis") && !json.isNull("expiresAtMillis")) {
+                                json.optLong("expiresAtMillis")
+                            } else null,
+                            backendFlavor = json.optString("backendFlavor").takeIf { it.isNotEmpty() },
+                        )
+                    }
+                }
+            }
         } catch (_: Exception) {
-            // A key that was invalidated (lock screen change, restore to a new
-            // device) or a corrupted file both mean the same thing: no session.
-            // Drop the useless bytes so the next launch does not retry them.
             files.clear()
             null
         }
     }
 
     override suspend fun write(session: StoredSession) {
+        val json = JSONObject().apply {
+            put("token", session.token)
+            session.refreshToken?.let { put("refreshToken", it) }
+            session.expiresAtMillis?.let { put("expiresAtMillis", it) }
+            session.backendFlavor?.let { put("backendFlavor", it) }
+        }
+
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, createKey())
-        val ciphertext = cipher.doFinal(session.token.toByteArray(Charsets.UTF_8))
+        val ciphertext = cipher.doFinal(json.toString().toByteArray(Charsets.UTF_8))
 
         val payload = ByteArray(VERSION_BYTES + IV_BYTES + ciphertext.size)
-        payload[0] = FORMAT_VERSION_BYTE
+        payload[0] = FORMAT_VERSION_V2_BYTE
         cipher.iv.copyInto(payload, VERSION_BYTES)
         ciphertext.copyInto(payload, VERSION_BYTES + IV_BYTES)
 
-        // Throws when the file cannot be made durable, so a caller never reports
-        // a session that was not actually saved.
         files.writeBytes(payload)
     }
 
@@ -84,8 +93,6 @@ class SessionVault(private val context: Context) : SessionStore {
         try {
             files.clear()
         } catch (_: Exception) {
-            // A failed delete cannot make the token readable; read() discards
-            // anything it cannot decrypt.
         }
     }
 
@@ -110,9 +117,6 @@ class SessionVault(private val context: Context) : SessionStore {
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
-                // No user-authentication requirement: the session must restore on
-                // a cold start without a biometric prompt, which is the same
-                // trade-off every "stay signed in" app makes.
                 .setUserAuthenticationRequired(false)
                 .build(),
         )
@@ -126,10 +130,13 @@ class SessionVault(private val context: Context) : SessionStore {
         const val TAG_BITS = 128
         const val IV_BYTES = 12
         const val VERSION_BYTES = 1
-        const val FORMAT_VERSION = 1
 
-        /** Same value as [FORMAT_VERSION], typed for the on-disk byte compare. */
-        val FORMAT_VERSION_BYTE: Byte = FORMAT_VERSION.toByte()
+        const val FORMAT_VERSION_V1 = 1
+        const val FORMAT_VERSION_V2 = 2
+
+        val FORMAT_VERSION_V1_BYTE: Byte = FORMAT_VERSION_V1.toByte()
+        val FORMAT_VERSION_V2_BYTE: Byte = FORMAT_VERSION_V2.toByte()
+
         const val DIRECTORY = "session"
     }
 }

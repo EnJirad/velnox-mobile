@@ -93,9 +93,10 @@ fun CategoryScreen(
         if (categoriesLoaded) return@LaunchedEffect
         when (val result = catalog.categories()) {
             is CatalogResult.Ok -> {
-                // Most-populated first; the count comes from the backend.
+                // Priority by displayOrder, then most-populated, then name.
                 categories = result.value.sortedWith(
-                    compareByDescending<CatalogCategory> { it.productCount }
+                    compareBy<CatalogCategory> { it.displayOrder }
+                        .thenByDescending { it.productCount }
                         .thenBy { it.name },
                 )
                 categoriesLoaded = true
@@ -244,14 +245,16 @@ private fun CategoryHub(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            text = stringResource(
-                                R.string.category_product_count,
-                                category.productCount,
-                            ),
-                            style = Text2xs,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (category.hasExplicitProductCount && category.productCount > 0) {
+                            Text(
+                                text = stringResource(
+                                    R.string.category_product_count,
+                                    category.productCount,
+                                ),
+                                style = Text2xs,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     Icon(
                         imageVector = VelnoxIcons.ChevronRight,

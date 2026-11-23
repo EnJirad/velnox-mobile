@@ -16,9 +16,26 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // The deployed Velnox API. Not a secret: it is a public HTTPS origin that
-        // every client already talks to. Kept here so no screen hard-codes a URL.
-        buildConfigField("String", "API_BASE_URL", "\"https://velnox-api.onrender.com\"")
+        // The deployed Velnox API. Primary target is Cloudflare Workers (api.velnox.live),
+        // with automatic fallback to workers.dev and legacy Render (velnox-api.onrender.com).
+        // Overridable via gradle property -PvelnoxApiBaseUrl=...
+        val apiBaseUrl = (project.findProperty("velnoxApiBaseUrl") as String?)
+            ?.trim()
+            ?.ifEmpty { null }
+            ?: "https://api.velnox.live"
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+
+        val fallbackUrls = (project.findProperty("velnoxFallbackUrls") as String?)
+            ?.trim()
+            ?.ifEmpty { null }
+            ?: "https://velnox-api.ma0979354966-js91934.workers.dev,https://velnox-api.onrender.com"
+        buildConfigField("String", "API_FALLBACK_URLS", "\"$fallbackUrls\"")
+
+        val mediaBaseUrl = (project.findProperty("velnoxMediaBaseUrl") as String?)
+            ?.trim()
+            ?.ifEmpty { null }
+            ?: "https://pub-75f6f26e59df431b854fe53caedb49b6.r2.dev"
+        buildConfigField("String", "MEDIA_BASE_URL", "\"$mediaBaseUrl\"")
 
         // Google Sign-In needs the *Web* OAuth client id as its `serverClientId`,
         // because the ID token's `aud` must match what the backend verifies.

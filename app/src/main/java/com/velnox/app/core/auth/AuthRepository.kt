@@ -5,21 +5,17 @@ import com.velnox.app.core.session.SessionManager
 /**
  * The one way the app signs in, restores and signs out.
  *
- * ### Rules it enforces
- *
- * - **A token is never trusted on its own.** [restore] asks the API who the
- *   token belongs to before reporting [RestoreOutcome.Active]; a token that clears
- *   its own `exp` check is reported [RestoreOutcome.Expired] without a pointless
- *   request.
- * - **Network failure is never success.** An unreachable API yields
- *   [RestoreOutcome.Unverified]; the token is kept so a later launch can retry it,
- *   and no account is produced.
- * - **Signing out clears storage first**, so a crash mid-logout cannot leave a
- *   usable token behind, and only then asks the server to revoke it.
+ * Enforces security & resilience rules:
+ * - A token is validated against the server on startup before reporting [RestoreOutcome.Active].
+ * - Supports short-lived access tokens (15m) + long-lived refresh tokens (7d) on Cloudflare Workers.
+ * - Single-flight refresh coordination prevents concurrent refresh token reuse revocation.
+ * - Network failure keeps the session locally as [RestoreOutcome.Unverified].
+ * - Signing out clears local storage first, then revokes tokens on the server.
  */
 class AuthRepository(
     private val api: AuthApi,
     private val sessions: SessionManager,
+    private val tokenRefresher: TokenRefresher? = null,
 ) {
 
     suspend fun signIn(email: String, password: String): SignInResult {
@@ -40,29 +36,93 @@ class AuthRepository(
 
     /**
      * Resolve whatever session is stored.
-     *
-     * The token is handed to the API, which verifies signature, revocation and the
-     * account row — the client never decides on its own that a token is good.
      */
     suspend fun restore(): RestoreOutcome {
-        val token = sessions.current() ?: return RestoreOutcome.NoSession
+        val session = sessions.currentSession() ?: return RestoreOutcome.NoSession
 
-        if (sessions.isExpired(token)) {
-            sessions.clear()
-            return RestoreOutcome.Expired
+        // Check proactive refresh if token has refresh token and is near or past expiry
+        var activeToken = session.token
+        if (tokenRefresher != null && session.refreshToken != null && sessions.shouldRefresh(session)) {
+            when (val refreshOutcome = tokenRefresher.refresh(session.token)) {
+                is RefreshResult.Success -> {
+                    activeToken = refreshOutcome.accessToken
+                }
+                is RefreshResult.Expired -> {
+                    sessions.clear()
+                    return RestoreOutcome.Expired
+                }
+                is RefreshResult.TransientFailure -> {
+                    // If access token is still valid according to exp, continue to me(); otherwise unverified
+                    if (sessions.isExpired(session.token)) {
+                        return RestoreOutcome.Unverified
+                    }
+                }
+                RefreshResult.NoRefreshToken -> {
+                    // Continue with existing token
+                }
+            }
+        } else if (sessions.isExpired(activeToken)) {
+            if (tokenRefresher != null && session.refreshToken != null) {
+                when (val refreshOutcome = tokenRefresher.refresh(activeToken)) {
+                    is RefreshResult.Success -> {
+                        activeToken = refreshOutcome.accessToken
+                    }
+                    is RefreshResult.Expired -> {
+                        sessions.clear()
+                        return RestoreOutcome.Expired
+                    }
+                    is RefreshResult.TransientFailure -> {
+                        return RestoreOutcome.Unverified
+                    }
+                    RefreshResult.NoRefreshToken -> {
+                        sessions.clear()
+                        return RestoreOutcome.Expired
+                    }
+                }
+            } else {
+                sessions.clear()
+                return RestoreOutcome.Expired
+            }
         }
 
-        return when (val result = api.me(token)) {
+        return when (val result = api.me(activeToken)) {
             is ApiResult.Ok -> RestoreOutcome.Active(result.value)
             is ApiResult.Error -> when (result.error) {
                 AuthError.Unauthorized -> {
-                    sessions.clear()
-                    RestoreOutcome.Expired
+                    // Reactive refresh attempt on 401
+                    if (tokenRefresher != null && session.refreshToken != null) {
+                        when (val refreshOutcome = tokenRefresher.refresh(activeToken)) {
+                            is RefreshResult.Success -> {
+                                when (val retry = api.me(refreshOutcome.accessToken)) {
+                                    is ApiResult.Ok -> RestoreOutcome.Active(retry.value)
+                                    is ApiResult.Error -> {
+                                        if (retry.error == AuthError.Unauthorized) {
+                                            sessions.clear()
+                                            RestoreOutcome.Expired
+                                        } else {
+                                            RestoreOutcome.Unverified
+                                        }
+                                    }
+                                }
+                            }
+                            is RefreshResult.Expired -> {
+                                sessions.clear()
+                                RestoreOutcome.Expired
+                            }
+                            is RefreshResult.TransientFailure -> RestoreOutcome.Unverified
+                            RefreshResult.NoRefreshToken -> {
+                                sessions.clear()
+                                RestoreOutcome.Expired
+                            }
+                        }
+                    } else {
+                        sessions.clear()
+                        RestoreOutcome.Expired
+                    }
                 }
 
                 AuthError.Network, AuthError.Server -> RestoreOutcome.Unverified
 
-                // A 404 or an unexpected body is not proof the token is valid.
                 else -> RestoreOutcome.Unverified
             }
         }
@@ -70,19 +130,15 @@ class AuthRepository(
 
     /** Drop the session locally, then revoke it on the server. Never throws. */
     suspend fun signOut() {
-        val token = sessions.current()
+        val session = sessions.currentSession()
         sessions.clear()
-        if (token != null) api.logout(token)
+        if (session != null) {
+            api.logout(session.token, session.refreshToken)
+        }
     }
 
     /**
      * Exchange a Google ID token for a session.
-     *
-     * The token is handed straight to the API, which verifies it with Google. The
-     * app never reads the claims itself and never decides that a Google account
-     * belongs to anyone: if the server says `LINK_REQUIRED`, an account already
-     * exists for that address and the user has to prove ownership with their
-     * password before Google is attached to it.
      */
     suspend fun signInWithGoogle(idToken: String): SignInResult {
         return when (val result = api.googleSignIn(idToken.trim())) {
@@ -91,19 +147,6 @@ class AuthRepository(
         }
     }
 
-    /**
-     * Attach the Google identity behind [idToken] to the account that is already
-     * signed in.
-     *
-     * This is the only path that can create a Google mapping for an existing
-     * account, and it needs both halves: a live session (proof of ownership) and a
-     * token the server verifies. Without a stored session there is nothing to
-     * prove, so the call is refused locally instead of being attempted and
-     * answered with a 401.
-     *
-     * Nothing about the session changes on success — it is the same account, now
-     * with a second way to sign in.
-     */
     suspend fun linkGoogle(idToken: String): ApiResult<Unit> {
         val token = sessions.current() ?: return ApiResult.Error(AuthError.Unauthorized)
         return api.linkGoogle(idToken.trim(), token)
@@ -111,37 +154,21 @@ class AuthRepository(
 
     /**
      * Ask the server to send a reset link.
-     *
-     * The outcome is intentionally not "does this account exist": the API answers
-     * uniformly, and a caller that branches on the result would rebuild the
-     * enumeration oracle the endpoint avoids.
      */
     suspend fun requestPasswordReset(email: String): ApiResult<Unit> =
         api.forgotPassword(email.trim().lowercase())
 
     /**
      * Choose a new password with a reset token.
-     *
-     * A successful reset invalidates the tokens that existed before it, so any
-     * session this device is holding is cleared: the user must sign in again with
-     * the password they just chose.
      */
     suspend fun resetPassword(token: String, password: String): ApiResult<Unit> {
         val result = api.resetPassword(token.trim(), password)
-        if (result is ApiResult.Ok) sessions.clear()
+        if (result is ApiResult.Ok<*>) sessions.clear()
         return result
     }
 
     private suspend fun persist(session: AuthSession): SignInResult {
-        return try {
-            sessions.save(session.token)
-            SignInResult.Success(session.user)
-        } catch (_: Exception) {
-            // The token could not be stored securely. Staying signed in for this
-            // process only would be a lie the next launch exposes, so the call
-            // fails instead of half-succeeding.
-            sessions.clear()
-            SignInResult.Failure(AuthError.Unknown)
-        }
+        sessions.save(session)
+        return SignInResult.Success(session.user)
     }
 }

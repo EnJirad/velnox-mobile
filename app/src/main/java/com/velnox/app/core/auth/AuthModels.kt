@@ -4,7 +4,7 @@ package com.velnox.app.core.auth
  * The signed-in account, as the Velnox API describes it.
  *
  * Never constructed by the client from user input: it comes from a `200` on
- * `/api/auth/mobile/login`, `/api/auth/mobile/google|line` or `/api/auth/me`.
+ * `/api/v1/auth/me`, `/api/auth/me`, `/api/auth/mobile/login`, or OAuth routes.
  */
 data class AuthUser(
     val id: String,
@@ -15,20 +15,25 @@ data class AuthUser(
     val coverUrl: String? = null,
 )
 
-/** A session issued by the API: the opaque token plus the account it belongs to. */
+/** A session issued by the API: the access token plus the account it belongs to and optional refresh token. */
 data class AuthSession(
     val token: String,
     val user: AuthUser,
+    val refreshToken: String? = null,
+    val expiresInSeconds: Long? = null,
+    val backendFlavor: String? = null,
+)
+
+/** Rotated tokens returned by POST /api/v1/auth/refresh. */
+data class AuthTokens(
+    val accessToken: String,
+    val refreshToken: String? = null,
+    val expiresIn: Long? = null,
 )
 
 /**
  * Every way a call can fail, reduced to the cases the UI can actually say
  * something useful about.
- *
- * [Unauthorized] and [InvalidCredentials] are deliberately distinct: the first
- * means "the session you have is no longer valid", the second "the password you
- * just typed is wrong". Collapsing them would either log people out for a typo
- * or keep a dead session alive.
  */
 enum class AuthError {
     /** 401 on an authenticated call: the token is expired, revoked or invalid. */
@@ -37,7 +42,7 @@ enum class AuthError {
     /** 401 on sign-in: wrong email or password. */
     InvalidCredentials,
 
-    /** 409 `EMAIL_EXISTS` on registration. */
+    /** 409 `EMAIL_EXISTS` or `CONFLICT` on registration. */
     EmailExists,
 
     /** 403 `ACCOUNT_DISABLED` / suspended / banned. */
@@ -54,8 +59,7 @@ enum class AuthError {
 
     /**
      * 503 `EMAIL_NOT_CONFIGURED`: the server has no mail transport, so a reset
-     * link cannot be delivered. Reported honestly instead of pretending an email
-     * was sent.
+     * link cannot be delivered.
      */
     EmailNotConfigured,
 
@@ -64,14 +68,13 @@ enum class AuthError {
 
     /**
      * 401 `INVALID_GOOGLE_TOKEN` / `EMAIL_NOT_VERIFIED`: the identity token the
-     * provider returned could not be trusted. Never treated as a sign-in.
+     * provider returned could not be trusted.
      */
     InvalidProviderToken,
 
     /**
      * 409 `LINK_REQUIRED`: an account already exists for that email but is not
-     * linked to this Google identity. The user must sign in with their password
-     * once to prove ownership, then link.
+     * linked to this Google identity.
      */
     LinkRequired,
 
@@ -79,20 +82,12 @@ enum class AuthError {
     ProviderUnavailable,
 
     /**
-     * 409 `EMAIL_MISMATCH` on `POST /api/auth/mobile/link`: the verified Google
-     * address is not the signed-in account's address.
-     *
-     * Linking to a different mailbox would attach someone else's identity to this
-     * account, so it is refused rather than reconciled.
+     * 409 `EMAIL_MISMATCH` on `POST /api/auth/mobile/link`.
      */
     EmailMismatch,
 
     /**
-     * 409 `IDENTITY_CONFLICT` on `POST /api/auth/mobile/link`: that Google account
-     * is already bound to another Velnox user.
-     *
-     * Nothing is moved. The alternative — re-pointing the mapping — would take the
-     * identity away from the account that owns it.
+     * 409 `IDENTITY_CONFLICT` on `POST /api/auth/mobile/link`.
      */
     IdentityConflict,
 
@@ -108,7 +103,7 @@ enum class AuthError {
 
 /** Result of one API call. There is no "probably worked" case. */
 sealed interface ApiResult<out T> {
-    data class Ok<T>(val value: T) : ApiResult<T>
+    data class Ok<out T>(val value: T) : ApiResult<T>
     data class Error(val error: AuthError) : ApiResult<Nothing>
 }
 
@@ -131,9 +126,7 @@ sealed interface RestoreOutcome {
 
     /**
      * The token could not be checked because the API was unreachable.
-     *
-     * The token is **kept** — it may still be valid — but the app must not act
-     * as if the user were signed in, because that has not been proven.
+     * The token is kept.
      */
     data object Unverified : RestoreOutcome
 }

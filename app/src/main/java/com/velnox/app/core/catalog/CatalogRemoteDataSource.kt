@@ -1,6 +1,10 @@
 package com.velnox.app.core.catalog
 
 import com.velnox.app.BuildConfig
+import com.velnox.app.core.network.BackendConfig
+import com.velnox.app.core.network.BackendDialect
+import com.velnox.app.core.network.BackendEndpointRouter
+import com.velnox.app.core.network.VelnoxMediaUrlResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -14,134 +18,210 @@ import java.util.concurrent.TimeUnit
 /**
  * The Velnox API client for the public catalogue.
  *
- * Scope is exactly three endpoints, all of them public and already deployed:
- *
- * | Call | Endpoint | Server-side rule |
- * |---|---|---|
- * | categories | `GET /api/categories/tree` | `is_active` only, with published counts |
- * | list | `GET /api/products/catalog` | `p.status = 'published' AND sh.status = 'active'` |
- * | detail | `GET /api/products/:id` | same predicate; otherwise `404 NOT_FOUND` |
- *
- * No call throws for an expected failure: the caller receives a
- * [CatalogResult.Failed]. Nothing is ever synthesised when the API fails — that
- * rule is the whole point of this class.
+ * Supports both Cloudflare Workers v1 API (`api.velnox.live`) and Express legacy API
+ * (`velnox-api.onrender.com`), with automatic host failover, dual routing, and
+ * resilient fallback.
  */
 class CatalogRemoteDataSource(
-    private val baseUrl: String = BuildConfig.API_BASE_URL,
+    baseUrl: String = BuildConfig.API_BASE_URL,
     private val client: OkHttpClient = defaultClient(),
+    val router: BackendEndpointRouter = BackendEndpointRouter(
+        primaryHost = baseUrl,
+        fallbackHosts = BackendConfig.FALLBACK_HOSTS,
+        client = client,
+    ),
 ) : CatalogApi {
 
     override suspend fun categories(): CatalogResult<List<CatalogCategory>> =
-        when (val raw = get("/api/categories/tree")) {
-            is Raw.Failure -> CatalogResult.Failed(raw.error)
-            is Raw.Success -> {
-                val data = raw.dataArray()
-                    ?: return CatalogResult.Failed(CatalogError.Server)
-                val flat = ArrayList<CatalogCategory>()
-                for (i in 0 until data.length()) {
-                    val node = data.optJSONObject(i) ?: continue
-                    parseCategory(node)?.let(flat::add)
-                    val children = node.optJSONArray("children") ?: continue
-                    for (c in 0 until children.length()) {
-                        val child = children.optJSONObject(c) ?: continue
-                        parseCategory(child)?.let(flat::add)
-                    }
+        router.executeWithFailover(isIdempotent = true) { host, dialect ->
+            val path = if (dialect == BackendDialect.WORKERS_V1) "/api/v1/categories" else "/api/categories/tree"
+            var raw = get(host, path)
+
+            if (raw is Raw.Failure && raw.error == CatalogError.NotFound) {
+                // Route compatibility fallback
+                val altPath = if (dialect == BackendDialect.WORKERS_V1) "/api/categories/tree" else "/api/v1/categories"
+                val altRaw = get(host, altPath)
+                if (altRaw is Raw.Success) {
+                    raw = altRaw
                 }
-                CatalogResult.Ok(flat)
+            }
+
+            when (raw) {
+                is Raw.Failure -> CatalogResult.Failed(raw.error)
+                is Raw.Success -> {
+                    val data = raw.dataArray() ?: return@executeWithFailover CatalogResult.Failed(CatalogError.Server)
+                    val flat = ArrayList<CatalogCategory>()
+                    flattenTree(data, flat, host, dialect)
+                    CatalogResult.Ok(flat)
+                }
             }
         }
 
-    override suspend fun products(query: CatalogQuery): CatalogResult<CatalogPage> {
-        val path = buildString {
-            append("/api/products/catalog?limit=")
-            append(query.limit.coerceIn(1, MAX_LIMIT))
-            append("&offset=")
-            append(query.offset.coerceAtLeast(0))
-            query.category?.takeIf { it.isNotBlank() }?.let {
-                append("&category=").append(encode(it))
-            }
-            query.search?.trim()?.takeIf { it.isNotEmpty() }?.let {
-                append("&q=").append(encode(it))
-            }
-            query.minPrice?.let {
-                append("&minPrice=").append(it)
-            }
-            query.maxPrice?.let {
-                append("&maxPrice=").append(it)
-            }
-            query.sortBy?.takeIf { it.isNotBlank() }?.let {
-                append("&sortBy=").append(encode(it))
-            }
-            query.shopId?.takeIf { it.isNotBlank() }?.let {
-                append("&shopId=").append(encode(it))
-            }
-        }
-
-        return when (val raw = get(path)) {
-            is Raw.Failure -> CatalogResult.Failed(raw.error)
-            is Raw.Success -> {
-                val data = raw.dataArray()
-                    ?: return CatalogResult.Failed(CatalogError.Server)
-                val items = ArrayList<CatalogProduct>(data.length())
-                for (i in 0 until data.length()) {
-                    val item = data.optJSONObject(i) ?: continue
-                    parseProduct(item)?.let(items::add)
-                }
-                // The endpoint publishes no total; a full page is the only signal
-                // that another one may exist.
-                CatalogResult.Ok(
-                    CatalogPage(
-                        items = items,
-                        hasMore = data.length() >= query.limit,
-                    ),
-                )
+    private fun flattenTree(
+        nodes: JSONArray,
+        result: MutableList<CatalogCategory>,
+        host: String,
+        dialect: BackendDialect,
+    ) {
+        for (i in 0 until nodes.length()) {
+            val node = nodes.optJSONObject(i) ?: continue
+            parseCategory(node, host, dialect)?.let(result::add)
+            val children = node.optJSONArray("children")
+            if (children != null && children.length() > 0) {
+                flattenTree(children, result, host, dialect)
             }
         }
     }
 
+    override suspend fun products(query: CatalogQuery): CatalogResult<CatalogPage> =
+        router.executeWithFailover(isIdempotent = true) { host, dialect ->
+            val path = if (dialect == BackendDialect.WORKERS_V1) {
+                val limit = query.limit.coerceIn(1, 100)
+                val page = (query.offset.coerceAtLeast(0) / limit) + 1
+                buildString {
+                    append("/api/v1/products?limit=").append(limit)
+                    append("&page=").append(page)
+                    query.categoryId?.takeIf { it.isNotBlank() }?.let { append("&categoryId=").append(encode(it)) }
+                    query.category?.takeIf { it.isNotBlank() }?.let { append("&categorySlug=").append(encode(it)) }
+                    query.search?.trim()?.takeIf { it.isNotEmpty() }?.let { append("&q=").append(encode(it)) }
+                    query.minPrice?.let { append("&minPrice=").append(it) }
+                    query.maxPrice?.let { append("&maxPrice=").append(it) }
+                    query.sortBy?.takeIf { it.isNotBlank() }?.let { append("&sort=").append(encode(it)) }
+                    query.shopId?.takeIf { it.isNotBlank() }?.let { append("&shopId=").append(encode(it)) }
+                }
+            } else {
+                buildString {
+                    append("/api/products/catalog?limit=").append(query.limit.coerceIn(1, MAX_LIMIT))
+                    append("&offset=").append(query.offset.coerceAtLeast(0))
+                    query.category?.takeIf { it.isNotBlank() }?.let { append("&category=").append(encode(it)) }
+                    query.search?.trim()?.takeIf { it.isNotEmpty() }?.let { append("&q=").append(encode(it)) }
+                    query.minPrice?.let { append("&minPrice=").append(it) }
+                    query.maxPrice?.let { append("&maxPrice=").append(it) }
+                    query.sortBy?.takeIf { it.isNotBlank() }?.let { append("&sortBy=").append(encode(it)) }
+                    query.shopId?.takeIf { it.isNotBlank() }?.let { append("&shopId=").append(encode(it)) }
+                }
+            }
+
+            var raw = get(host, path)
+            if (raw is Raw.Failure && raw.error == CatalogError.NotFound && dialect == BackendDialect.WORKERS_V1) {
+                // Retry with legacy endpoint
+                val legacyPath = buildString {
+                    append("/api/products/catalog?limit=").append(query.limit.coerceIn(1, MAX_LIMIT))
+                    append("&offset=").append(query.offset.coerceAtLeast(0))
+                    query.category?.takeIf { it.isNotBlank() }?.let { append("&category=").append(encode(it)) }
+                    query.search?.trim()?.takeIf { it.isNotEmpty() }?.let { append("&q=").append(encode(it)) }
+                    query.minPrice?.let { append("&minPrice=").append(it) }
+                    query.maxPrice?.let { append("&maxPrice=").append(it) }
+                    query.sortBy?.takeIf { it.isNotBlank() }?.let { append("&sortBy=").append(encode(it)) }
+                    query.shopId?.takeIf { it.isNotBlank() }?.let { append("&shopId=").append(encode(it)) }
+                }
+                raw = get(host, legacyPath)
+            }
+
+            when (raw) {
+                is Raw.Failure -> CatalogResult.Failed(raw.error)
+                is Raw.Success -> {
+                    val data = raw.dataArray() ?: return@executeWithFailover CatalogResult.Failed(CatalogError.Server)
+                    val items = ArrayList<CatalogProduct>(data.length())
+                    for (i in 0 until data.length()) {
+                        val item = data.optJSONObject(i) ?: continue
+                        parseProduct(item, host, dialect)?.let(items::add)
+                    }
+
+                    val envelope = raw.envelope()
+                    val pagination = envelope?.optJSONObject("pagination")
+                    val hasMore = if (pagination != null) {
+                        val page = pagination.optInt("page", 1)
+                        val totalPages = pagination.optInt("totalPages", 1)
+                        page < totalPages
+                    } else {
+                        data.length() >= query.limit
+                    }
+
+                    CatalogResult.Ok(CatalogPage(items = items, hasMore = hasMore))
+                }
+            }
+        }
+
     override suspend fun product(id: String): CatalogResult<ProductDetail> =
-        when (val raw = get("/api/products/${encode(id)}")) {
-            is Raw.Failure -> CatalogResult.Failed(raw.error)
-            is Raw.Success -> {
-                val data = raw.dataObject()
-                    ?: return CatalogResult.Failed(CatalogError.Server)
-                parseDetail(data)?.let { CatalogResult.Ok(it) }
-                    ?: CatalogResult.Failed(CatalogError.Server)
+        router.executeWithFailover(isIdempotent = true) { host, dialect ->
+            val path = if (dialect == BackendDialect.WORKERS_V1) "/api/v1/products/${encode(id)}" else "/api/products/${encode(id)}"
+            var raw = get(host, path)
+
+            if (raw is Raw.Failure && raw.error == CatalogError.NotFound && dialect == BackendDialect.WORKERS_V1) {
+                raw = get(host, "/api/products/${encode(id)}")
+            }
+
+            when (raw) {
+                is Raw.Failure -> CatalogResult.Failed(raw.error)
+                is Raw.Success -> {
+                    val data = raw.dataObject() ?: return@executeWithFailover CatalogResult.Failed(CatalogError.Server)
+                    parseDetail(data, host, dialect)?.let { CatalogResult.Ok(it) }
+                        ?: CatalogResult.Failed(CatalogError.Server)
+                }
             }
         }
 
     override suspend fun shop(slugOrId: String): CatalogResult<ShopDetail> =
-        when (val raw = get("/api/shops/${encode(slugOrId)}")) {
-            is Raw.Failure -> CatalogResult.Failed(raw.error)
-            is Raw.Success -> {
-                val data = raw.dataObject()
-                    ?: return CatalogResult.Failed(CatalogError.Server)
-                parseShop(data)?.let { CatalogResult.Ok(it) }
-                    ?: CatalogResult.Failed(CatalogError.Server)
+        router.executeWithFailover(isIdempotent = true) { host, dialect ->
+            val path = if (dialect == BackendDialect.WORKERS_V1) "/api/v1/shops/${encode(slugOrId)}" else "/api/shops/${encode(slugOrId)}"
+            var raw = get(host, path)
+
+            if (raw is Raw.Failure && raw.error == CatalogError.NotFound && dialect == BackendDialect.WORKERS_V1) {
+                raw = get(host, "/api/shops/${encode(slugOrId)}")
+            }
+
+            when (raw) {
+                is Raw.Failure -> CatalogResult.Failed(raw.error)
+                is Raw.Success -> {
+                    val data = raw.dataObject() ?: return@executeWithFailover CatalogResult.Failed(CatalogError.Server)
+                    val parsed = parseShop(data, host, dialect)
+                    if (parsed != null) {
+                        // If Workers returned direct shop record without products, fetch products by shopId
+                        if (parsed.products.isEmpty()) {
+                            val shopProds = products(CatalogQuery(shopId = parsed.shop.id, limit = 40))
+                            if (shopProds is CatalogResult.Ok) {
+                                CatalogResult.Ok(parsed.copy(products = shopProds.value.items))
+                            } else {
+                                CatalogResult.Ok(parsed)
+                            }
+                        } else {
+                            CatalogResult.Ok(parsed)
+                        }
+                    } else {
+                        CatalogResult.Failed(CatalogError.Server)
+                    }
+                }
             }
         }
 
     override suspend fun reviews(productId: String): CatalogResult<ProductReviewsData> =
-        when (val raw = get("/api/products/${encode(productId)}/reviews")) {
-            is Raw.Failure -> CatalogResult.Failed(raw.error)
-            is Raw.Success -> {
-                val data = raw.dataObject()
-                    ?: return CatalogResult.Failed(CatalogError.Server)
-                parseReviews(data)?.let { CatalogResult.Ok(it) }
-                    ?: CatalogResult.Failed(CatalogError.Server)
+        router.executeWithFailover(isIdempotent = true) { host, dialect ->
+            val raw = get(host, "/api/products/${encode(productId)}/reviews")
+            when (raw) {
+                is Raw.Failure -> {
+                    // Graceful degradation for endpoints not yet ported to Workers
+                    if (raw.error == CatalogError.NotFound) {
+                        CatalogResult.Ok(ProductReviewsData(items = emptyList(), total = 0))
+                    } else {
+                        CatalogResult.Failed(raw.error)
+                    }
+                }
+                is Raw.Success -> {
+                    val data = raw.dataObject() ?: return@executeWithFailover CatalogResult.Ok(ProductReviewsData())
+                    parseReviews(data)?.let { CatalogResult.Ok(it) } ?: CatalogResult.Ok(ProductReviewsData())
+                }
             }
         }
-
-    // ------------------------------------------------------------- transport
 
     private sealed interface Raw {
         data class Success(val body: String) : Raw
         data class Failure(val error: CatalogError) : Raw
     }
 
-    private suspend fun get(path: String): Raw = withContext(Dispatchers.IO) {
+    private suspend fun get(host: String, path: String): Raw = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url(baseUrl.trimEnd('/') + path)
+            .url(host.trimEnd('/') + path)
             .get()
             .header("Accept", "application/json")
             .build()
@@ -150,10 +230,7 @@ class CatalogRemoteDataSource(
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 when {
-                    response.code == 404 -> Raw.Failure(CatalogError.NotFound)
-                    // 400 covers a non-UUID id, which the API reports as a database
-                    // error; from the app's point of view it is simply not a product.
-                    response.code == 400 -> Raw.Failure(CatalogError.NotFound)
+                    response.code == 404 || response.code == 400 -> Raw.Failure(CatalogError.NotFound)
                     !response.isSuccessful -> Raw.Failure(CatalogError.Server)
                     else -> Raw.Success(body)
                 }
@@ -163,9 +240,6 @@ class CatalogRemoteDataSource(
         }
     }
 
-    // ---------------------------------------------------------------- parsing
-
-    /** The envelope is `{ success, data }`; a missing or false `success` is an error. */
     private fun Raw.Success.envelope(): JSONObject? = try {
         val json = JSONObject(body)
         if (json.optBoolean("success", false)) json else null
@@ -177,42 +251,62 @@ class CatalogRemoteDataSource(
 
     private fun Raw.Success.dataObject(): JSONObject? = envelope()?.optJSONObject("data")
 
-    private fun parseCategory(node: JSONObject): CatalogCategory? {
+    private fun parseCategory(node: JSONObject, host: String, dialect: BackendDialect): CatalogCategory? {
         val slug = node.optString("slug").trim().takeIf { it.isNotEmpty() } ?: return null
-        val name = node.optString("name").trim().takeIf { it.isNotEmpty() } ?: slug
+        val id = node.stringOrNull("id")
+        val nameEn = node.stringOrNull("nameEn")
+        val name = nameEn ?: node.optString("name").trim().takeIf { it.isNotEmpty() } ?: slug
+        val nameTh = node.stringOrNull("nameTh")
+        val displayName = node.stringOrNull("display_name") ?: nameTh
+
+        val hasCount = node.has("product_count") || node.has("productCount")
+        val count = if (hasCount) node.optInt("product_count", node.optInt("productCount", 0)) else 0
+        val iconUrl = VelnoxMediaUrlResolver.resolve(node.stringOrNull("iconUrl"), host, dialect)
+        val displayOrder = node.optInt("displayOrder", node.optInt("sortOrder", 0))
+
         return CatalogCategory(
             slug = slug,
             name = name,
-            displayName = node.stringOrNull("display_name"),
-            productCount = node.optInt("product_count", 0),
+            displayName = displayName,
+            productCount = count,
+            id = id,
+            iconUrl = iconUrl,
+            hasExplicitProductCount = hasCount,
+            displayOrder = displayOrder,
         )
     }
 
-    private fun parseProduct(item: JSONObject): CatalogProduct? {
+    private fun parseProduct(item: JSONObject, host: String, dialect: BackendDialect): CatalogProduct? {
         val id = item.stringOrNull("id") ?: return null
         val name = item.stringOrNull("name") ?: return null
         val featuredVariant = item.optJSONObject("featuredVariant")
         val featPrice = featuredVariant?.numberOrNull("price")
         val compareAt = featuredVariant?.numberOrNull("compareAtPrice")
             ?: item.numberOrNull("compareAtPrice")
+            ?: item.numberOrNull("originalPrice")
         val discount = featuredVariant?.numberOrNull("discountPercent")?.toInt()
             ?: item.numberOrNull("discountPercent")?.toInt()
         val rating = item.numberOrNull("rating")
         val reviewCount = item.optInt("reviewCount", 0)
         val sellerId = item.stringOrNull("sellerId")
         val shopId = item.stringOrNull("shopId")
+        val slug = item.stringOrNull("slug")
+
+        val inStock = if (item.has("isAvailable")) {
+            item.optBoolean("isAvailable")
+        } else {
+            (item.numberOrNull("currentStock") ?: item.numberOrNull("totalAvailableStock"))?.let { it > 0 }
+        }
 
         return CatalogProduct(
             id = id,
             name = name,
             price = item.numberOrNull("price"),
             currency = item.stringOrNull("currency") ?: DEFAULT_CURRENCY,
-            imageUrl = primaryImageUrl(item),
-            categorySlug = item.stringOrNull("categorySlug")
-                ?: item.stringOrNull("category"),
+            imageUrl = primaryImageUrl(item, host, dialect),
+            categorySlug = item.stringOrNull("categorySlug") ?: item.stringOrNull("category"),
             shopName = item.stringOrNull("shopName"),
-            inStock = (item.numberOrNull("currentStock")
-                ?: item.numberOrNull("totalAvailableStock"))?.let { it > 0 },
+            inStock = inStock,
             soldCount = item.optInt("soldCount", 0),
             compareAtPrice = compareAt,
             discountPercent = discount,
@@ -221,10 +315,11 @@ class CatalogRemoteDataSource(
             sellerId = sellerId,
             shopId = shopId,
             variantPrice = featPrice,
+            slug = slug,
         )
     }
 
-    private fun parseDetail(data: JSONObject): ProductDetail? {
+    private fun parseDetail(data: JSONObject, host: String, dialect: BackendDialect): ProductDetail? {
         val id = data.stringOrNull("id") ?: return null
         val name = data.stringOrNull("name") ?: return null
 
@@ -232,14 +327,30 @@ class CatalogRemoteDataSource(
         val array = data.optJSONArray("images")
         if (array != null) {
             for (i in 0 until array.length()) {
-                val image = array.optJSONObject(i) ?: continue
-                val url = image.displayUrl() ?: continue
-                images += CatalogImage(url = url, isPrimary = image.optBoolean("isPrimary", false))
+                val str = array.optString(i).trim()
+                if (str.isNotEmpty()) {
+                    val resolved = VelnoxMediaUrlResolver.resolve(str, host, dialect)
+                    if (resolved != null) {
+                        images += CatalogImage(url = resolved, isPrimary = (i == 0))
+                    }
+                } else {
+                    val image = array.optJSONObject(i) ?: continue
+                    val url = image.displayUrl() ?: continue
+                    val resolved = VelnoxMediaUrlResolver.resolve(url, host, dialect)
+                    if (resolved != null) {
+                        images += CatalogImage(url = resolved, isPrimary = image.optBoolean("isPrimary", false))
+                    }
+                }
             }
         }
-        // Keep the seller's order; the primary image is pulled to the front.
+        if (images.isEmpty()) {
+            primaryImageUrl(data, host, dialect)?.let {
+                images += CatalogImage(url = it, isPrimary = true)
+            }
+        }
         images.sortWith(compareByDescending { if (it.isPrimary) 1 else 0 })
 
+        val isAvailable = if (data.has("isAvailable")) data.optBoolean("isAvailable") else null
         val stock = (data.numberOrNull("totalAvailableStock")
             ?: data.optJSONObject("inventory")?.numberOrNull("available"))?.toInt()
 
@@ -247,6 +358,7 @@ class CatalogRemoteDataSource(
         val featPrice = featVar?.numberOrNull("price")
         val featCompareAt = featVar?.numberOrNull("compareAtPrice")
             ?: data.numberOrNull("compareAtPrice")
+            ?: data.numberOrNull("originalPrice")
         val featDiscount = featVar?.numberOrNull("discountPercent")?.toInt()
             ?: data.numberOrNull("discountPercent")?.toInt()
 
@@ -299,7 +411,7 @@ class CatalogRemoteDataSource(
                         val vId = vObj.stringOrNull("id") ?: continue
                         val vVal = vObj.stringOrNull("value") ?: continue
                         val vLabel = vObj.stringOrNull("label") ?: vVal
-                        val vImg = vObj.stringOrNull("imageUrl")
+                        val vImg = VelnoxMediaUrlResolver.resolve(vObj.stringOrNull("imageUrl"), host, dialect)
                         val vStock = vObj.numberOrNull("stock")?.toInt()
                         valsList += ProductOptionValue(id = vId, value = vVal, label = vLabel, imageUrl = vImg, stock = vStock)
                     }
@@ -341,7 +453,10 @@ class CatalogRemoteDataSource(
                             ?: blockObj.stringOrNull("url")
                             ?: blockObj.displayUrl()
                         if (!imgUrl.isNullOrBlank()) {
-                            descBlocksList += DescriptionBlock.Image(id = bId, imageUrl = imgUrl)
+                            val resolved = VelnoxMediaUrlResolver.resolve(imgUrl, host, dialect)
+                            if (resolved != null) {
+                                descBlocksList += DescriptionBlock.Image(id = bId, imageUrl = resolved)
+                            }
                         }
                     }
                     "text" -> {
@@ -360,16 +475,23 @@ class CatalogRemoteDataSource(
             for (i in 0 until detailImagesArray.length()) {
                 val str = detailImagesArray.optString(i).trim()
                 if (str.isNotEmpty()) {
-                    detailImagesList += str
+                    VelnoxMediaUrlResolver.resolve(str, host, dialect)?.let { detailImagesList += it }
                 } else {
                     val dObj = detailImagesArray.optJSONObject(i)
                     val dUrl = dObj?.displayUrl() ?: dObj?.stringOrNull("url")
                     if (!dUrl.isNullOrBlank()) {
-                        detailImagesList += dUrl
+                        VelnoxMediaUrlResolver.resolve(dUrl, host, dialect)?.let { detailImagesList += it }
                     }
                 }
             }
         }
+
+        val categoryPathArray = data.optJSONArray("categoryPath")
+        val resolvedCatSlug = data.stringOrNull("categorySlug")
+            ?: data.stringOrNull("category")
+            ?: categoryPathArray?.let { arr ->
+                if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.stringOrNull("slug") else null
+            }
 
         return ProductDetail(
             id = id,
@@ -378,7 +500,7 @@ class CatalogRemoteDataSource(
             price = data.numberOrNull("price"),
             currency = data.stringOrNull("currency") ?: DEFAULT_CURRENCY,
             images = images,
-            categorySlug = data.stringOrNull("categorySlug") ?: data.stringOrNull("category"),
+            categorySlug = resolvedCatSlug,
             shopName = shopObj?.stringOrNull("name") ?: data.stringOrNull("shopName"),
             unit = data.stringOrNull("unit"),
             availableStock = stock,
@@ -396,11 +518,12 @@ class CatalogRemoteDataSource(
             reviewCount = reviewCount,
             descriptionBlocks = descBlocksList,
             detailImages = detailImagesList,
+            isAvailable = isAvailable,
         )
     }
 
-    private fun parseShop(data: JSONObject): ShopDetail? {
-        val sObj = data.optJSONObject("shop") ?: return null
+    private fun parseShop(data: JSONObject, host: String, dialect: BackendDialect): ShopDetail? {
+        val sObj = data.optJSONObject("shop") ?: data
         val id = sObj.stringOrNull("id") ?: return null
         val name = sObj.stringOrNull("name") ?: ""
         val slug = sObj.stringOrNull("slug") ?: id
@@ -411,8 +534,8 @@ class CatalogRemoteDataSource(
             name = name,
             slug = slug,
             description = sObj.stringOrNull("description"),
-            logoUrl = sObj.stringOrNull("logo") ?: sObj.stringOrNull("imageUrl"),
-            coverUrl = sObj.stringOrNull("cover"),
+            logoUrl = VelnoxMediaUrlResolver.resolve(sObj.stringOrNull("logo") ?: sObj.stringOrNull("logoUrl") ?: sObj.stringOrNull("imageUrl"), host, dialect),
+            coverUrl = VelnoxMediaUrlResolver.resolve(sObj.stringOrNull("cover") ?: sObj.stringOrNull("coverUrl"), host, dialect),
             phone = sObj.stringOrNull("phone"),
             status = sObj.stringOrNull("status"),
             productCount = sObj.optInt("productCount", 0),
@@ -426,7 +549,7 @@ class CatalogRemoteDataSource(
         if (prodsArray != null) {
             for (i in 0 until prodsArray.length()) {
                 val pObj = prodsArray.optJSONObject(i) ?: continue
-                parseProduct(pObj)?.let { productsList += it }
+                parseProduct(pObj, host, dialect)?.let { productsList += it }
             }
         }
 
@@ -485,16 +608,19 @@ class CatalogRemoteDataSource(
         )
     }
 
-    /** `primaryImage`, else the first entry of `images`. */
-    private fun primaryImageUrl(item: JSONObject): String? =
-        item.optJSONObject("primaryImage")?.displayUrl()
+    private fun primaryImageUrl(item: JSONObject, host: String, dialect: BackendDialect): String? {
+        val raw = item.stringOrNull("primaryImageUrl")
+            ?: item.optJSONObject("primaryImage")?.displayUrl()
             ?: item.optJSONArray("images")?.let { array ->
-                (0 until array.length())
-                    .mapNotNull { array.optJSONObject(it) }
-                    .firstNotNullOfOrNull { it.displayUrl() }
+                if (array.length() > 0) {
+                    val firstStr = array.optString(0).trim()
+                    if (firstStr.isNotEmpty()) firstStr
+                    else (0 until array.length()).mapNotNull { array.optJSONObject(it) }.firstNotNullOfOrNull { it.displayUrl() }
+                } else null
             }
+        return VelnoxMediaUrlResolver.resolve(raw, host, dialect)
+    }
 
-    /** `displayUrl` is the sized variant; `url` is the original. Either is real. */
     private fun JSONObject.displayUrl(): String? =
         stringOrNull("displayUrl") ?: stringOrNull("url")
 
@@ -503,7 +629,6 @@ class CatalogRemoteDataSource(
         return optString(key).trim().takeIf { it.isNotEmpty() }
     }
 
-    /** Accepts both JSON numbers and numeric strings (`0` and `"0.00"` both occur). */
     private fun JSONObject.numberOrNull(key: String): Double? {
         if (!has(key) || isNull(key)) return null
         val raw = opt(key)
@@ -522,8 +647,9 @@ class CatalogRemoteDataSource(
         const val DEFAULT_CURRENCY = "THB"
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(BackendConfig.CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
+            .readTimeout(BackendConfig.READ_TIMEOUT_SEC, TimeUnit.SECONDS)
+            .writeTimeout(BackendConfig.WRITE_TIMEOUT_SEC, TimeUnit.SECONDS)
             .build()
     }
 }

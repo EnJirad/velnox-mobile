@@ -9,10 +9,12 @@ import com.velnox.app.core.auth.AuthApi
 import com.velnox.app.core.auth.AuthRemoteDataSource
 import com.velnox.app.core.auth.AuthRepository
 import com.velnox.app.core.auth.GoogleClientIdSource
+import com.velnox.app.core.auth.TokenRefresher
 import com.velnox.app.core.catalog.CatalogRemoteDataSource
 import com.velnox.app.core.catalog.CatalogRepository
 import com.velnox.app.core.customer.CustomerRemoteDataSource
 import com.velnox.app.core.customer.CustomerRepository
+import com.velnox.app.core.network.BackendEndpointRouter
 import com.velnox.app.core.preferences.PreferencesRepository
 import com.velnox.app.core.session.SessionController
 import com.velnox.app.core.session.SessionManager
@@ -28,6 +30,8 @@ import com.velnox.app.core.session.SessionVault
  *   Sign-In, from the build or from the API's config probe.
  * - [catalog] — the public product catalogue, cached in memory across screens.
  * - [customer] — the authenticated customer API (profile, addresses, cart, orders…).
+ * - [backendRouter] — dynamic host failover router (api.velnox.live -> workers.dev -> onrender.com).
+ * - [tokenRefresher] — single-flight mutex token refresh coordinator.
  *
  * Wiring, in one place: `SessionVault` (Android Keystore) → `SessionManager`
  * (single in-memory token + expiry) → `AuthRemoteDataSource` (OkHttp) →
@@ -39,6 +43,14 @@ class VelnoxApplication : Application(), ImageLoaderFactory {
         private set
 
     lateinit var session: SessionController
+        private set
+
+    /** Dynamic host failover and dialect routing coordinator. */
+    lateinit var backendRouter: BackendEndpointRouter
+        private set
+
+    /** Single-flight mutex token refresh coordinator preventing concurrent token reuse. */
+    lateinit var tokenRefresher: TokenRefresher
         private set
 
     /** Shared by the repository and the Google flow, so there is one client. */
@@ -71,24 +83,34 @@ class VelnoxApplication : Application(), ImageLoaderFactory {
         }
         preferences = PreferencesRepository(this)
 
-        val api = AuthRemoteDataSource()
+        val sharedClient = BackendEndpointRouter.defaultClient()
+        val router = BackendEndpointRouter(client = sharedClient)
+        backendRouter = router
+
+        val api = AuthRemoteDataSource(client = sharedClient, router = router)
         authApi = api
         googleClientId = GoogleClientIdSource(api)
 
-        catalog = CatalogRepository(CatalogRemoteDataSource())
+        catalog = CatalogRepository(CatalogRemoteDataSource(client = sharedClient, router = router))
 
         val sessions = SessionManager(SessionVault(this))
+        val refresher = TokenRefresher(api = api, sessions = sessions)
+        tokenRefresher = refresher
+
         session = SessionController(
             repository = AuthRepository(
                 api = api,
                 sessions = sessions,
+                tokenRefresher = refresher,
             ),
         )
 
         customer = CustomerRepository(
-            api = CustomerRemoteDataSource(),
+            api = CustomerRemoteDataSource(client = sharedClient, router = router),
             token = { sessions.current() },
             onUnauthorized = { session.onUnauthorized() },
+            tokenRefresher = refresher,
+            sessions = sessions,
         )
     }
 

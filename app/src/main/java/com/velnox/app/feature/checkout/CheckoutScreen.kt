@@ -53,6 +53,7 @@ import com.velnox.app.R
 import com.velnox.app.core.catalog.PriceFormat
 import com.velnox.app.core.customer.CheckoutLine
 import com.velnox.app.core.customer.CheckoutRequest
+import com.velnox.app.core.customer.CustomerError
 import com.velnox.app.core.customer.CustomerResult
 import com.velnox.app.core.customer.ShippingQuote
 import com.velnox.app.core.customer.rememberCustomerRepository
@@ -62,6 +63,7 @@ import com.velnox.app.feature.cart.CartState
 import com.velnox.app.feature.home.ProductArtTile
 import com.velnox.app.feature.profile.AddressBookState
 import com.velnox.app.feature.profile.UserAddress
+import com.velnox.app.feature.profile.toInput
 import com.velnox.app.ui.components.BrandBadge
 import com.velnox.app.ui.components.EmptyState
 import com.velnox.app.ui.components.PageGutter
@@ -195,8 +197,14 @@ fun CheckoutScreen(
             }
 
             is CustomerResult.Failed -> {
-                quote = null
-                quoteError = res.userMessage(context)
+                if (res.error == CustomerError.NotFound) {
+                    // Endpoint omitted on target Workers API; degrade cleanly to local computation
+                    quote = null
+                    quoteError = null
+                } else {
+                    quote = null
+                    quoteError = res.userMessage(context)
+                }
             }
         }
         quoteLoading = false
@@ -339,6 +347,7 @@ fun CheckoutScreen(
                                     cartItemIds = selectedRemoteIds.takeIf { it.isNotEmpty() },
                                     shippingQuoteId = quote?.quoteId,
                                     requestId = requestId,
+                                    shippingAddress = address.toInput(),
                                 )
                                 when (val res = repository.call { api, token -> api.checkout(token, req) }) {
                                     is CustomerResult.Ok -> {

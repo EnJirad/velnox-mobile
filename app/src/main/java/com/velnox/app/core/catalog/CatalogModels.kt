@@ -2,16 +2,7 @@ package com.velnox.app.core.catalog
 
 /**
  * Models for the public Velnox catalogue.
- *
- * Every field here exists in a response the deployed API actually returns
- * (`GET /api/products/catalog`, `GET /api/products/:id`,
- * `GET /api/categories/tree`). Nothing is derived, invented or defaulted to a
- * plausible-looking value: when the API omits something the field stays `null`
- * and the UI hides it.
- *
- * The API formats money differently per endpoint (`price` is a JSON number on
- * the catalogue and detail routes, a string such as `"0.00"` on the legacy list
- * route), so it is parsed into a [Double] once, here.
+ * Supports both Cloudflare Workers v1 API (`api.velnox.live`) and Express legacy API.
  */
 data class CatalogProduct(
     val id: String,
@@ -33,6 +24,7 @@ data class CatalogProduct(
     val sellerId: String? = null,
     val shopId: String? = null,
     val variantPrice: Double? = null,
+    val slug: String? = null,
 ) {
     /** The actual selling price (featured variant price if present and product base price is 0 or compareAtPrice). */
     val displayPrice: Double?
@@ -103,7 +95,7 @@ sealed interface DescriptionBlock {
     ) : DescriptionBlock
 }
 
-/** One seller shop profile from `GET /api/shops/:idOrSlug`. */
+/** One seller shop profile from `GET /api/v1/shops/:id` or `GET /api/shops/:idOrSlug`. */
 data class SellerShop(
     val id: String,
     val sellerId: String?,
@@ -145,8 +137,7 @@ data class ProductReviewsData(
 )
 
 /**
- * A product's own page. [description] is the seller's text; when it is empty the
- * UI shows nothing rather than filler.
+ * A product's own page.
  */
 data class ProductDetail(
     val id: String,
@@ -173,8 +164,9 @@ data class ProductDetail(
     val reviewCount: Int = 0,
     val descriptionBlocks: List<DescriptionBlock> = emptyList(),
     val detailImages: List<String> = emptyList(),
+    val isAvailable: Boolean? = null,
 ) {
-    val isInStock: Boolean? get() = availableStock?.let { it > 0 }
+    val isInStock: Boolean? get() = availableStock?.let { it > 0 } ?: isAvailable
 
     val displayPrice: Double?
         get() = when {
@@ -184,18 +176,18 @@ data class ProductDetail(
 }
 
 /**
- * A category from `GET /api/categories/tree`.
- *
- * [name] is the English name, [displayName] the localised one the backend
- * carries (Thai today). The app prefers [displayName] for Thai and [name]
- * otherwise instead of inventing a translation.
+ * A category from `GET /api/v1/categories` or `GET /api/categories/tree`.
  */
 data class CatalogCategory(
     val slug: String,
     val name: String,
     val displayName: String?,
-    /** Published-product count reported by the backend, used to skip empty chips. */
-    val productCount: Int,
+    /** Published-product count reported by the backend (0 if omitted). */
+    val productCount: Int = 0,
+    val id: String? = null,
+    val iconUrl: String? = null,
+    val hasExplicitProductCount: Boolean = true,
+    val displayOrder: Int = 0,
 )
 
 /** One page of the catalogue plus whether another page exists. */
@@ -205,12 +197,12 @@ data class CatalogPage(
 )
 
 /**
- * What to ask the catalogue for. [offset] is a row offset, matching the API's
- * `offset` parameter; [limit] is bounded by the API at 200.
+ * What to ask the catalogue for. Supports both offset/limit and categoryId/categorySlug.
  */
 data class CatalogQuery(
     val search: String? = null,
     val category: String? = null,
+    val categoryId: String? = null,
     val minPrice: Double? = null,
     val maxPrice: Double? = null,
     val sortBy: String? = null,
@@ -218,6 +210,17 @@ data class CatalogQuery(
     val offset: Int = 0,
     val limit: Int = PAGE_SIZE,
 ) {
+    fun cacheKey(): String = buildString {
+        append(offset).append(':').append(limit)
+        search?.let { append(":s=").append(it) }
+        category?.let { append(":c=").append(it) }
+        categoryId?.let { append(":cid=").append(it) }
+        minPrice?.let { append(":min=").append(it) }
+        maxPrice?.let { append(":max=").append(it) }
+        sortBy?.let { append(":sort=").append(it) }
+        shopId?.let { append(":sh=").append(it) }
+    }
+
     companion object {
         const val PAGE_SIZE = 20
     }

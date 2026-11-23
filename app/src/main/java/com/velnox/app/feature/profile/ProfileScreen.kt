@@ -6,6 +6,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Base64
 import com.velnox.app.BuildConfig
+import com.velnox.app.core.network.VelnoxMediaUrlResolver
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -103,8 +104,7 @@ private fun bust(url: String?, version: Long): String? {
     if (url.isNullOrBlank()) return null
     if (url.startsWith("data:")) return url
     val fullUrl = if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("content://") && !url.startsWith("file://")) {
-        val cleanKey = url.trimStart('/')
-        "${BuildConfig.API_BASE_URL}/api/media/$cleanKey"
+        VelnoxMediaUrlResolver.resolve(url) ?: url
     } else {
         url
     }
@@ -139,8 +139,7 @@ private fun resolveImageModel(url: String?): Any? {
     if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("content://") || url.startsWith("file://")) {
         return url
     }
-    val cleanKey = url.trimStart('/')
-    return "${BuildConfig.API_BASE_URL}/api/media/$cleanKey"
+    return VelnoxMediaUrlResolver.resolve(url) ?: url
 }
 
 /**
