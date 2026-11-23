@@ -21,8 +21,19 @@ data class AuthSession(
     val user: AuthUser,
     val refreshToken: String? = null,
     val expiresInSeconds: Long? = null,
-    val backendFlavor: String? = null,
-)
+) {
+    var backendFlavor: String? = null
+
+    constructor(
+        token: String,
+        user: AuthUser,
+        refreshToken: String? = null,
+        expiresInSeconds: Long? = null,
+        backendFlavor: String? = null,
+    ) : this(token, user, refreshToken, expiresInSeconds) {
+        this.backendFlavor = backendFlavor
+    }
+}
 
 /** Rotated tokens returned by POST /api/v1/auth/refresh. */
 data class AuthTokens(

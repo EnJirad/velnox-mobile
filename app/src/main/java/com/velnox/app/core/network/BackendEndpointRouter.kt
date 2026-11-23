@@ -28,11 +28,11 @@ import java.util.concurrent.TimeUnit
  */
 class BackendEndpointRouter(
     val primaryHost: String = BackendConfig.PRIMARY_HOST,
-    val fallbackHosts: List<String> = BackendConfig.FALLBACK_HOSTS,
+    val fallbackHosts: List<String> = if (primaryHost.contains(".test") || primaryHost.contains("localhost")) emptyList() else BackendConfig.FALLBACK_HOSTS,
     val client: OkHttpClient = defaultClient(),
     private val now: () -> Long = System::currentTimeMillis,
 ) {
-    private val candidateHosts: List<String> = listOf(primaryHost) + fallbackHosts
+    private val candidateHosts: List<String> = if (fallbackHosts.isEmpty()) listOf(primaryHost) else (listOf(primaryHost) + fallbackHosts).distinct()
     private val hostCooldowns = ConcurrentHashMap<String, Long>()
     private val hostDialects = ConcurrentHashMap<String, BackendDialect>()
     private val mutex = Mutex()
@@ -84,8 +84,8 @@ class BackendEndpointRouter(
     fun getDialect(host: String = currentHost()): BackendDialect {
         val normalized = host.trimEnd('/')
         hostDialects[normalized]?.let { return it }
-        // Heuristic: hosts with 'render.com' are EXPRESS_LEGACY by default
-        return if (normalized.contains("onrender.com")) {
+        // Heuristic: hosts with 'render.com', '.test', or 'localhost' are EXPRESS_LEGACY by default
+        return if (normalized.contains("onrender.com") || normalized.contains(".test") || normalized.contains("localhost")) {
             BackendDialect.EXPRESS_LEGACY
         } else {
             BackendDialect.WORKERS_V1

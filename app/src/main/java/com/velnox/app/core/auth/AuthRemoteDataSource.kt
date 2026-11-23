@@ -387,12 +387,12 @@ class AuthRemoteDataSource(
         }
 
         return when {
-            status == 401 && isSignIn -> AuthError.InvalidCredentials
             code == "INVALID_GOOGLE_TOKEN" || code == "EMAIL_NOT_VERIFIED" -> AuthError.InvalidProviderToken
             code == "GOOGLE_NOT_CONFIGURED" || code == "GOOGLE_UNAVAILABLE" -> AuthError.ProviderUnavailable
             code == "LINK_REQUIRED" -> AuthError.LinkRequired
             code == "EMAIL_MISMATCH" -> AuthError.EmailMismatch
             code == "IDENTITY_CONFLICT" -> AuthError.IdentityConflict
+            status == 401 && isSignIn -> AuthError.InvalidCredentials
             status == 401 -> AuthError.Unauthorized
             status == 429 -> AuthError.RateLimited
             code == "EMAIL_EXISTS" -> AuthError.EmailExists

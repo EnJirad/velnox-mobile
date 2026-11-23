@@ -359,14 +359,23 @@ class CustomerRemoteDataSource(
                 body.put("shippingAddressId", request.shippingAddressId)
             }
 
-            val mappedMethod = when (request.paymentMethod.uppercase()) {
+            val mappedMethod = when (request.paymentMethod.trim().uppercase()) {
                 "CARD", "STRIPE" -> "stripe"
                 "PROMPTPAY" -> "promptpay"
                 "COD" -> "cod"
                 "BANK_TRANSFER" -> "bank_transfer"
-                else -> request.paymentMethod.lowercase()
+                else -> request.paymentMethod
             }
             body.put("paymentMethod", mappedMethod)
+            if (request.items.isNotEmpty()) {
+                val items = JSONArray()
+                for (line in request.items) {
+                    val obj = JSONObject().put("productId", line.productId).put("quantity", line.quantity)
+                    line.variantId?.let { obj.put("variantId", it) }
+                    items.put(obj)
+                }
+                body.put("items", items)
+            }
             request.note?.takeIf { it.isNotBlank() }?.let { body.put("notes", it) }
         } else {
             body.put("shippingAddressId", request.shippingAddressId)
@@ -1165,7 +1174,7 @@ class CustomerRemoteDataSource(
     }
 
     private fun imageOf(obj: JSONObject): String? {
-        val raw = obj.str("imageUrl", "image_url", "image")
+        val raw = obj.str("imageUrl", "image_url", "image", "productImageUrl", "product_image_url")
             ?: obj.optJSONObject("primaryImage")?.str("displayUrl", "url")
             ?: obj.optJSONArray("images")?.optJSONObject(0)?.str("displayUrl", "url")
             ?: obj.optJSONArray("images")?.optString(0)?.takeIf { it.isNotBlank() }

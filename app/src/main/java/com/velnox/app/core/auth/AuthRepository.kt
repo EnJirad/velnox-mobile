@@ -168,7 +168,11 @@ class AuthRepository(
     }
 
     private suspend fun persist(session: AuthSession): SignInResult {
-        sessions.save(session)
-        return SignInResult.Success(session.user)
+        return try {
+            sessions.save(session)
+            SignInResult.Success(session.user)
+        } catch (_: Exception) {
+            SignInResult.Failure(AuthError.Unknown)
+        }
     }
 }
