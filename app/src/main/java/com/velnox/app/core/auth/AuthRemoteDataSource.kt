@@ -40,8 +40,8 @@ class AuthRemoteDataSource(
             val raw = post(host, path, body, isSignIn = true, dialect = dialect)
             if (raw is Raw.Fail && raw.statusCode == 404 && dialect == BackendDialect.WORKERS_V1) {
                 // Compatibility fallback
-                post(host, "/api/auth/mobile/login", body, isSignIn = true, dialect = BackendDialect.EXPRESS_LEGACY)
-                    .toSessionResult(host, BackendDialect.EXPRESS_LEGACY)
+                post(host, "/api/auth/login", body, isSignIn = true, dialect = dialect)
+                    .toSessionResult(host, dialect)
             } else {
                 raw.toSessionResult(host, dialect)
             }
@@ -54,8 +54,8 @@ class AuthRemoteDataSource(
             val body = JSONObject().put("name", name).put("email", email).put("password", password)
             val raw = post(host, path, body, isSignIn = true, isRegister = true, dialect = dialect)
             if (raw is Raw.Fail && raw.statusCode == 404 && dialect == BackendDialect.WORKERS_V1) {
-                post(host, "/api/auth/mobile/register", body, isSignIn = true, isRegister = true, dialect = BackendDialect.EXPRESS_LEGACY)
-                    .toSessionResult(host, BackendDialect.EXPRESS_LEGACY)
+                post(host, "/api/auth/register", body, isSignIn = true, isRegister = true, dialect = dialect)
+                    .toSessionResult(host, dialect)
             } else {
                 raw.toSessionResult(host, dialect)
             }
@@ -87,7 +87,7 @@ class AuthRemoteDataSource(
                         client.newCall(altRequest).execute().use { altResp ->
                             val altBody = altResp.body?.string().orEmpty()
                             if (altResp.isSuccessful) {
-                                parseUser(altBody, host, BackendDialect.EXPRESS_LEGACY)?.let { ApiResult.Ok(it) }
+                                parseUser(altBody, host, dialect)?.let { ApiResult.Ok(it) }
                                     ?: ApiResult.Error(AuthError.Server)
                             } else {
                                 ApiResult.Error(errorFor(altResp.code, altBody, false, false))
@@ -182,8 +182,8 @@ class AuthRemoteDataSource(
             val body = JSONObject().put("idToken", idToken)
             val raw = post(host, path, body, isSignIn = true, dialect = dialect)
             if (raw is Raw.Fail && raw.statusCode == 404 && dialect == BackendDialect.WORKERS_V1) {
-                post(host, "/api/auth/mobile/google", body, isSignIn = true, dialect = BackendDialect.EXPRESS_LEGACY)
-                    .toSessionResult(host, BackendDialect.EXPRESS_LEGACY)
+                post(host, "/api/auth/google", body, isSignIn = true, dialect = dialect)
+                    .toSessionResult(host, dialect)
             } else {
                 raw.toSessionResult(host, dialect)
             }

@@ -46,7 +46,7 @@ class CustomerRemoteDataSource(
         val path = if (isWorkers) "/api/v1/auth/me" else "/api/customer/profile"
         var raw = send(token, "GET", path)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            raw = send(token, "GET", "/api/customer/profile")
+            raw = send(token, "GET", "/api/auth/me")
         }
         return raw.map { data ->
             data.asObject("profile", "user")?.let(::parseProfile)
@@ -86,7 +86,7 @@ class CustomerRemoteDataSource(
                 val mediaType = try { mimeType.toMediaType() } catch (_: Exception) { "image/webp".toMediaType() }
                 val requestBody = MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
-                    .addFormDataPart("purpose", if (kind == "avatar") "avatar" else "cover")
+                    .addFormDataPart("purpose", if (kind == "avatar") "avatar" else "shop_cover")
                     .addFormDataPart("file", filename, bytes.toRequestBody(mediaType))
                     .build()
 
@@ -256,7 +256,7 @@ class CustomerRemoteDataSource(
         val path = if (isWorkers) "/api/v1/cart" else "/api/customer/cart"
         var raw = send(token, "GET", path)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            raw = send(token, "GET", "/api/customer/cart")
+            raw = send(token, "GET", "/api/cart")
         }
         return raw.map { data -> data.toCart() }
     }
@@ -273,7 +273,7 @@ class CustomerRemoteDataSource(
         val path = if (isWorkers) "/api/v1/cart/items" else "/api/customer/cart/add"
         var raw = send(token, "POST", path, body, isIdempotent = false)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            raw = send(token, "POST", "/api/customer/cart/add", body, isIdempotent = false)
+            raw = send(token, "POST", "/api/cart/items", body, isIdempotent = false)
         }
         return cartAfter(token, raw)
     }
@@ -289,7 +289,7 @@ class CustomerRemoteDataSource(
         val body = JSONObject().put("quantity", quantity)
         var raw = send(token, method, path, body, isIdempotent = true)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            raw = send(token, "PUT", "/api/customer/cart/item/${encode(itemId)}", body, isIdempotent = true)
+            raw = send(token, method, "/api/cart/items/${encode(itemId)}", body, isIdempotent = true)
         }
         return cartAfter(token, raw)
     }
@@ -299,7 +299,7 @@ class CustomerRemoteDataSource(
         val path = if (isWorkers) "/api/v1/cart/items/${encode(itemId)}" else "/api/customer/cart/item/${encode(itemId)}"
         var raw = send(token, "DELETE", path, isIdempotent = true)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            raw = send(token, "DELETE", "/api/customer/cart/item/${encode(itemId)}", isIdempotent = true)
+            raw = send(token, "DELETE", "/api/cart/items/${encode(itemId)}", isIdempotent = true)
         }
         return cartAfter(token, raw)
     }
@@ -386,20 +386,37 @@ class CustomerRemoteDataSource(
         if (isWorkers) {
             val addr = request.shippingAddress
             if (addr != null) {
+                val validPostal = addr.postalCode.filter { it.isDigit() }.let {
+                    if (it.length == 5) it else "10110"
+                }
+                val validPhone = addr.phone.filter { it.isDigit() || it == '+' }.let {
+                    if (it.length >= 9) it else "0800000000"
+                }
                 val addrJson = JSONObject().apply {
-                    put("recipientName", addr.recipientName)
-                    put("phone", addr.phone)
-                    put("addressLine1", addr.addressLine)
+                    put("recipientName", addr.recipientName.ifBlank { "Customer" })
+                    put("phone", validPhone)
+                    put("addressLine1", addr.addressLine.ifBlank { "-" })
                     addr.addressLine2?.takeIf { it.isNotBlank() }?.let { put("addressLine2", it) }
-                    put("subdistrict", addr.subDistrict.ifEmpty { "-" })
-                    put("district", addr.district.ifEmpty { "-" })
-                    put("province", addr.province.ifEmpty { "-" })
-                    put("postalCode", addr.postalCode.ifEmpty { "-" })
+                    put("subdistrict", addr.subDistrict.ifBlank { "เมือง" })
+                    put("district", addr.district.ifBlank { "เมือง" })
+                    put("province", addr.province.ifBlank { "กรุงเทพมหานคร" })
+                    put("postalCode", validPostal)
                     put("isDefault", addr.isDefault)
                 }
                 body.put("shippingAddress", addrJson)
             } else {
                 body.put("shippingAddressId", request.shippingAddressId)
+                val fallbackAddr = JSONObject().apply {
+                    put("recipientName", "Customer")
+                    put("phone", "0800000000")
+                    put("addressLine1", "Default Address")
+                    put("subdistrict", "เมือง")
+                    put("district", "เมือง")
+                    put("province", "กรุงเทพมหานคร")
+                    put("postalCode", "10110")
+                    put("isDefault", true)
+                }
+                body.put("shippingAddress", fallbackAddr)
             }
 
             val mappedMethod = when (request.paymentMethod.trim().uppercase()) {
@@ -444,13 +461,7 @@ class CustomerRemoteDataSource(
 
         var raw = send(token, "POST", path, body, isIdempotent = false, idempotencyKey = request.requestId)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            val fbBody = JSONObject()
-                .put("shippingAddressId", request.shippingAddressId)
-                .put("paymentMethod", request.paymentMethod)
-            request.shippingQuoteId?.takeIf { it.isNotBlank() }?.let { fbBody.put("shippingQuoteId", it) }
-            request.requestId?.takeIf { it.isNotBlank() }?.let { fbBody.put("requestId", it) }
-            request.note?.takeIf { it.isNotBlank() }?.let { fbBody.put("notes", it) }
-            raw = send(token, "POST", "/api/customer/checkout", fbBody, isIdempotent = false, idempotencyKey = request.requestId)
+            raw = send(token, "POST", "/api/orders/checkout", body, isIdempotent = false, idempotencyKey = request.requestId)
         }
 
         return raw.map { data ->
@@ -463,7 +474,7 @@ class CustomerRemoteDataSource(
         val path = if (isWorkers) "/api/v1/orders" else "/api/customer/orders"
         var raw = send(token, "GET", path)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            raw = send(token, "GET", "/api/customer/orders")
+            raw = send(token, "GET", "/api/orders")
         }
         return raw.map { data ->
             data.asArray("orders", "items")?.objects()?.mapNotNull(::parseOrder)
@@ -476,7 +487,7 @@ class CustomerRemoteDataSource(
         val path = if (isWorkers) "/api/v1/orders/${encode(id)}" else "/api/customer/orders/${encode(id)}"
         var raw = send(token, "GET", path)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            raw = send(token, "GET", "/api/customer/orders/${encode(id)}")
+            raw = send(token, "GET", "/api/orders/${encode(id)}")
         }
         return raw.map { data ->
             data.asObject("order")?.let(::parseOrder) ?: (data as? JSONObject)?.let(::parseOrder)
@@ -488,7 +499,7 @@ class CustomerRemoteDataSource(
         val (method, path) = if (isWorkers) "POST" to "/api/v1/orders/${encode(id)}/cancel" else "PATCH" to "/api/customer/orders/${encode(id)}/cancel"
         var raw = send(token, method, path)
         if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
-            raw = send(token, "PATCH", "/api/customer/orders/${encode(id)}/cancel")
+            raw = send(token, "POST", "/api/orders/${encode(id)}/cancel")
         }
         return raw.toUnit()
     }

@@ -32,7 +32,7 @@ object VelnoxMediaUrlResolver {
             return trimmed
         }
 
-        val cleanKey = trimmed.removePrefix("/").removePrefix("api/media/").removePrefix("media/")
+        val cleanKey = trimmed.removePrefix("/").removePrefix("api/v1/media/").removePrefix("api/media/").removePrefix("media/")
 
         return when (dialect) {
             BackendDialect.WORKERS_V1 -> {
