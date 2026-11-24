@@ -149,7 +149,7 @@ internal object MapTileMath {
     const val TILE_SIZE = 256.0
     const val MIN_ZOOM = 4.0
     const val MAX_TILE_ZOOM = 18
-    const val MAX_ZOOM = 21.0
+    const val MAX_ZOOM = 18.0
     const val DEFAULT_STREET_ZOOM = 16.5
     const val ROOFTOP_ZOOM = 18.0
 
@@ -697,13 +697,13 @@ internal fun MapPinPickerDialog(
                             modifier = Modifier.fillMaxSize(),
                         )
 
-                        // Layer 2: Slippy Map Raster Tiles (ArcGIS Satellite with Digital Magnification)
-                        val effectiveTileZoom = zoom.toInt().coerceIn(MapTileMath.MIN_ZOOM.toInt(), MapTileMath.MAX_TILE_ZOOM)
-                        val scale = 2.0.pow(zoom - effectiveTileZoom).toFloat()
+                        // Layer 2: Slippy Map Raster Tiles (ArcGIS Satellite)
+                        val intZoom = zoom.toInt().coerceIn(MapTileMath.MIN_ZOOM.toInt(), MapTileMath.MAX_TILE_ZOOM)
+                        val scale = 2.0.pow(zoom - intZoom).toFloat()
                         val scaledTilePx = (MapTileMath.TILE_SIZE * scale).toFloat()
-                        val numTiles = 1 shl effectiveTileZoom
+                        val numTiles = 1 shl intZoom
 
-                        val (centerMercX, centerMercY) = MapTileMath.latLngToMercator(centerLat, centerLng, effectiveTileZoom.toDouble())
+                        val (centerMercX, centerMercY) = MapTileMath.latLngToMercator(centerLat, centerLng, intZoom.toDouble())
                         val halfW = wPx / 2f
                         val halfH = hPx / 2f
 
@@ -712,14 +712,17 @@ internal fun MapPinPickerDialog(
                         val minTileY = floor((centerMercY - halfH / scale) / MapTileMath.TILE_SIZE).toInt().coerceIn(0, numTiles - 1)
                         val maxTileY = ceil((centerMercY + halfH / scale) / MapTileMath.TILE_SIZE).toInt().coerceIn(0, numTiles - 1)
 
+                        // 1 physical pixel overlap between adjacent tiles eliminates subpixel rounding gaps
+                        val tileSizeDp = ceil((scaledTilePx + 1.0) / density).dp
+
                         for (tx in minTileX..maxTileX) {
                             for (ty in minTileY..maxTileY) {
                                 val wrappedTx = ((tx % numTiles) + numTiles) % numTiles
                                 val tileScreenX = halfW + ((tx * MapTileMath.TILE_SIZE - centerMercX) * scale).toFloat()
                                 val tileScreenY = halfH + ((ty * MapTileMath.TILE_SIZE - centerMercY) * scale).toFloat()
-                                val tileUrl = MapTileMath.getTileUrl(wrappedTx, ty, effectiveTileZoom, MapLayerType.Satellite)
+                                val tileUrl = MapTileMath.getTileUrl(wrappedTx, ty, intZoom, MapLayerType.Satellite)
 
-                                key("$effectiveTileZoom-$wrappedTx-$ty") {
+                                key("$intZoom-$wrappedTx-$ty") {
                                     AsyncImage(
                                         model = ImageRequest.Builder(context)
                                             .data(tileUrl)
@@ -730,7 +733,7 @@ internal fun MapPinPickerDialog(
                                         contentScale = ContentScale.FillBounds,
                                         modifier = Modifier
                                             .offset { IntOffset(tileScreenX.roundToInt(), tileScreenY.roundToInt()) }
-                                            .size((scaledTilePx / density).dp),
+                                            .size(tileSizeDp),
                                     )
                                 }
                             }
@@ -777,7 +780,7 @@ internal fun MapPinPickerDialog(
 
                     // Dynamic scaling pin: progressively scales down when zooming in deep
                     // so users can see exact house outlines and rooftops without obstruction
-                    val pinScale = (1.0f - ((zoom.toFloat() - 15f) / 6f) * 0.55f).coerceIn(0.45f, 1.0f)
+                    val pinScale = (1.0f - ((zoom.toFloat() - 15f) / 3f) * 0.35f).coerceIn(0.65f, 1.0f)
                     val pinHeight = 46.dp * pinScale
                     val anchorDotSize = (10.dp * pinScale).coerceAtLeast(6.dp)
 
@@ -1028,27 +1031,9 @@ private fun MapBackdropCanvas(
     } else {
         Color(0xFFE2E8F0)
     }
-    val gridColor = if (layerType == MapLayerType.Satellite) {
-        Color(0xFF1E293B).copy(alpha = 0.5f)
-    } else if (isDark) {
-        Color(0xFF334155).copy(alpha = 0.4f)
-    } else {
-        Color(0xFFCBD5E1).copy(alpha = 0.6f)
-    }
 
     Canvas(modifier = modifier) {
         drawRect(color = bgColor)
-        val step = 32.dp.toPx()
-        var x = 0f
-        while (x < size.width) {
-            drawLine(color = gridColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
-            x += step
-        }
-        var y = 0f
-        while (y < size.height) {
-            drawLine(color = gridColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
-            y += step
-        }
     }
 }
 
