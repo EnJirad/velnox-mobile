@@ -149,7 +149,7 @@ internal object MapTileMath {
     const val TILE_SIZE = 256.0
     const val MIN_ZOOM = 4.0
     const val MAX_TILE_ZOOM = 18
-    const val MAX_ZOOM = 18.0
+    const val MAX_ZOOM = 20.0
     const val DEFAULT_STREET_ZOOM = 16.5
     const val ROOFTOP_ZOOM = 18.0
 
@@ -712,8 +712,8 @@ internal fun MapPinPickerDialog(
                         val minTileY = floor((centerMercY - halfH / scale) / MapTileMath.TILE_SIZE).toInt().coerceIn(0, numTiles - 1)
                         val maxTileY = ceil((centerMercY + halfH / scale) / MapTileMath.TILE_SIZE).toInt().coerceIn(0, numTiles - 1)
 
-                        // 1 physical pixel overlap between adjacent tiles eliminates subpixel rounding gaps
-                        val tileSizeDp = ceil((scaledTilePx + 1.0) / density).dp
+                        // 2 physical pixels overlap between adjacent tiles eliminates subpixel rounding gaps
+                        val tileSizeDp = ceil((scaledTilePx + 2.0) / density).dp
 
                         for (tx in minTileX..maxTileX) {
                             for (ty in minTileY..maxTileY) {
@@ -780,7 +780,7 @@ internal fun MapPinPickerDialog(
 
                     // Dynamic scaling pin: progressively scales down when zooming in deep
                     // so users can see exact house outlines and rooftops without obstruction
-                    val pinScale = (1.0f - ((zoom.toFloat() - 15f) / 3f) * 0.35f).coerceIn(0.65f, 1.0f)
+                    val pinScale = (1.0f - ((zoom.toFloat() - 15f) / 5f) * 0.45f).coerceIn(0.55f, 1.0f)
                     val pinHeight = 46.dp * pinScale
                     val anchorDotSize = (10.dp * pinScale).coerceAtLeast(6.dp)
 
