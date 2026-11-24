@@ -148,7 +148,8 @@ data class MapSearchResult(
 internal object MapTileMath {
     const val TILE_SIZE = 256.0
     const val MIN_ZOOM = 4.0
-    const val MAX_ZOOM = 19.0
+    const val MAX_TILE_ZOOM = 18
+    const val MAX_ZOOM = 21.0
     const val DEFAULT_STREET_ZOOM = 16.5
     const val ROOFTOP_ZOOM = 18.0
 
@@ -363,7 +364,7 @@ internal fun MapPinPickerDialog(
     var centerLat by remember { mutableDoubleStateOf(initialLatitude ?: DEFAULT_LAT) }
     var centerLng by remember { mutableDoubleStateOf(initialLongitude ?: DEFAULT_LNG) }
     var zoom by remember { mutableDoubleStateOf(if (initialLatitude != null) 17.5 else MapTileMath.DEFAULT_STREET_ZOOM) }
-    var layerType by remember { mutableStateOf(MapLayerType.Street) }
+    var layerType by remember { mutableStateOf(MapLayerType.Satellite) }
     var isDragging by remember { mutableStateOf(false) }
     var gpsNotice by remember { mutableStateOf<String?>(null) }
     var autoFillAddress by remember { mutableStateOf(true) }
@@ -445,7 +446,7 @@ internal fun MapPinPickerDialog(
             tonalElevation = 6.dp,
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header Bar: Title + Map Layer Switcher + Close
+                // Header Bar: Title + Close
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -466,45 +467,6 @@ internal fun MapPinPickerDialog(
                         modifier = Modifier.weight(1f),
                     )
 
-                    // Layer Switcher: Street / Satellite
-                    Row(
-                        modifier = Modifier
-                            .clip(Circle)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(Circle)
-                                .background(if (layerType == MapLayerType.Street) VelnoxBrand else Color.Transparent)
-                                .velnoxClickable(role = Role.RadioButton) { layerType = MapLayerType.Street }
-                                .padding(horizontal = 9.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.address_map_layer_street),
-                                style = Text2xs.copy(fontWeight = FontWeight.Bold),
-                                color = if (layerType == MapLayerType.Street) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(Circle)
-                                .background(if (layerType == MapLayerType.Satellite) VelnoxBrand else Color.Transparent)
-                                .velnoxClickable(role = Role.RadioButton) { layerType = MapLayerType.Satellite }
-                                .padding(horizontal = 9.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.address_map_layer_satellite),
-                                style = Text2xs.copy(fontWeight = FontWeight.Bold),
-                                color = if (layerType == MapLayerType.Satellite) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.width(4.dp))
                     IconActionButton(
                         icon = VelnoxIcons.Close,
                         contentDescription = stringResource(R.string.common_close),
@@ -735,13 +697,13 @@ internal fun MapPinPickerDialog(
                             modifier = Modifier.fillMaxSize(),
                         )
 
-                        // Layer 2: Slippy Map Raster Tiles (Carto Street / Esri Satellite)
-                        val intZoom = zoom.toInt().coerceIn(MapTileMath.MIN_ZOOM.toInt(), MapTileMath.MAX_ZOOM.toInt())
-                        val scale = 2.0.pow(zoom - intZoom).toFloat()
+                        // Layer 2: Slippy Map Raster Tiles (ArcGIS Satellite with Digital Magnification)
+                        val effectiveTileZoom = zoom.toInt().coerceIn(MapTileMath.MIN_ZOOM.toInt(), MapTileMath.MAX_TILE_ZOOM)
+                        val scale = 2.0.pow(zoom - effectiveTileZoom).toFloat()
                         val scaledTilePx = (MapTileMath.TILE_SIZE * scale).toFloat()
-                        val numTiles = 1 shl intZoom
+                        val numTiles = 1 shl effectiveTileZoom
 
-                        val (centerMercX, centerMercY) = MapTileMath.latLngToMercator(centerLat, centerLng, intZoom.toDouble())
+                        val (centerMercX, centerMercY) = MapTileMath.latLngToMercator(centerLat, centerLng, effectiveTileZoom.toDouble())
                         val halfW = wPx / 2f
                         val halfH = hPx / 2f
 
@@ -755,9 +717,9 @@ internal fun MapPinPickerDialog(
                                 val wrappedTx = ((tx % numTiles) + numTiles) % numTiles
                                 val tileScreenX = halfW + ((tx * MapTileMath.TILE_SIZE - centerMercX) * scale).toFloat()
                                 val tileScreenY = halfH + ((ty * MapTileMath.TILE_SIZE - centerMercY) * scale).toFloat()
-                                val tileUrl = MapTileMath.getTileUrl(wrappedTx, ty, intZoom, layerType)
+                                val tileUrl = MapTileMath.getTileUrl(wrappedTx, ty, effectiveTileZoom, MapLayerType.Satellite)
 
-                                key("$intZoom-$wrappedTx-$ty-$layerType") {
+                                key("$effectiveTileZoom-$wrappedTx-$ty") {
                                     AsyncImage(
                                         model = ImageRequest.Builder(context)
                                             .data(tileUrl)
@@ -779,7 +741,7 @@ internal fun MapPinPickerDialog(
                             val cx = size.width / 2f
                             val cy = size.height / 2f
                             val crossLen = 14.dp.toPx()
-                            val strokeColor = if (layerType == MapLayerType.Satellite) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.25f)
+                            val strokeColor = Color.White.copy(alpha = 0.5f)
                             drawLine(color = strokeColor, start = Offset(cx - crossLen, cy), end = Offset(cx + crossLen, cy), strokeWidth = 1.5f)
                             drawLine(color = strokeColor, start = Offset(cx, cy - crossLen), end = Offset(cx, cy + crossLen), strokeWidth = 1.5f)
                         }
@@ -813,6 +775,12 @@ internal fun MapPinPickerDialog(
                         )
                     }
 
+                    // Dynamic scaling pin: progressively scales down when zooming in deep
+                    // so users can see exact house outlines and rooftops without obstruction
+                    val pinScale = (1.0f - ((zoom.toFloat() - 15f) / 6f) * 0.55f).coerceIn(0.45f, 1.0f)
+                    val pinHeight = 46.dp * pinScale
+                    val anchorDotSize = (10.dp * pinScale).coerceAtLeast(6.dp)
+
                     // Exact center-locked pin marker + target dot
                     Box(
                         modifier = Modifier.align(Alignment.Center),
@@ -821,14 +789,15 @@ internal fun MapPinPickerDialog(
                         // Target anchor dot directly under pin tip
                         Box(
                             modifier = Modifier
-                                .size(if (isDragging) 14.dp else 10.dp)
+                                .size(if (isDragging) anchorDotSize * 1.3f else anchorDotSize)
                                 .clip(Circle)
                                 .background(VelnoxBrand.copy(alpha = 0.25f))
                                 .border(1.5.dp, VelnoxBrand, Circle),
                         )
                         // Pin teardrop whose bottom tip sits at the exact center
                         CenterRoofPin(
-                            modifier = Modifier.offset(y = (-22).dp + pinLift),
+                            scale = pinScale,
+                            modifier = Modifier.offset(y = (-pinHeight / 2f) + pinLift),
                         )
                     }
 
@@ -1084,13 +1053,18 @@ private fun MapBackdropCanvas(
 }
 
 @Composable
-private fun CenterRoofPin(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(width = 36.dp, height = 46.dp)) {
+private fun CenterRoofPin(
+    scale: Float = 1.0f,
+    modifier: Modifier = Modifier,
+) {
+    val width = 36.dp * scale
+    val height = 46.dp * scale
+    Canvas(modifier = modifier.size(width = width, height = height)) {
         val w = size.width
         val h = size.height
         val cx = w / 2f
         val headRadius = w * 0.42f
-        val headCenterY = headRadius + 2f
+        val headCenterY = headRadius + (2f * scale)
 
         val pinPath = Path().apply {
             moveTo(cx, h)
@@ -1112,8 +1086,8 @@ private fun CenterRoofPin(modifier: Modifier = Modifier) {
             close()
         }
 
-        // Crisp white outline for contrast over streets & satellite rooftops
-        drawPath(path = pinPath, color = Color.White, style = Stroke(width = 5f))
+        // Crisp white outline for contrast over satellite rooftops
+        drawPath(path = pinPath, color = Color.White, style = Stroke(width = 4.5f * scale))
         drawPath(path = pinPath, color = VelnoxBrand)
         // Inner white dot
         drawCircle(

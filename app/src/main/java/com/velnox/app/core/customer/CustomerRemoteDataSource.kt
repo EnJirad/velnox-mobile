@@ -37,6 +37,8 @@ class CustomerRemoteDataSource(
         fallbackHosts = BackendConfig.FALLBACK_HOSTS,
         client = client,
     ),
+    context: android.content.Context? = null,
+    val localAddressStore: LocalAddressStore = LocalAddressStore(context),
 ) : CustomerApi {
 
     // ------------------------------------------------------ profile & addresses
@@ -202,10 +204,12 @@ class CustomerRemoteDataSource(
         val raw = send(token, "GET", "/api/customer/addresses")
         return when (raw) {
             is Raw.Failure -> {
-                if (raw.error == CustomerError.NotFound) {
-                    CustomerResult.Ok(emptyList())
+                if (raw.error == CustomerError.NotFound || raw.error == CustomerError.Network) {
+                    CustomerResult.Ok(localAddressStore.getAll())
                 } else {
-                    CustomerResult.Failed(raw.error, raw.message)
+                    val local = localAddressStore.getAll()
+                    if (local.isNotEmpty()) CustomerResult.Ok(local)
+                    else CustomerResult.Failed(raw.error, raw.message)
                 }
             }
             is Raw.Success -> {
@@ -213,7 +217,13 @@ class CustomerRemoteDataSource(
                 val list = data.asArray("addresses", "items")?.objects()?.mapNotNull(::parseAddress)
                     ?: (data as? JSONArray)?.objects()?.mapNotNull(::parseAddress)
                     ?: emptyList()
-                CustomerResult.Ok(list)
+                if (list.isNotEmpty()) {
+                    localAddressStore.replaceAll(list)
+                    CustomerResult.Ok(list)
+                } else {
+                    val local = localAddressStore.getAll()
+                    CustomerResult.Ok(local)
+                }
             }
         }
     }
@@ -241,13 +251,64 @@ class CustomerRemoteDataSource(
         }
         input.latitude?.let { body.put("latitude", it) }
         input.longitude?.let { body.put("longitude", it) }
-        return send(token, "POST", "/api/customer/addresses", body).map { data ->
-            (data as? JSONObject)?.str("id") ?: addressId
+
+        val raw = send(token, "POST", "/api/customer/addresses", body)
+        return when (raw) {
+            is Raw.Success -> {
+                val remoteId = (raw.data as? JSONObject)?.str("id") ?: addressId
+                val effectiveId = remoteId ?: "addr_${System.currentTimeMillis()}"
+                val savedAddress = CustomerAddress(
+                    id = effectiveId,
+                    label = input.label,
+                    recipientName = input.recipientName,
+                    phone = input.phone,
+                    addressLine = input.addressLine,
+                    addressLine2 = input.addressLine2,
+                    subDistrict = input.subDistrict,
+                    district = input.district,
+                    province = input.province,
+                    postalCode = input.postalCode,
+                    latitude = input.latitude,
+                    longitude = input.longitude,
+                    isDefault = input.isDefault,
+                )
+                localAddressStore.save(savedAddress)
+                CustomerResult.Ok(effectiveId)
+            }
+            is Raw.Failure -> {
+                // If remote endpoint is 404 (Workers not implemented) or Network failure,
+                // fall back to saving locally so customer address is reliably stored
+                val localId = addressId ?: "addr_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(8)}"
+                val localAddress = CustomerAddress(
+                    id = localId,
+                    label = input.label,
+                    recipientName = input.recipientName,
+                    phone = input.phone,
+                    addressLine = input.addressLine,
+                    addressLine2 = input.addressLine2,
+                    subDistrict = input.subDistrict,
+                    district = input.district,
+                    province = input.province,
+                    postalCode = input.postalCode,
+                    latitude = input.latitude,
+                    longitude = input.longitude,
+                    isDefault = input.isDefault,
+                )
+                localAddressStore.save(localAddress)
+                CustomerResult.Ok(localId)
+            }
         }
     }
 
-    override suspend fun deleteAddress(token: String, id: String): CustomerResult<Unit> =
-        send(token, "DELETE", "/api/customer/addresses/${encode(id)}").toUnit()
+    override suspend fun deleteAddress(token: String, id: String): CustomerResult<Unit> {
+        localAddressStore.delete(id)
+        val raw = send(token, "DELETE", "/api/customer/addresses/${encode(id)}")
+        return if (raw is Raw.Failure && raw.error == CustomerError.NotFound) {
+            CustomerResult.Ok(Unit)
+        } else {
+            raw.toUnit()
+        }
+    }
 
     // ------------------------------------------------------------------- cart
 

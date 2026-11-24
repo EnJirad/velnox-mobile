@@ -183,7 +183,8 @@ private fun VelnoxNavHost(
     val scope = rememberCoroutineScope()
 
     var tabKey by rememberSaveable { mutableStateOf(AppTab.Home.key) }
-    var overlayKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var overlayStack by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    val overlayKey: String? = overlayStack.lastOrNull()
     var loginReasonKey by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDestinationKey by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -273,11 +274,17 @@ private fun VelnoxNavHost(
 
     fun openTab(next: AppTab) {
         tabKey = next.key
-        overlayKey = null
+        overlayStack = emptyList()
+    }
+
+    fun popOverlay() {
+        if (overlayStack.isNotEmpty()) {
+            overlayStack = overlayStack.dropLast(1)
+        }
     }
 
     fun closeOverlay() {
-        overlayKey = null
+        overlayStack = emptyList()
     }
 
     /** Open Login for [reason], remembering where the guest was trying to go. */
@@ -331,7 +338,9 @@ private fun VelnoxNavHost(
             askForSignIn(reason, overlayDestination(key))
             return
         }
-        overlayKey = key
+        if (overlayStack.lastOrNull() != key) {
+            overlayStack = overlayStack + key
+        }
     }
 
     fun openProduct(productId: String) {
@@ -369,7 +378,7 @@ private fun VelnoxNavHost(
                 openTab(AppTab.fromKey(pending.removePrefix(TAB_DESTINATION)))
 
             pending.startsWith(OVERLAY_DESTINATION) ->
-                overlayKey = pending.removePrefix(OVERLAY_DESTINATION)
+                requestOverlay(pending.removePrefix(OVERLAY_DESTINATION))
         }
     }
 
@@ -542,7 +551,7 @@ private fun VelnoxNavHost(
 
     fun signOut() {
         closeAuth()
-        overlayKey = null
+        overlayStack = emptyList()
         tabKey = AppTab.Home.key
         scope.launch { session.signOut() }
     }
@@ -559,10 +568,7 @@ private fun VelnoxNavHost(
                 goToStep(AuthStep.Login)
 
             loginReason != null -> dismissLogin()
-            current != null && current.startsWith("settings/") -> overlayKey = "settings"
-            current != null && current.startsWith("category:") -> overlayKey = "category"
-            current != null && current.startsWith("thread:") -> overlayKey = "messages"
-            current != null -> closeOverlay()
+            current != null -> popOverlay()
             tab != AppTab.Home -> openTab(AppTab.Home)
         }
     }
@@ -654,7 +660,7 @@ private fun VelnoxNavHost(
                         }
 
                         "settings" -> SettingsScreen(
-                            onBack = ::closeOverlay,
+                            onBack = ::popOverlay,
                             onOpen = { page -> requestOverlay(page.key) },
                             onSignOut = ::signOut,
                         )
@@ -665,20 +671,20 @@ private fun VelnoxNavHost(
                                 closeOverlay()
                                 requestTab(AppTab.Home)
                             },
-                            onBack = ::closeOverlay,
+                            onBack = ::popOverlay,
                         )
 
                         "category" -> MarketScreen(
                             initialCategorySlug = null,
-                            onBack = ::closeOverlay,
+                            onBack = ::popOverlay,
                             onOpenProduct = ::openProduct,
                             onOpenCategory = ::openCategory,
                         )
 
                         "checkout" -> CheckoutScreen(
                             cartState = cart,
-                            onBack = ::closeOverlay,
-                            onManageAddresses = { overlayKey = SettingsPage.Addresses.key },
+                            onBack = ::popOverlay,
+                            onManageAddresses = { requestOverlay(SettingsPage.Addresses.key) },
                             onViewOrder = { orderId ->
                                 openOrder(orderId)
                             },
@@ -686,7 +692,7 @@ private fun VelnoxNavHost(
 
                         "wishlist" -> WishlistScreen(
                             cartState = cart,
-                            onBack = ::closeOverlay,
+                            onBack = ::popOverlay,
                             onOpenProduct = ::openProduct,
                             onExplore = {
                                 closeOverlay()
@@ -696,7 +702,7 @@ private fun VelnoxNavHost(
 
                         "notifications" -> NotificationCenterScreen(
                             state = notifications,
-                            onBack = ::closeOverlay,
+                            onBack = ::popOverlay,
                             onOpenRoute = { route ->
                                 if (route.startsWith("order:")) {
                                     openOrder(route.removePrefix("order:"))
@@ -705,7 +711,7 @@ private fun VelnoxNavHost(
                                 } else if (route.startsWith("product:")) {
                                     openProduct(route.removePrefix("product:"))
                                 } else if (route.startsWith("settings/")) {
-                                    overlayKey = route
+                                    requestOverlay(route)
                                 } else {
                                     requestOverlay(route)
                                 }
@@ -713,7 +719,7 @@ private fun VelnoxNavHost(
                         )
 
                         "search" -> SearchScreen(
-                            onBack = ::closeOverlay,
+                            onBack = ::popOverlay,
                             onOpenProduct = ::openProduct,
                             searchState = searchState,
                         )
@@ -722,20 +728,20 @@ private fun VelnoxNavHost(
                             if (overlay.startsWith("category:")) {
                                 MarketScreen(
                                     initialCategorySlug = overlay.removePrefix("category:"),
-                                    onBack = { overlayKey = "category" },
+                                    onBack = ::popOverlay,
                                     onOpenProduct = ::openProduct,
                                     onOpenCategory = ::openCategory,
                                 )
                             } else if (overlay.startsWith("shop:")) {
                                 ShopScreen(
                                     shopSlugOrId = overlay.removePrefix("shop:"),
-                                    onBack = ::closeOverlay,
+                                    onBack = ::popOverlay,
                                     onOpenProduct = ::openProduct,
                                 )
                             } else if (overlay.startsWith("product:")) {
                                 ProductDetailScreen(
                                     productId = overlay.removePrefix("product:"),
-                                    onBack = ::closeOverlay,
+                                    onBack = ::popOverlay,
                                     onOpenShop = ::openShop,
                                     onOpenProduct = ::openProduct,
                                     onContactSeller = { shopId, prodId ->
@@ -812,12 +818,10 @@ private fun VelnoxNavHost(
                             } else {
                                 val page = SettingsPage.fromKey(overlay)
                                 if (page != null) {
-                                    // A child page always returns to the Settings hub; the
-                                    // hub's own Back is the one that closes the overlay.
                                     SettingsDetailScreen(
                                         page = page,
-                                        onBack = { overlayKey = "settings" },
-                                        onOpenSupportChat = { threadId -> overlayKey = "thread:$threadId" },
+                                        onBack = ::popOverlay,
+                                        onOpenSupportChat = { threadId -> requestOverlay("thread:$threadId") },
                                     )
                                 } else if (overlay.startsWith("order:")) {
                                     OrderDetailScreen(
@@ -827,7 +831,7 @@ private fun VelnoxNavHost(
                                             closeOverlay()
                                             requestTab(AppTab.Cart)
                                         },
-                                        onBack = ::closeOverlay,
+                                        onBack = ::popOverlay,
                                         onOpenProduct = ::openProduct,
                                         onContactSeller = { shopId, prodId ->
                                             if (!sessionState.isAuthenticated) {
@@ -846,14 +850,14 @@ private fun VelnoxNavHost(
                                     ConversationScreen(
                                         threadId = overlay.removePrefix("thread:"),
                                         onOpenProduct = ::openProduct,
-                                        onBack = { overlayKey = "messages" },
+                                        onBack = ::popOverlay,
                                         onPickImage = onPickImage,
                                         onPickVideo = onPickVideo,
                                     )
                                 } else {
                                     PlaceholderDestination(
                                         overlayKey = overlay,
-                                        onBack = ::closeOverlay,
+                                        onBack = ::popOverlay,
                                     )
                                 }
                             }

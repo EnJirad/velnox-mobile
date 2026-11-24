@@ -174,6 +174,8 @@ fun ProfileScreen(
     var showPhotoOptionsFor by remember { mutableStateOf<PhotoTarget?>(null) }
     var isUploadingAvatar by remember { mutableStateOf(false) }
     var isUploadingCover by remember { mutableStateOf(false) }
+    var pendingAvatarSuccess by remember { mutableStateOf(false) }
+    var pendingCoverSuccess by remember { mutableStateOf(false) }
 
     // Synchronize latest profile from backend so web updates appear instantly on mobile
     LaunchedEffect(user.id) {
@@ -258,13 +260,12 @@ fun ProfileScreen(
                                     cacheBustVersion = System.currentTimeMillis()
                                 }
 
-                                snackbarHostState.showSnackbar(
-                                    message = if (target == PhotoTarget.Avatar) {
-                                        context.getString(R.string.profile_avatar_updated)
-                                    } else {
-                                        context.getString(R.string.profile_cover_updated)
-                                    },
-                                )
+                                // Wait until the image is actually rendered on screen before announcing success
+                                if (target == PhotoTarget.Avatar) {
+                                    pendingAvatarSuccess = true
+                                } else {
+                                    pendingCoverSuccess = true
+                                }
                             }
                             is CustomerResult.Failed -> {
                                 snackbarHostState.showSnackbar(
@@ -343,7 +344,22 @@ fun ProfileScreen(
                                 launchGallery(PhotoTarget.Cover)
                             }
                         },
-                        onOpenEditProfile = onOpenEditProfile,
+                        onAvatarRendered = {
+                            if (pendingAvatarSuccess) {
+                                pendingAvatarSuccess = false
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(context.getString(R.string.profile_avatar_updated))
+                                }
+                            }
+                        },
+                        onCoverRendered = {
+                            if (pendingCoverSuccess) {
+                                pendingCoverSuccess = false
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(context.getString(R.string.profile_cover_updated))
+                                }
+                            }
+                        },
                     )
                 }
 
@@ -490,7 +506,8 @@ private fun ProfileHeaderCard(
     isUploadingCover: Boolean = false,
     onEditAvatar: () -> Unit,
     onEditCover: () -> Unit,
-    onOpenEditProfile: () -> Unit,
+    onAvatarRendered: () -> Unit = {},
+    onCoverRendered: () -> Unit = {},
 ) {
     val initials = remember(user.name, user.email) { initialsOf(user.name, user.email) }
 
@@ -520,6 +537,7 @@ private fun ProfileHeaderCard(
                         contentDescription = stringResource(R.string.profile_change_cover),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
+                        onSuccess = { onCoverRendered() },
                     )
                     // Subtle top-to-bottom scrim for legibility of cover edit chip
                     Box(
@@ -600,6 +618,7 @@ private fun ProfileHeaderCard(
                             contentDescription = stringResource(R.string.profile_change_avatar),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
+                            onSuccess = { onAvatarRendered() },
                         )
                     } else {
                         InitialsAvatar(initials = initials, size = 70, brand = true)
@@ -623,26 +642,6 @@ private fun ProfileHeaderCard(
                         modifier = Modifier.size(13.dp),
                     )
                 }
-            }
-
-            // Quick Edit Profile Action aligned to bottom-end of header overlap zone
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 2.dp)
-                    .size(36.dp)
-                    .clip(SquircleSm)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, SquircleSm)
-                    .velnoxClickable(role = Role.Button, onClick = onOpenEditProfile),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = VelnoxIcons.Pencil,
-                    contentDescription = stringResource(R.string.profile_edit),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
-                )
             }
         }
 

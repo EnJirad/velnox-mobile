@@ -723,36 +723,6 @@ fun ProductDetailScreen(
                                                 color = MaterialTheme.colorScheme.onSurface,
                                             )
                                         }
-                                        if (onContactSeller != null && !shopTarget.isNullOrBlank()) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(SquircleXs)
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                    .velnoxClickable(role = Role.Button) {
-                                                        onContactSeller.invoke(shopTarget, product.id)
-                                                    }
-                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                ) {
-                                                    Icon(
-                                                        imageVector = VelnoxIcons.MessageCircle,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.onSurface,
-                                                        modifier = Modifier.size(13.dp),
-                                                    )
-                                                    Text(
-                                                        text = stringResource(R.string.product_chat_seller),
-                                                        style = Text2xs.copy(fontWeight = FontWeight.SemiBold),
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                    )
-                                                }
-                                            }
-                                            Spacer(Modifier.width(6.dp))
-                                        }
                                         if (!shopTarget.isNullOrBlank() && onOpenShop != null) {
                                             Box(
                                                 modifier = Modifier

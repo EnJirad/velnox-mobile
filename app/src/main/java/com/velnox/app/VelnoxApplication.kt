@@ -106,7 +106,7 @@ class VelnoxApplication : Application(), ImageLoaderFactory {
         )
 
         customer = CustomerRepository(
-            api = CustomerRemoteDataSource(client = sharedClient, router = router),
+            api = CustomerRemoteDataSource(context = this, client = sharedClient, router = router),
             token = { sessions.current() },
             onUnauthorized = { session.onUnauthorized() },
             tokenRefresher = refresher,
