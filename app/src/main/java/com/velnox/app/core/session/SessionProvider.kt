@@ -32,7 +32,7 @@ fun VelnoxSessionProvider(content: @Composable () -> Unit) {
         controller.restoreOnce()
     }
 
-    // Silent background retry if session verification was unverified at launch (e.g. Render cold start)
+    // Silent background retry if session verification was unverified at launch (e.g. transient network offline)
     LaunchedEffect(controller.notice, controller.state) {
         if (controller.notice == SessionNotice.NetworkUnavailable && controller.state is SessionState.Guest) {
             while (isActive && controller.notice == SessionNotice.NetworkUnavailable && controller.state is SessionState.Guest) {

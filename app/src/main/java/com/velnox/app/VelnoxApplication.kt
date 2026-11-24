@@ -30,7 +30,7 @@ import com.velnox.app.core.session.SessionVault
  *   Sign-In, from the build or from the API's config probe.
  * - [catalog] — the public product catalogue, cached in memory across screens.
  * - [customer] — the authenticated customer API (profile, addresses, cart, orders…).
- * - [backendRouter] — dynamic host failover router (api.velnox.live -> workers.dev -> onrender.com).
+ * - [backendRouter] — dynamic host failover router (workers.dev -> api.velnox.live).
  * - [tokenRefresher] — single-flight mutex token refresh coordinator.
  *
  * Wiring, in one place: `SessionVault` (Android Keystore) → `SessionManager`

@@ -62,7 +62,7 @@ class SessionController(
 
     /**
      * Silent background retry when session restoration failed because the API was
-     * unreachable at launch (e.g. Render server cold-sleep or transient offline).
+     * unreachable at launch (e.g. network timeout or transient offline).
      *
      * As soon as the server wakes up and answers, the session seamlessly becomes
      * [SessionState.Authenticated] in the background without user intervention.

@@ -5,13 +5,12 @@ import com.velnox.app.BuildConfig
 /**
  * Backend dialect supported by the Velnox Marketplace platform.
  *
- * - [WORKERS_V1]: Target Cloudflare Workers + Hono architecture (api.velnox.live).
+ * - [WORKERS_V1]: Cloudflare Workers + Hono architecture (the unified production backend
+ *   matching the Velnox website and ecosystem).
  *   Features JSON-native tokens, /api/v1 endpoints, decimal currency, R2 CDN media,
  *   and strict token rotation.
  *
- * - [EXPRESS_LEGACY]: Legacy/transitional Node.js Express architecture (velnox-api.onrender.com).
- *   Features /api/customer and /api/auth/mobile endpoints, cookie-native sessions,
- *   and streaming /api/media endpoints.
+ * - [EXPRESS_LEGACY]: Deprecated legacy Express dialect (retained strictly for local test fixtures).
  */
 enum class BackendDialect {
     WORKERS_V1,
@@ -29,7 +28,7 @@ object BackendConfig {
     val FALLBACK_HOSTS: List<String> = BuildConfig.API_FALLBACK_URLS
         .split(',')
         .map { it.trim().trimEnd('/') }
-        .filter { it.isNotEmpty() && it != PRIMARY_HOST }
+        .filter { it.isNotEmpty() && it != PRIMARY_HOST && !it.contains("onrender.com") }
 
     val MEDIA_BASE_URL: String = BuildConfig.MEDIA_BASE_URL.trimEnd('/')
 

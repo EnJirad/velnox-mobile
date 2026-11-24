@@ -16,7 +16,7 @@ import java.io.IOException
  * Parsing against responses captured from the deployed API.
  *
  * `catalog_sample.json`, `product_detail_sample.json` and `categories_sample.json`
- * are real answers from `https://velnox-api.onrender.com`, trimmed to one product
+ * are real answers captured from the API, trimmed to one product
  * and two images. The field names, types and values are untouched, so a backend
  * change that renames or re-types a field breaks these tests instead of silently
  * emptying the app.

@@ -26,9 +26,8 @@ import java.util.concurrent.TimeUnit
 /**
  * The Velnox API client for the authenticated customer area.
  *
- * Supports both Cloudflare Workers v1 API (`api.velnox.live`) and Express legacy API
- * (`velnox-api.onrender.com`), with automatic host failover, dual routing, and
- * resilient fallback.
+ * Built for Cloudflare Workers API architecture (`velnox-api.ma0979354966-js91934.workers.dev` and `api.velnox.live`),
+ * matching the unified Velnox web platform.
  */
 class CustomerRemoteDataSource(
     baseUrl: String = BuildConfig.API_BASE_URL,
@@ -812,34 +811,6 @@ class CustomerRemoteDataSource(
                     }
                     val message = envelope?.optJSONObject("error")?.str("message")
                         ?: envelope?.str("message")
-
-                    // Legacy capability fallback for routes not yet ported to Workers
-                    if (response.code == 404 && dialect == BackendDialect.WORKERS_V1 && router.allowLegacyCapabilityFallback) {
-                        for (fbHost in router.candidateHostsList()) {
-                            if (fbHost != host && fbHost.contains("onrender.com")) {
-                                try {
-                                    val fbRequest = Request.Builder()
-                                        .url(fbHost.trimEnd('/') + path)
-                                        .header("Authorization", "Bearer $token")
-                                        .header("Accept", "application/json")
-                                        .header("Cookie", "${AuthRemoteDataSource.SESSION_COOKIE}=$token")
-                                        .method(method, requestBody)
-                                        .build()
-                                    val fbResp = client.newCall(fbRequest).execute()
-                                    fbResp.use { fbR ->
-                                        if (fbR.isSuccessful) {
-                                            val fbText = fbR.body?.string().orEmpty()
-                                            val fbEnv = try { JSONObject(fbText) } catch (_: Exception) { null }
-                                            return@executeWithFailover Raw.Success(
-                                                fbEnv?.opt("data")?.takeUnless { it === JSONObject.NULL },
-                                            )
-                                        }
-                                    }
-                                } catch (_: Exception) {
-                                }
-                            }
-                        }
-                    }
 
                     when {
                         response.code == 401 -> Raw.Failure(CustomerError.Unauthorized, message)

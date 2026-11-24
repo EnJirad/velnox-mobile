@@ -37,10 +37,10 @@ class VelnoxMediaUrlResolverTest {
         val key = "products/prod-123/main.png"
         val resolved = VelnoxMediaUrlResolver.resolve(
             rawUrl = key,
-            baseUrl = "https://velnox-api.onrender.com",
+            baseUrl = "https://legacy.test",
             dialect = BackendDialect.EXPRESS_LEGACY,
         )
-        assertEquals("https://velnox-api.onrender.com/api/media/products/prod-123/main.png", resolved)
+        assertEquals("https://legacy.test/api/media/products/prod-123/main.png", resolved)
     }
 
     @Test
@@ -48,9 +48,9 @@ class VelnoxMediaUrlResolverTest {
         val relative = "/api/media/uploads/photo.jpg"
         val resolved = VelnoxMediaUrlResolver.resolve(
             rawUrl = relative,
-            baseUrl = "https://velnox-api.onrender.com",
+            baseUrl = "https://legacy.test",
             dialect = BackendDialect.EXPRESS_LEGACY,
         )
-        assertEquals("https://velnox-api.onrender.com/api/media/uploads/photo.jpg", resolved)
+        assertEquals("https://legacy.test/api/media/uploads/photo.jpg", resolved)
     }
 }

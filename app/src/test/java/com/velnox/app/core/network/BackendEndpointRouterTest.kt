@@ -13,65 +13,65 @@ class BackendEndpointRouterTest {
     @Test
     fun `default host is primary host`() {
         val router = BackendEndpointRouter(
-            primaryHost = "https://api.velnox.live",
+            primaryHost = "https://velnox-api.ma0979354966-js91934.workers.dev",
             fallbackHosts = listOf(
-                "https://velnox-api.ma0979354966-js91934.workers.dev",
-                "https://velnox-api.onrender.com"
+                "https://api.velnox.live",
+                "https://backup.test"
             ),
         )
 
-        assertEquals("https://api.velnox.live", router.currentHost())
+        assertEquals("https://velnox-api.ma0979354966-js91934.workers.dev", router.currentHost())
     }
 
     @Test
-    fun `dialect detection identifies workers vs render legacy`() {
+    fun `dialect detection identifies workers vs legacy test fixture`() {
         val router = BackendEndpointRouter(
-            primaryHost = "https://api.velnox.live",
+            primaryHost = "https://velnox-api.ma0979354966-js91934.workers.dev",
             fallbackHosts = listOf(
-                "https://velnox-api.ma0979354966-js91934.workers.dev",
-                "https://velnox-api.onrender.com"
+                "https://api.velnox.live",
+                "https://legacy.test"
             ),
         )
 
-        assertEquals(BackendDialect.WORKERS_V1, router.getDialect("https://api.velnox.live"))
         assertEquals(BackendDialect.WORKERS_V1, router.getDialect("https://velnox-api.ma0979354966-js91934.workers.dev"))
-        assertEquals(BackendDialect.EXPRESS_LEGACY, router.getDialect("https://velnox-api.onrender.com"))
+        assertEquals(BackendDialect.WORKERS_V1, router.getDialect("https://api.velnox.live"))
+        assertEquals(BackendDialect.EXPRESS_LEGACY, router.getDialect("https://legacy.test"))
     }
 
     @Test
     fun `host failure puts host on cooldown and switches to next fallback`() {
         var currentTime = 1000L
         val router = BackendEndpointRouter(
-            primaryHost = "https://api.velnox.live",
+            primaryHost = "https://velnox-api.ma0979354966-js91934.workers.dev",
             fallbackHosts = listOf(
-                "https://velnox-api.ma0979354966-js91934.workers.dev",
-                "https://velnox-api.onrender.com"
+                "https://api.velnox.live",
+                "https://backup.test"
             ),
             now = { currentTime },
         )
 
-        assertEquals("https://api.velnox.live", router.currentHost())
-
-        // Mark primary failed
-        router.markHostFailure("https://api.velnox.live")
         assertEquals("https://velnox-api.ma0979354966-js91934.workers.dev", router.currentHost())
 
-        // Mark secondary failed
+        // Mark primary failed
         router.markHostFailure("https://velnox-api.ma0979354966-js91934.workers.dev")
-        assertEquals("https://velnox-api.onrender.com", router.currentHost())
+        assertEquals("https://api.velnox.live", router.currentHost())
+
+        // Mark secondary failed
+        router.markHostFailure("https://api.velnox.live")
+        assertEquals("https://backup.test", router.currentHost())
 
         // Advance time past cooldown
         currentTime += BackendConfig.HOST_COOLDOWN_MS + 1
-        assertEquals("https://api.velnox.live", router.currentHost())
+        assertEquals("https://velnox-api.ma0979354966-js91934.workers.dev", router.currentHost())
     }
 
     @Test
     fun `executeWithFailover automatically cascades on UnknownHostException`() = runBlocking {
         var currentTime = 1000L
         val router = BackendEndpointRouter(
-            primaryHost = "https://api.velnox.live",
+            primaryHost = "https://velnox-api.ma0979354966-js91934.workers.dev",
             fallbackHosts = listOf(
-                "https://velnox-api.onrender.com"
+                "https://api.velnox.live"
             ),
             now = { currentTime },
         )
@@ -79,15 +79,15 @@ class BackendEndpointRouterTest {
         val calledHosts = mutableListOf<String>()
         val result = router.executeWithFailover(isIdempotent = true) { host, dialect ->
             calledHosts.add(host)
-            if (host == "https://api.velnox.live") {
-                throw UnknownHostException("Unable to resolve host api.velnox.live")
+            if (host == "https://velnox-api.ma0979354966-js91934.workers.dev") {
+                throw UnknownHostException("Unable to resolve host")
             }
             "success-from-$host"
         }
 
-        assertEquals("success-from-https://velnox-api.onrender.com", result)
-        assertEquals(listOf("https://api.velnox.live", "https://velnox-api.onrender.com"), calledHosts)
+        assertEquals("success-from-https://api.velnox.live", result)
+        assertEquals(listOf("https://velnox-api.ma0979354966-js91934.workers.dev", "https://api.velnox.live"), calledHosts)
         // Primary should now be in cooldown
-        assertEquals("https://velnox-api.onrender.com", router.currentHost())
+        assertEquals("https://api.velnox.live", router.currentHost())
     }
 }

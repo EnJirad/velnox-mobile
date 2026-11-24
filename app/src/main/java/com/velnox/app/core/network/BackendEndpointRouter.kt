@@ -15,16 +15,14 @@ import java.util.concurrent.TimeUnit
 /**
  * Intelligent endpoint router and host failover manager.
  *
- * Supports ordered candidate hosts:
- * 1. Primary target (`https://api.velnox.live`)
- * 2. Secondary Cloudflare Workers origin (`https://velnox-api.ma0979354966-js91934.workers.dev`)
- * 3. Legacy Render monolith (`https://velnox-api.onrender.com`)
+ * Supports ordered candidate hosts for the Cloudflare Workers architecture:
+ * 1. Primary Cloudflare Workers origin (`https://velnox-api.ma0979354966-js91934.workers.dev`)
+ * 2. Custom domain target (`https://api.velnox.live`)
  *
  * If the primary host fails with a connection or DNS resolution error, it enters a temporary
  * cooldown and the router seamlessly fails over to the next candidate host.
  *
- * Also detects the backend dialect ([BackendDialect.WORKERS_V1] vs [BackendDialect.EXPRESS_LEGACY])
- * to adapt routes and data models transparently.
+ * Dialect defaults to [BackendDialect.WORKERS_V1] for all live production endpoints.
  */
 class BackendEndpointRouter(
     val primaryHost: String = BackendConfig.PRIMARY_HOST,
@@ -37,7 +35,7 @@ class BackendEndpointRouter(
     private val hostDialects = ConcurrentHashMap<String, BackendDialect>()
     private val mutex = Mutex()
 
-    var allowLegacyCapabilityFallback: Boolean = true
+    var allowLegacyCapabilityFallback: Boolean = false
 
     fun candidateHostsList(): List<String> = candidateHosts
 
@@ -84,8 +82,8 @@ class BackendEndpointRouter(
     fun getDialect(host: String = currentHost()): BackendDialect {
         val normalized = host.trimEnd('/')
         hostDialects[normalized]?.let { return it }
-        // Heuristic: hosts with 'render.com', '.test', or 'localhost' are EXPRESS_LEGACY by default
-        return if (normalized.contains("onrender.com") || normalized.contains(".test") || normalized.contains("localhost")) {
+        // Only test fixtures using '.test' or 'localhost' use EXPRESS_LEGACY
+        return if (normalized.contains(".test") || normalized.contains("localhost")) {
             BackendDialect.EXPRESS_LEGACY
         } else {
             BackendDialect.WORKERS_V1

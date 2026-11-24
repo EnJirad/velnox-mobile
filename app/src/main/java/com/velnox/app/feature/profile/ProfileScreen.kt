@@ -117,7 +117,7 @@ private fun bust(url: String?, version: Long): String? {
 /**
  * Resolves an avatar or cover string to an object that Coil can natively display:
  * - data: URL -> ByteArray (decoded from base64, rendered instantly in-memory)
- * - relative storage path -> absolute API media URL (https://velnox-api.onrender.com/api/media/...)
+ * - relative storage path -> absolute media URL or R2 CDN URL
  * - http/https/content/file URI -> used directly
  */
 private fun resolveImageModel(url: String?): Any? {

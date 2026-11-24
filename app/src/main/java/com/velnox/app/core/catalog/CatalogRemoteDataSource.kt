@@ -18,9 +18,8 @@ import java.util.concurrent.TimeUnit
 /**
  * The Velnox API client for the public catalogue.
  *
- * Supports both Cloudflare Workers v1 API (`api.velnox.live`) and Express legacy API
- * (`velnox-api.onrender.com`), with automatic host failover, dual routing, and
- * resilient fallback.
+ * Connects to the Cloudflare Workers v1 API (`velnox-api.ma0979354966-js91934.workers.dev` / `api.velnox.live`),
+ * with automatic host failover and resilient fallback.
  */
 class CatalogRemoteDataSource(
     baseUrl: String = BuildConfig.API_BASE_URL,
