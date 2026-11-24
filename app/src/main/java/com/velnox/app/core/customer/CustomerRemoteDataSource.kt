@@ -42,10 +42,18 @@ class CustomerRemoteDataSource(
 
     // ------------------------------------------------------ profile & addresses
 
-    override suspend fun profile(token: String): CustomerResult<CustomerProfile> =
-        send(token, "GET", "/api/customer/profile").map { data ->
-            data.asObject("profile", "user")?.let(::parseProfile)
+    override suspend fun profile(token: String): CustomerResult<CustomerProfile> {
+        val isWorkers = router.getDialect() == BackendDialect.WORKERS_V1
+        val path = if (isWorkers) "/api/v1/auth/me" else "/api/customer/profile"
+        var raw = send(token, "GET", path)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound && isWorkers) {
+            raw = send(token, "GET", "/api/customer/profile")
         }
+        return raw.map { data ->
+            data.asObject("profile", "user")?.let(::parseProfile)
+                ?: (data as? JSONObject)?.let(::parseProfile)
+        }
+    }
 
     override suspend fun updateProfile(
         token: String,
@@ -53,8 +61,14 @@ class CustomerRemoteDataSource(
     ): CustomerResult<CustomerProfile> {
         val body = JSONObject().put("name", update.name)
         update.phone?.let { body.put("phone", it) }
-        return send(token, "PUT", "/api/customer/profile", body).map { data ->
+        var raw = send(token, "PUT", "/api/customer/profile", body)
+        if (raw is Raw.Failure && raw.error == CustomerError.NotFound) {
+            val meRaw = send(token, "GET", "/api/v1/auth/me")
+            if (meRaw is Raw.Success) raw = meRaw
+        }
+        return raw.map { data ->
             data.asObject("profile", "user")?.let(::parseProfile)
+                ?: (data as? JSONObject)?.let(::parseProfile)
         }
     }
 
@@ -185,10 +199,25 @@ class CustomerRemoteDataSource(
         }
     }
 
-    override suspend fun addresses(token: String): CustomerResult<List<CustomerAddress>> =
-        send(token, "GET", "/api/customer/addresses").map { data ->
-            data.asArray("addresses", "items")?.objects()?.mapNotNull(::parseAddress)
+    override suspend fun addresses(token: String): CustomerResult<List<CustomerAddress>> {
+        val raw = send(token, "GET", "/api/customer/addresses")
+        return when (raw) {
+            is Raw.Failure -> {
+                if (raw.error == CustomerError.NotFound) {
+                    CustomerResult.Ok(emptyList())
+                } else {
+                    CustomerResult.Failed(raw.error, raw.message)
+                }
+            }
+            is Raw.Success -> {
+                val data = raw.data
+                val list = data.asArray("addresses", "items")?.objects()?.mapNotNull(::parseAddress)
+                    ?: (data as? JSONArray)?.objects()?.mapNotNull(::parseAddress)
+                    ?: emptyList()
+                CustomerResult.Ok(list)
+            }
         }
+    }
 
     override suspend fun saveAddress(
         token: String,
@@ -284,10 +313,25 @@ class CustomerRemoteDataSource(
 
     // --------------------------------------------------------------- wishlist
 
-    override suspend fun wishlist(token: String): CustomerResult<List<WishlistEntry>> =
-        send(token, "GET", "/api/customer/wishlist").map { data ->
-            data.asArray("items", "wishlist", "products")?.objects()?.mapNotNull(::parseWishlist)
+    override suspend fun wishlist(token: String): CustomerResult<List<WishlistEntry>> {
+        val raw = send(token, "GET", "/api/customer/wishlist")
+        return when (raw) {
+            is Raw.Failure -> {
+                if (raw.error == CustomerError.NotFound) {
+                    CustomerResult.Ok(emptyList())
+                } else {
+                    CustomerResult.Failed(raw.error, raw.message)
+                }
+            }
+            is Raw.Success -> {
+                val data = raw.data
+                val list = data.asArray("items", "wishlist", "products")?.objects()?.mapNotNull(::parseWishlist)
+                    ?: (data as? JSONArray)?.objects()?.mapNotNull(::parseWishlist)
+                    ?: emptyList()
+                CustomerResult.Ok(list)
+            }
         }
+    }
 
     override suspend fun toggleWishlist(token: String, productId: String): CustomerResult<Boolean> {
         val raw = send(

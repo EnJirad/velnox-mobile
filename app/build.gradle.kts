@@ -16,19 +16,19 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // The deployed Velnox API. Primary target is Cloudflare Workers (api.velnox.live),
-        // with automatic fallback to workers.dev and legacy Render (velnox-api.onrender.com).
+        // The deployed Velnox API. Primary target is Cloudflare Workers (velnox-api.ma0979354966-js91934.workers.dev),
+        // with automatic fallback to api.velnox.live (future custom domain) and legacy Render (velnox-api.onrender.com).
         // Overridable via gradle property -PvelnoxApiBaseUrl=...
         val apiBaseUrl = (project.findProperty("velnoxApiBaseUrl") as String?)
             ?.trim()
             ?.ifEmpty { null }
-            ?: "https://api.velnox.live"
+            ?: "https://velnox-api.ma0979354966-js91934.workers.dev"
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
 
         val fallbackUrls = (project.findProperty("velnoxFallbackUrls") as String?)
             ?.trim()
             ?.ifEmpty { null }
-            ?: "https://velnox-api.ma0979354966-js91934.workers.dev,https://velnox-api.onrender.com"
+            ?: "https://api.velnox.live,https://velnox-api.onrender.com"
         buildConfigField("String", "API_FALLBACK_URLS", "\"$fallbackUrls\"")
 
         val mediaBaseUrl = (project.findProperty("velnoxMediaBaseUrl") as String?)
